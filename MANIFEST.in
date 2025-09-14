@@ -1,0 +1,17 @@
+include README.md
+include LICENSE
+include QUICKSTART.md
+include requirements.txt
+include pyproject.toml
+
+recursive-include src *.py
+recursive-include extension *.json *.js *.html *.css
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+recursive-exclude * .DS_Store
+
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *.swp
+global-exclude *~
+global-exclude .git*

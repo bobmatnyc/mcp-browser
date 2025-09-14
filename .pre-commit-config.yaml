@@ -1,0 +1,85 @@
+# Pre-commit configuration for MCP Browser
+# Run: make pre-commit to install hooks
+
+repos:
+  # Black code formatting
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        language_version: python3
+        files: ^(src/|tests/|test_.*\.py)
+        args: ["--line-length=88"]
+
+  # Ruff linting and import sorting
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.9
+    hooks:
+      - id: ruff
+        files: ^(src/|tests/|test_.*\.py)
+        args: ["--fix", "--exit-non-zero-on-fix"]
+
+  # MyPy type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        files: ^src/
+        additional_dependencies:
+          - types-aiofiles
+          - types-websockets
+        args: ["--ignore-missing-imports"]
+
+  # Basic file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        files: ^(src/|tests/|\.md$|\.yml$|\.yaml$)
+      - id: end-of-file-fixer
+        files: ^(src/|tests/|\.md$|\.yml$|\.yaml$)
+      - id: check-yaml
+      - id: check-json
+        exclude: ^extension/
+      - id: check-added-large-files
+        args: ["--maxkb=1000"]
+      - id: check-merge-conflict
+      - id: debug-statements
+        files: ^(src/|tests/)
+
+  # Python-specific checks
+  - repo: https://github.com/pre-commit/pygrep-hooks
+    rev: v1.10.0
+    hooks:
+      - id: python-check-blanket-noqa
+        files: ^(src/|tests/)
+      - id: python-check-mock-methods
+        files: ^(src/|tests/)
+      - id: python-no-log-warn
+        files: ^(src/|tests/)
+
+  # Security checks
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        files: ^src/
+        args: ["-r", "-f", "json"]
+        exclude: ^tests/
+
+# Global settings
+fail_fast: false
+default_stages: [commit]
+
+# Custom command shortcuts
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: []
+  submodules: false
