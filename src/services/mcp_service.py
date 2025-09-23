@@ -1,10 +1,11 @@
 """MCP server implementation."""
 
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List
+
 from mcp.server import Server
 from mcp.server.models import InitializationOptions
-from mcp.types import Tool, TextContent, ImageContent
+from mcp.types import ImageContent, TextContent, Tool
 
 logger = logging.getLogger(__name__)
 
@@ -15,16 +16,19 @@ class MCPService:
     def __init__(
         self,
         browser_service=None,
-        screenshot_service=None
+        screenshot_service=None,
+        dom_interaction_service=None
     ):
         """Initialize MCP service.
 
         Args:
             browser_service: Browser service for navigation and logs
             screenshot_service: Screenshot service for captures
+            dom_interaction_service: DOM interaction service for element manipulation
         """
         self.browser_service = browser_service
         self.screenshot_service = screenshot_service
+        self.dom_interaction_service = dom_interaction_service
         self.server = Server("browserpymcp")
         self._setup_tools()
 
@@ -97,6 +101,195 @@ class MCPService:
                         },
                         "required": ["port"]
                     }
+                ),
+                Tool(
+                    name="browser_click",
+                    description="Click an element on the page",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "port": {
+                                "type": "integer",
+                                "description": "Browser port number"
+                            },
+                            "selector": {
+                                "type": "string",
+                                "description": "CSS selector for the element"
+                            },
+                            "xpath": {
+                                "type": "string",
+                                "description": "XPath expression for the element"
+                            },
+                            "text": {
+                                "type": "string",
+                                "description": "Text content to match"
+                            },
+                            "index": {
+                                "type": "integer",
+                                "description": "Element index if multiple matches",
+                                "default": 0
+                            }
+                        },
+                        "required": ["port"]
+                    }
+                ),
+                Tool(
+                    name="browser_fill_field",
+                    description="Fill a form field with a value",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "port": {
+                                "type": "integer",
+                                "description": "Browser port number"
+                            },
+                            "selector": {
+                                "type": "string",
+                                "description": "CSS selector for the field"
+                            },
+                            "xpath": {
+                                "type": "string",
+                                "description": "XPath expression for the field"
+                            },
+                            "value": {
+                                "type": "string",
+                                "description": "Value to fill in the field"
+                            },
+                            "index": {
+                                "type": "integer",
+                                "description": "Field index if multiple matches",
+                                "default": 0
+                            }
+                        },
+                        "required": ["port", "value"]
+                    }
+                ),
+                Tool(
+                    name="browser_fill_form",
+                    description="Fill multiple form fields at once",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "port": {
+                                "type": "integer",
+                                "description": "Browser port number"
+                            },
+                            "form_data": {
+                                "type": "object",
+                                "description": "Object mapping selectors to values",
+                                "additionalProperties": {
+                                    "type": "string"
+                                }
+                            },
+                            "submit": {
+                                "type": "boolean",
+                                "description": "Submit form after filling",
+                                "default": False
+                            }
+                        },
+                        "required": ["port", "form_data"]
+                    }
+                ),
+                Tool(
+                    name="browser_submit_form",
+                    description="Submit a form",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "port": {
+                                "type": "integer",
+                                "description": "Browser port number"
+                            },
+                            "selector": {
+                                "type": "string",
+                                "description": "CSS selector for form or form element"
+                            },
+                            "xpath": {
+                                "type": "string",
+                                "description": "XPath expression for form"
+                            }
+                        },
+                        "required": ["port"]
+                    }
+                ),
+                Tool(
+                    name="browser_get_element",
+                    description="Get information about an element",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "port": {
+                                "type": "integer",
+                                "description": "Browser port number"
+                            },
+                            "selector": {
+                                "type": "string",
+                                "description": "CSS selector for the element"
+                            },
+                            "xpath": {
+                                "type": "string",
+                                "description": "XPath expression for the element"
+                            },
+                            "text": {
+                                "type": "string",
+                                "description": "Text content to match"
+                            }
+                        },
+                        "required": ["port"]
+                    }
+                ),
+                Tool(
+                    name="browser_wait_for_element",
+                    description="Wait for an element to appear on the page",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "port": {
+                                "type": "integer",
+                                "description": "Browser port number"
+                            },
+                            "selector": {
+                                "type": "string",
+                                "description": "CSS selector for the element"
+                            },
+                            "timeout": {
+                                "type": "integer",
+                                "description": "Timeout in milliseconds",
+                                "default": 5000
+                            }
+                        },
+                        "required": ["port", "selector"]
+                    }
+                ),
+                Tool(
+                    name="browser_select_option",
+                    description="Select an option from a dropdown",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "port": {
+                                "type": "integer",
+                                "description": "Browser port number"
+                            },
+                            "selector": {
+                                "type": "string",
+                                "description": "CSS selector for select element"
+                            },
+                            "option_value": {
+                                "type": "string",
+                                "description": "Option value attribute"
+                            },
+                            "option_text": {
+                                "type": "string",
+                                "description": "Option text content"
+                            },
+                            "option_index": {
+                                "type": "integer",
+                                "description": "Option index"
+                            }
+                        },
+                        "required": ["port", "selector"]
+                    }
                 )
             ]
 
@@ -113,6 +306,20 @@ class MCPService:
                 return await self._handle_query_logs(arguments)
             elif name == "browser_screenshot":
                 return await self._handle_screenshot(arguments)
+            elif name == "browser_click":
+                return await self._handle_click(arguments)
+            elif name == "browser_fill_field":
+                return await self._handle_fill_field(arguments)
+            elif name == "browser_fill_form":
+                return await self._handle_fill_form(arguments)
+            elif name == "browser_submit_form":
+                return await self._handle_submit_form(arguments)
+            elif name == "browser_get_element":
+                return await self._handle_get_element(arguments)
+            elif name == "browser_wait_for_element":
+                return await self._handle_wait_for_element(arguments)
+            elif name == "browser_select_option":
+                return await self._handle_select_option(arguments)
             else:
                 return [TextContent(
                     type="text",
@@ -243,27 +450,318 @@ class MCPService:
                 text=f"Failed to capture screenshot for port {port}"
             )]
 
+    async def _handle_click(
+        self,
+        arguments: Dict[str, Any]
+    ) -> List[TextContent]:
+        """Handle element click.
+
+        Args:
+            arguments: Tool arguments
+
+        Returns:
+            List of text content responses
+        """
+        if not self.dom_interaction_service:
+            return [TextContent(
+                type="text",
+                text="DOM interaction service not available"
+            )]
+
+        port = arguments.get("port")
+        result = await self.dom_interaction_service.click(
+            port=port,
+            selector=arguments.get("selector"),
+            xpath=arguments.get("xpath"),
+            text=arguments.get("text"),
+            index=arguments.get("index", 0)
+        )
+
+        if result.get("success"):
+            element_info = result.get("elementInfo", {})
+            return [TextContent(
+                type="text",
+                text=f"Successfully clicked element: {element_info.get('tagName', 'unknown')} "
+                     f"with text '{element_info.get('text', '')[:50]}'"
+            )]
+        else:
+            return [TextContent(
+                type="text",
+                text=f"Failed to click element: {result.get('error', 'Unknown error')}"
+            )]
+
+    async def _handle_fill_field(
+        self,
+        arguments: Dict[str, Any]
+    ) -> List[TextContent]:
+        """Handle form field filling.
+
+        Args:
+            arguments: Tool arguments
+
+        Returns:
+            List of text content responses
+        """
+        if not self.dom_interaction_service:
+            return [TextContent(
+                type="text",
+                text="DOM interaction service not available"
+            )]
+
+        port = arguments.get("port")
+        value = arguments.get("value")
+        result = await self.dom_interaction_service.fill_field(
+            port=port,
+            value=value,
+            selector=arguments.get("selector"),
+            xpath=arguments.get("xpath"),
+            index=arguments.get("index", 0)
+        )
+
+        if result.get("success"):
+            return [TextContent(
+                type="text",
+                text=f"Successfully filled field with value: {value}"
+            )]
+        else:
+            return [TextContent(
+                type="text",
+                text=f"Failed to fill field: {result.get('error', 'Unknown error')}"
+            )]
+
+    async def _handle_fill_form(
+        self,
+        arguments: Dict[str, Any]
+    ) -> List[TextContent]:
+        """Handle multiple form fields filling.
+
+        Args:
+            arguments: Tool arguments
+
+        Returns:
+            List of text content responses
+        """
+        if not self.dom_interaction_service:
+            return [TextContent(
+                type="text",
+                text="DOM interaction service not available"
+            )]
+
+        port = arguments.get("port")
+        form_data = arguments.get("form_data", {})
+        submit = arguments.get("submit", False)
+
+        result = await self.dom_interaction_service.fill_form(
+            port=port,
+            form_data=form_data,
+            submit=submit
+        )
+
+        if result.get("success"):
+            filled_count = len(result.get("fields", {}))
+            submitted = result.get("submitted", False)
+            msg = f"Successfully filled {filled_count} form fields"
+            if submit and submitted:
+                msg += " and submitted the form"
+            return [TextContent(
+                type="text",
+                text=msg
+            )]
+        else:
+            errors = result.get("errors", [])
+            return [TextContent(
+                type="text",
+                text=f"Failed to fill form. Errors: {'; '.join(errors)}"
+            )]
+
+    async def _handle_submit_form(
+        self,
+        arguments: Dict[str, Any]
+    ) -> List[TextContent]:
+        """Handle form submission.
+
+        Args:
+            arguments: Tool arguments
+
+        Returns:
+            List of text content responses
+        """
+        if not self.dom_interaction_service:
+            return [TextContent(
+                type="text",
+                text="DOM interaction service not available"
+            )]
+
+        port = arguments.get("port")
+        result = await self.dom_interaction_service.submit_form(
+            port=port,
+            selector=arguments.get("selector"),
+            xpath=arguments.get("xpath")
+        )
+
+        if result.get("success"):
+            return [TextContent(
+                type="text",
+                text="Successfully submitted form"
+            )]
+        else:
+            return [TextContent(
+                type="text",
+                text=f"Failed to submit form: {result.get('error', 'Unknown error')}"
+            )]
+
+    async def _handle_get_element(
+        self,
+        arguments: Dict[str, Any]
+    ) -> List[TextContent]:
+        """Handle getting element information.
+
+        Args:
+            arguments: Tool arguments
+
+        Returns:
+            List of text content responses
+        """
+        if not self.dom_interaction_service:
+            return [TextContent(
+                type="text",
+                text="DOM interaction service not available"
+            )]
+
+        port = arguments.get("port")
+        result = await self.dom_interaction_service.get_element(
+            port=port,
+            selector=arguments.get("selector"),
+            xpath=arguments.get("xpath"),
+            text=arguments.get("text")
+        )
+
+        if result.get("success"):
+            element_info = result.get("elementInfo", {})
+            info_text = (
+                f"Element found: {element_info.get('tagName', 'unknown')}\n"
+                f"  ID: {element_info.get('id', 'none')}\n"
+                f"  Class: {element_info.get('className', 'none')}\n"
+                f"  Text: {element_info.get('text', '')[:100]}\n"
+                f"  Visible: {element_info.get('isVisible', False)}\n"
+                f"  Enabled: {element_info.get('isEnabled', False)}"
+            )
+
+            if element_info.get('value'):
+                info_text += f"\n  Value: {element_info['value']}"
+            if element_info.get('href'):
+                info_text += f"\n  Href: {element_info['href']}"
+
+            return [TextContent(
+                type="text",
+                text=info_text
+            )]
+        else:
+            return [TextContent(
+                type="text",
+                text=f"Element not found: {result.get('error', 'Unknown error')}"
+            )]
+
+    async def _handle_wait_for_element(
+        self,
+        arguments: Dict[str, Any]
+    ) -> List[TextContent]:
+        """Handle waiting for element.
+
+        Args:
+            arguments: Tool arguments
+
+        Returns:
+            List of text content responses
+        """
+        if not self.dom_interaction_service:
+            return [TextContent(
+                type="text",
+                text="DOM interaction service not available"
+            )]
+
+        port = arguments.get("port")
+        selector = arguments.get("selector")
+        timeout = arguments.get("timeout", 5000)
+
+        result = await self.dom_interaction_service.wait_for_element(
+            port=port,
+            selector=selector,
+            timeout=timeout
+        )
+
+        if result.get("success"):
+            element_info = result.get("elementInfo", {})
+            return [TextContent(
+                type="text",
+                text=f"Element appeared: {element_info.get('tagName', 'unknown')} "
+                     f"with selector '{selector}'"
+            )]
+        else:
+            return [TextContent(
+                type="text",
+                text=f"Element did not appear within {timeout}ms: {result.get('error', '')}"
+            )]
+
+    async def _handle_select_option(
+        self,
+        arguments: Dict[str, Any]
+    ) -> List[TextContent]:
+        """Handle dropdown option selection.
+
+        Args:
+            arguments: Tool arguments
+
+        Returns:
+            List of text content responses
+        """
+        if not self.dom_interaction_service:
+            return [TextContent(
+                type="text",
+                text="DOM interaction service not available"
+            )]
+
+        port = arguments.get("port")
+        result = await self.dom_interaction_service.select_option(
+            port=port,
+            selector=arguments.get("selector"),
+            option_value=arguments.get("option_value"),
+            option_text=arguments.get("option_text"),
+            option_index=arguments.get("option_index")
+        )
+
+        if result.get("success"):
+            return [TextContent(
+                type="text",
+                text=f"Selected option: {result.get('selectedText', '')} "
+                     f"(value: {result.get('selectedValue', '')})"
+            )]
+        else:
+            return [TextContent(
+                type="text",
+                text=f"Failed to select option: {result.get('error', 'Unknown error')}"
+            )]
+
     async def start(self) -> None:
         """Start the MCP server."""
         # Initialize server with options
-        init_options = InitializationOptions(
-            server_name="browserpymcp",
-            server_version="1.0.0"
-        )
+        # Note: InitializationOptions configured for mcp-browser v1.0.1
 
         # The actual server start is handled by the stdio transport
-        logger.info("MCP service initialized")
+        # Note: No logging here as it could interfere with MCP JSON-RPC
 
     async def run_stdio(self) -> None:
         """Run the MCP server with stdio transport."""
-        from mcp.server.stdio import stdio
+        from mcp.server.stdio import stdio_server
+        from mcp.types import ServerCapabilities
 
-        async with stdio() as (read_stream, write_stream):
+        async with stdio_server() as (read_stream, write_stream):
             await self.server.run(
                 read_stream,
                 write_stream,
                 InitializationOptions(
                     server_name="browserpymcp",
-                    server_version="1.0.0"
+                    server_version="1.0.0",
+                    capabilities=ServerCapabilities()
                 )
             )

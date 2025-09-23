@@ -1,22 +1,17 @@
 """BrowserPyMCP - MCP server for browser console log capture and control."""
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 __author__ = "BrowserPyMCP Team"
 
+from .container import ServiceContainer
+from .models import BrowserConnection, BrowserState, ConsoleLevel, ConsoleMessage
 from .services import (
-    StorageService,
-    WebSocketService,
     BrowserService,
     MCPService,
-    ScreenshotService
+    ScreenshotService,
+    StorageService,
+    WebSocketService,
 )
-from .models import (
-    ConsoleMessage,
-    ConsoleLevel,
-    BrowserState,
-    BrowserConnection
-)
-from .container import ServiceContainer
 
 __all__ = [
     # Services

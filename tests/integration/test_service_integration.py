@@ -1,16 +1,17 @@
 """Integration tests for service interactions."""
 
-import pytest
 import asyncio
 import tempfile
+from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
+
+import pytest
 
 from src.container.service_container import ServiceContainer
-from src.services.storage_service import StorageService, StorageConfig
+from src.models.console_message import ConsoleLevel, ConsoleMessage
 from src.services.browser_service import BrowserService
-from src.models.console_message import ConsoleMessage, ConsoleLevel
-from datetime import datetime
+from src.services.storage_service import StorageConfig, StorageService
 
 
 class TestServiceIntegration:
@@ -44,7 +45,7 @@ class TestServiceIntegration:
     async def test_browser_storage_integration(self, container):
         """Test browser service with storage integration."""
         browser_service = await container.get('browser_service')
-        storage_service = await container.get('storage_service')
+        # Note: storage_service is used by browser_service internally
 
         # Create test message
         message = ConsoleMessage(
@@ -141,7 +142,7 @@ class TestServiceIntegration:
     async def test_storage_rotation_integration(self, container):
         """Test storage rotation with browser service."""
         storage_service = await container.get('storage_service')
-        browser_service = await container.get('browser_service')
+        # Note: browser_service uses storage_service internally
 
         # Override rotation size for testing
         storage_service.config.max_file_size_mb = 0.001  # Very small

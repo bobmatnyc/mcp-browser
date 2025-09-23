@@ -3,22 +3,20 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "browserpymcp"
-version = "1.0.0"
-description = "MCP server for browser console log capture and control"
+name = "mcp-browser"
+version = "1.0.1"
+description = "Browser console log capture and control via MCP for Claude Code"
 readme = "README.md"
 authors = [
-    { name = "BrowserPyMCP Team", email = "support@browserpymcp.dev" }
+    { name = "MCP Browser Team", email = "support@mcp-browser.dev" }
 ]
 license = { text = "MIT" }
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -30,6 +28,9 @@ dependencies = [
     "websockets>=11.0",
     "playwright>=1.40.0",
     "aiofiles>=23.0.0",
+    "aiohttp>=3.9.0",
+    "click>=8.1.0",
+    "rich>=13.7.0",
 ]
 
 [project.optional-dependencies]
@@ -43,7 +44,7 @@ dev = [
 ]
 
 [project.scripts]
-browserpymcp = "src.cli.main:main"
+mcp-browser = "mcp_browser.cli.main:main"
 
 [project.urls]
 Homepage = "https://github.com/browserpymcp/mcp-browser"
@@ -52,25 +53,37 @@ Repository = "https://github.com/browserpymcp/mcp-browser"
 Issues = "https://github.com/browserpymcp/mcp-browser/issues"
 
 [tool.setuptools]
-package-dir = {"" = "."}
-packages = ["src", "src.cli", "src.container", "src.models", "src.services"]
+package-dir = {"mcp_browser" = "src"}
+packages = ["mcp_browser", "mcp_browser.cli", "mcp_browser.container", "mcp_browser.models", "mcp_browser.services"]
 
 [tool.setuptools.package-data]
-"*" = ["*.json", "*.html", "*.js", "*.png"]
+mcp_browser = [
+    "static/*.html",
+    "static/*.css",
+    "static/*.js",
+    "static/dashboard/*",
+    "extension/*.js",
+    "extension/*.html",
+    "extension/*.json",
+    "extension/*.png",
+    "extension/icons/*.png",
+]
 
 [tool.black]
 line-length = 88
-target-version = ['py38', 'py39', 'py310', 'py311']
+target-version = ['py310', 'py311', 'py312']
 include = '\.pyi?$'
 
 [tool.ruff]
 line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
 select = ["E", "F", "I", "N", "W"]
 ignore = ["E501"]
-target-version = "py38"
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
