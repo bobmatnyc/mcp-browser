@@ -2,6 +2,12 @@
 
 from setuptools import setup, find_packages
 from pathlib import Path
+import sys
+import os
+
+# Add src to path to import _version
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+from _version import __version__, __author__, __author_email__, __description__
 
 # Read README for long description
 readme_path = Path(__file__).parent / "README.md"
@@ -9,10 +15,10 @@ long_description = readme_path.read_text() if readme_path.exists() else ""
 
 setup(
     name="mcp-browser",
-    version="1.0.1",
-    author="MCP Browser Team",
-    author_email="support@mcp-browser.dev",
-    description="MCP server for browser console log capture and control",
+    version=__version__,
+    author=__author__,
+    author_email=__author_email__,
+    description=__description__,
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/browserpymcp/mcp-browser",

@@ -5,44 +5,68 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.1] - 2025-09-23
+## [Unreleased]
 
-### Fixed
-- **Package Configuration**: Standardized package name to "mcp-browser" across all configuration files
-- **Version Consistency**: Fixed version inconsistencies between pyproject.toml (0.1.0), setup.py (1.0.0), and source files
-- **Python Requirements**: Updated Python version requirement to >=3.10 consistently across all files
-- **Dependencies**: Consolidated and aligned dependencies between setup.py and pyproject.toml
-- **Build Tools**: Updated Python version targets in black, ruff, and mypy configurations
+## [1.0.2] - 2025-09-23
 
 ### Added
-- **Shell Script**: Added project-level management shell script for improved DevOps workflow
-- **Test Suite**: Comprehensive test suite for MCP functions with async testing support
-- **Documentation**: Improved project documentation and setup instructions
+- Comprehensive CLI help system with detailed command documentation
+- Semantic versioning and build tracking implemented with single source of truth
+- Project management shell script for automated operations
+- Interactive quickstart command with step-by-step setup guide
+- Doctor diagnostic command for system health checks
+- Tutorial mode with interactive learning flows
+- Shell completion support for bash, zsh, and fish
+- Version bumping automation script (`scripts/bump_version.py`)
+- CLI `version` command to display detailed build information with git metadata
+- Build metadata tracking (git commit, branch, build date, dirty state)
+- Version consistency validation across all package files
+- GitHub Actions workflow for automated releases and PyPI publishing
+- Docker image publishing to Docker Hub and GitHub Container Registry
 
 ### Changed
-- **Package Name**: Unified package name from "browserpymcp" to "mcp-browser"
-- **Entry Point**: Updated console script entry point to use correct module path
-- **Python Support**: Removed support for Python 3.8 and 3.9, now requires Python >=3.10
+- Centralized version management in `src/_version.py`
+- Updated all version references to use single source
+- Enhanced build system with setuptools-scm support
+- Improved CLI interface with better user experience
+- Enhanced documentation with comprehensive command reference
 
-## [1.0.0] - 2025-09-14
+### Fixed
+- Version consistency issues across package files
+- Build metadata accuracy in development environments
+
+## [1.0.1] - 2024-01-15
 
 ### Added
-- Initial release of MCP Browser implementation
-- Service-Oriented Architecture (SOA) with Dependency Injection
-- Browser console log capture and control via MCP for Claude Code integration
-- Chrome extension for real-time console monitoring
-- WebSocket service for browser communication
-- Storage service with JSONL persistence and automatic log rotation
-- Screenshot service with Playwright integration
-- MCP service exposing browser tools to Claude Code
-- Dashboard service for web-based monitoring
-- Docker support with development containers
-- Comprehensive documentation and setup guides
+- Initial stable release with core functionality
+- MCP server implementation for browser console capture
+- Chrome extension for WebSocket communication
+- Service-Oriented Architecture with dependency injection
+- Console log storage with JSONL format and rotation
+- Screenshot service using Playwright
+- Dashboard interface for monitoring
+- DOM interaction capabilities
 
-### Features
-- **Browser Integration**: Chrome extension captures console messages from all tabs
-- **Real-time Communication**: WebSocket connection between browser and server
-- **Log Management**: Automatic log rotation at 50MB with 7-day retention
-- **MCP Tools**: Navigate, query logs, and capture screenshots via Claude Code
-- **Dashboard**: Web interface for monitoring connections and logs
-- **Async Architecture**: Fully asynchronous service layer with proper error handling
+### Fixed
+- WebSocket port auto-discovery for conflict resolution
+- Message buffering to prevent I/O blocking
+- Async service initialization patterns
+
+### Changed
+- Improved error handling and logging
+- Enhanced service lifecycle management
+- Better connection state tracking
+
+## [1.0.0] - 2024-01-01
+
+### Added
+- Initial release
+- Basic MCP server functionality
+- Chrome extension prototype
+- Simple console log capture
+- Basic navigation commands
+
+[Unreleased]: https://github.com/browserpymcp/mcp-browser/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/browserpymcp/mcp-browser/compare/v1.0.1...v1.0.2
+[1.0.1]: https://github.com/browserpymcp/mcp-browser/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/browserpymcp/mcp-browser/releases/tag/v1.0.0
