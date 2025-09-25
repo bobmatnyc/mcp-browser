@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Browser Extension Detection Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .status-box {
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            transition: all 0.3s;
+        }
+        .status-box.checking {
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
+        }
+        .status-box.detected {
+            background: #d1fae5;
+            border: 2px solid #10b981;
+        }
+        .status-box.not-detected {
+            background: #fee2e2;
+            border: 2px solid #ef4444;
+        }
+        .method-list {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0;
+        }
+        .method-list li {
+            padding: 10px;
+            margin: 10px 0;
+            background: #f9fafb;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .method-list .success {
+            color: #10b981;
+        }
+        .method-list .fail {
+            color: #ef4444;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .log {
+            background: #1f2937;
+            color: #e5e7eb;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 14px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #3b82f6;
+            padding-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 MCP Browser Extension Detection Demo</h1>
+
+        <div id="status" class="status-box checking">
+            <h2 id="status-text">Checking for extension...</h2>
+            <p id="status-detail">Running detection methods...</p>
+        </div>
+
+        <h3>Detection Methods:</h3>
+        <ul class="method-list" id="methods">
+            <li>DOM Marker Detection <span id="method-dom">⏳</span></li>
+            <li>Global Variable Check <span id="method-global">⏳</span></li>
+            <li>Console Modification <span id="method-console">⏳</span></li>
+            <li>CSS Class Detection <span id="method-css">⏳</span></li>
+            <li>Message Passing <span id="method-message">⏳</span></li>
+            <li>Custom Event <span id="method-event">⏳</span></li>
+        </ul>
+
+        <div style="display: flex; gap: 10px; margin: 20px 0;">
+            <button onclick="detector.runDetection()">Run Detection Again</button>
+            <button onclick="detector.startAutoDetect()">Start Auto-Detection</button>
+            <button onclick="detector.stopAutoDetect()">Stop Auto-Detection</button>
+            <button onclick="window.open('extension-installer.html', '_blank')">Installation Guide</button>
+        </div>
+
+        <div class="log" id="log">
+            <div class="log-entry">Detection log will appear here...</div>
+        </div>
+    </div>
+
+    <script>
+        class ExtensionDetector {
+            constructor() {
+                this.detected = false;
+                this.autoDetectInterval = null;
+                this.detectionResults = {};
+                this.init();
+            }
+
+            init() {
+                // Listen for extension messages
+                window.addEventListener('message', (event) => {
+                    if (event.data && (event.data.type === 'MCP_BROWSER_PONG' || event.data.type === 'MCP_BROWSER_EXTENSION')) {
+                        this.log('Received pong from extension: ' + JSON.stringify(event.data));
+                        this.detectionResults.message = true;
+                        this.updateMethodStatus('message', true);
+                        this.updateOverallStatus(true);
+                    }
+                });
+
+                // Listen for custom events
+                document.addEventListener('mcp-browser-extension-ready', (event) => {
+                    this.log('Extension ready event received');
+                    this.detectionResults.event = true;
+                    this.updateMethodStatus('event', true);
+                    this.updateOverallStatus(true);
+                });
+
+                document.addEventListener('mcp-browser-test-pong', (event) => {
+                    this.log('Test pong event received');
+                    this.detectionResults.event = true;
+                    this.updateMethodStatus('event', true);
+                });
+
+                // Run initial detection
+                setTimeout(() => this.runDetection(), 500);
+            }
+
+            runDetection() {
+                this.log('Starting extension detection...');
+                this.detectionResults = {};
+                this.detected = false;
+
+                // Reset all method indicators
+                ['dom', 'global', 'console', 'css', 'message', 'event'].forEach(method => {
+                    this.updateMethodStatus(method, null);
+                });
+
+                // Method 1: Check for DOM marker
+                const domMarker = document.querySelector('[data-mcp-browser-extension]');
+                this.detectionResults.dom = !!domMarker;
+                this.updateMethodStatus('dom', this.detectionResults.dom);
+                if (domMarker) {
+                    this.log('DOM marker found: version ' + domMarker.dataset.version);
+                }
+
+                // Method 2: Check global variable
+                this.detectionResults.global = !!window.__MCP_BROWSER_EXTENSION__;
+                this.updateMethodStatus('global', this.detectionResults.global);
+                if (window.__MCP_BROWSER_EXTENSION__) {
+                    this.log('Global variable found: ' + JSON.stringify(window.__MCP_BROWSER_EXTENSION__));
+                }
+
+                // Method 3: Check console modification
+                const consoleModified = console.log.toString().includes('MCP') ||
+                                       console.log.toString().includes('chrome.runtime');
+                this.detectionResults.console = consoleModified;
+                this.updateMethodStatus('console', consoleModified);
+
+                // Method 4: Check for CSS class
+                const cssClass = document.documentElement.classList.contains('mcp-browser-extension-active');
+                this.detectionResults.css = cssClass;
+                this.updateMethodStatus('css', cssClass);
+
+                // Method 5: Send message ping
+                window.postMessage({ type: 'MCP_BROWSER_PING', timestamp: Date.now() }, '*');
+                this.log('Sent ping message, waiting for response...');
+
+                // Method 6: Dispatch custom event
+                const pingEvent = new CustomEvent('mcp-browser-test-ping', {
+                    detail: { timestamp: Date.now() }
+                });
+                document.dispatchEvent(pingEvent);
+                this.log('Dispatched custom event, waiting for response...');
+
+                // Check if any method succeeded
+                const anyDetected = Object.values(this.detectionResults).some(v => v === true);
+
+                // Update overall status after a short delay to allow async methods
+                setTimeout(() => {
+                    const finalDetected = Object.values(this.detectionResults).some(v => v === true);
+                    this.updateOverallStatus(finalDetected);
+                }, 1000);
+            }
+
+            updateMethodStatus(method, success) {
+                const element = document.getElementById('method-' + method);
+                if (element) {
+                    if (success === true) {
+                        element.textContent = '✅';
+                        element.className = 'success';
+                    } else if (success === false) {
+                        element.textContent = '❌';
+                        element.className = 'fail';
+                    } else {
+                        element.textContent = '⏳';
+                        element.className = '';
+                    }
+                }
+            }
+
+            updateOverallStatus(detected) {
+                this.detected = detected;
+                const statusBox = document.getElementById('status');
+                const statusText = document.getElementById('status-text');
+                const statusDetail = document.getElementById('status-detail');
+
+                if (detected) {
+                    statusBox.className = 'status-box detected';
+                    statusText.textContent = '✅ Extension Detected!';
+
+                    const successMethods = Object.entries(this.detectionResults)
+                        .filter(([_, success]) => success)
+                        .map(([method, _]) => method);
+
+                    statusDetail.textContent = 'Detection successful via: ' + successMethods.join(', ');
+                    this.log('Extension detected successfully!');
+                } else {
+                    statusBox.className = 'status-box not-detected';
+                    statusText.textContent = '❌ Extension Not Detected';
+                    statusDetail.textContent = 'Extension is not installed or not active. Click "Installation Guide" for help.';
+                    this.log('Extension not detected. Please install the extension and refresh the page.');
+                }
+            }
+
+            startAutoDetect() {
+                if (this.autoDetectInterval) {
+                    this.log('Auto-detection already running');
+                    return;
+                }
+
+                this.log('Starting auto-detection (every 2 seconds)');
+                this.autoDetectInterval = setInterval(() => {
+                    this.runDetection();
+                }, 2000);
+            }
+
+            stopAutoDetect() {
+                if (this.autoDetectInterval) {
+                    clearInterval(this.autoDetectInterval);
+                    this.autoDetectInterval = null;
+                    this.log('Auto-detection stopped');
+                } else {
+                    this.log('Auto-detection was not running');
+                }
+            }
+
+            log(message) {
+                const logEl = document.getElementById('log');
+                const timestamp = new Date().toLocaleTimeString();
+                const entry = document.createElement('div');
+                entry.className = 'log-entry';
+                entry.textContent = `[${timestamp}] ${message}`;
+
+                // Remove initial placeholder if it exists
+                const placeholder = logEl.querySelector('.log-entry');
+                if (placeholder && placeholder.textContent === 'Detection log will appear here...') {
+                    placeholder.remove();
+                }
+
+                logEl.appendChild(entry);
+                logEl.scrollTop = logEl.scrollHeight;
+
+                // Also log to console
+                console.log('[Extension Detector]', message);
+            }
+        }
+
+        // Initialize detector
+        const detector = new ExtensionDetector();
+    </script>
+</body>
+</html>

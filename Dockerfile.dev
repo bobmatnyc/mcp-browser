@@ -1,0 +1,55 @@
+# Development Dockerfile for MCP Browser
+# Optimized for development with hot reload and debugging capabilities
+
+ARG PYTHON_VERSION=3.11
+FROM python:${PYTHON_VERSION}-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements.txt pyproject.toml ./
+
+# Install Python dependencies with development extras
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir watchdog
+
+# Install Playwright browsers
+RUN playwright install chromium && \
+    playwright install-deps chromium
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/tmp /app/src /app/extension /app/tests
+
+# Copy source code (this layer changes frequently)
+COPY src/ ./src/
+COPY extension/ ./extension/
+COPY tests/ ./tests/
+
+# Install the package in development mode
+RUN pip install -e .
+
+# Create non-root user for security
+RUN useradd --create-home --shell /bin/bash mcpuser && \
+    chown -R mcpuser:mcpuser /app
+
+# Switch to non-root user
+USER mcpuser
+
+# Expose ports
+EXPOSE 8875-8895
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8875/health || exit 1
+
+# Default command for development
+CMD ["python", "-m", "src.dev_runner"]

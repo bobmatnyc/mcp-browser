@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "mcp-browser": {
+      "command": "/Users/masa/Projects/managed/mcp-browser/.venv/bin/mcp-browser",
+      "args": ["mcp"],
+      "env": {
+        "MCP_BROWSER_HOME": "/Users/masa/.mcp-browser",
+        "PYTHONPATH": "/Users/masa/Projects/managed/mcp-browser"
+      }
+    }
+  }
+}

@@ -67,6 +67,26 @@ repos:
         args: ["-r", "-f", "json"]
         exclude: ^tests/
 
+  # Version consistency checks
+  - repo: local
+    hooks:
+      - id: version-consistency
+        name: Check version consistency
+        entry: python scripts/check_version_consistency.py
+        language: python
+        pass_filenames: false
+        files: ^(VERSION|src/_version\.py|pyproject\.toml|setup\.py)$
+        additional_dependencies: []
+
+      - id: changelog-entry
+        name: Check changelog entry
+        entry: python scripts/check_changelog.py
+        language: python
+        pass_filenames: false
+        files: ^CHANGELOG\.md$
+        stages: [push]
+        additional_dependencies: []
+
 # Global settings
 fail_fast: false
 default_stages: [commit]

@@ -2,7 +2,7 @@
 # Architecture: Python MCP Server + Chrome Extension
 
 .DEFAULT_GOAL := help
-.PHONY: help install dev build test lint format quality clean deploy
+.PHONY: help install dev build test lint format quality clean deploy version bump-patch bump-minor bump-major check-version
 
 # Colors for output
 GREEN := \033[0;32m
@@ -30,12 +30,24 @@ install: ## Install all dependencies and Playwright browsers
 	playwright install chromium
 	@echo "$(GREEN)✓ Installation complete$(NC)"
 
-# ONE way to develop
-dev: ## Start development server with WebSocket
-	@echo "$(BLUE)Starting development server...$(NC)"
-	@echo "$(YELLOW)Chrome Extension: Load 'extension/' folder in chrome://extensions/$(NC)"
-	@echo "$(YELLOW)Claude Desktop: Use 'browserpymcp mcp' command$(NC)"
-	python -m src.cli.main start
+# ONE way to develop - Full development environment
+dev: ## Start full development environment (server + extension)
+	@echo "$(BLUE)Starting full development environment...$(NC)"
+	@echo "$(YELLOW)This will start both MCP server and Chrome with extension loaded$(NC)"
+	scripts/dev-full.sh
+
+# Development subcommands
+dev-server: ## Start only the MCP server with hot reload
+	@echo "$(BLUE)Starting development server with hot reload...$(NC)"
+	scripts/dev-server.sh
+
+dev-extension: ## Load Chrome extension in development mode
+	@echo "$(BLUE)Loading Chrome extension...$(NC)"
+	scripts/dev-extension.sh
+
+dev-extension-manual: ## Show manual extension loading instructions
+	@echo "$(BLUE)Manual extension loading instructions:$(NC)"
+	scripts/dev-extension.sh --instructions-only
 
 # ONE way to build
 build: ## Build and validate the project
@@ -113,14 +125,45 @@ status: ## Show server status
 	@echo "$(BLUE)Checking server status...$(NC)"
 	python -m src.cli.main status
 
+version: ## Show version information
+	@python -m src.cli.main version
+
+bump-patch: ## Bump patch version (1.0.1 -> 1.0.2)
+	@echo "$(BLUE)Bumping patch version...$(NC)"
+	@python scripts/bump_version.py patch
+	@echo "$(GREEN)✓ Version bumped$(NC)"
+
+bump-minor: ## Bump minor version (1.0.1 -> 1.1.0)
+	@echo "$(BLUE)Bumping minor version...$(NC)"
+	@python scripts/bump_version.py minor
+	@echo "$(GREEN)✓ Version bumped$(NC)"
+
+bump-major: ## Bump major version (1.0.1 -> 2.0.0)
+	@echo "$(BLUE)Bumping major version...$(NC)"
+	@python scripts/bump_version.py major
+	@echo "$(GREEN)✓ Version bumped$(NC)"
+
+check-version: ## Check version consistency
+	@echo "$(BLUE)Checking version consistency...$(NC)"
+	@python scripts/check_version_consistency.py
+
 # Extension development
-extension-build: ## Build Chrome extension (if build steps needed)
-	@echo "$(BLUE)Chrome extension ready to load$(NC)"
+extension-build: ## Build Chrome extension with icons
+	@echo "$(BLUE)Building Chrome extension...$(NC)"
+	@python tmp/create_extension_icons.py || echo "$(YELLOW)Icons already exist$(NC)"
+	@echo "$(GREEN)✓ Extension ready to load$(NC)"
 	@echo "$(YELLOW)Navigate to chrome://extensions/ and load 'extension/' folder$(NC)"
 
 extension-test: ## Test extension connection
 	@echo "$(BLUE)Testing extension connection...$(NC)"
 	python -c "import asyncio; from src.cli.main import BrowserMCPServer; server = BrowserMCPServer(); asyncio.run(server.show_status())"
+
+extension-reload: ## Instructions for reloading extension during development
+	@echo "$(BLUE)Extension Reload Instructions:$(NC)"
+	@echo "1. Open chrome://extensions/"
+	@echo "2. Find 'BrowserPyMCP Console Capture'"
+	@echo "3. Click the reload button (🔄)"
+	@echo "4. Or use the reload shortcut: Ctrl+R on the extensions page"
 
 # Documentation generation
 docs: ## Generate documentation
@@ -138,12 +181,43 @@ pre-commit: ## Setup pre-commit hooks
 	@echo "$(GREEN)✓ Pre-commit hooks installed$(NC)"
 
 # Development environment setup
-setup: install pre-commit ## Complete development environment setup
+setup: install pre-commit extension-build ## Complete development environment setup
 	@echo "$(GREEN)✓ Development environment ready$(NC)"
 	@echo "$(YELLOW)Next steps:$(NC)"
-	@echo "  1. make dev           # Start development server"
-	@echo "  2. Load extension in Chrome"
-	@echo "  3. Configure Claude Desktop"
+	@echo "  1. make dev           # Start full development environment"
+	@echo "  2. make dev-server    # Start only MCP server"
+	@echo "  3. make dev-extension # Load extension in Chrome"
+	@echo "  4. Configure Claude Desktop with 'browserpymcp mcp'"
+
+# Development workflow commands
+dev-status: ## Show development environment status
+	@echo "$(BLUE)Development Environment Status$(NC)"
+	@echo "================================="
+	@echo -n "MCP Server: "
+	@curl -s http://localhost:8875 >/dev/null 2>&1 && echo "$(GREEN)Running$(NC)" || echo "$(RED)Stopped$(NC)"
+	@echo -n "Extension Icons: "
+	@test -f extension/icon-16.png && echo "$(GREEN)Present$(NC)" || echo "$(RED)Missing$(NC)"
+	@echo -n "Scripts: "
+	@test -x scripts/dev-full.sh && echo "$(GREEN)Executable$(NC)" || echo "$(RED)Not executable$(NC)"
+	@echo -n "Environment: "
+	@test -f .env.development && echo "$(GREEN)Configured$(NC)" || echo "$(RED)Missing$(NC)"
+
+dev-logs: ## Show development server logs
+	@echo "$(BLUE)Development Server Logs$(NC)"
+	@if [ -f tmp/dev-server.pid ]; then \
+		echo "Server PID: $$(cat tmp/dev-server.pid)"; \
+		echo "Recent logs:"; \
+		tail -20 tmp/logs/mcp-server.log 2>/dev/null || echo "No logs found"; \
+	else \
+		echo "$(YELLOW)Development server not running$(NC)"; \
+	fi
+
+dev-clean: ## Clean development artifacts
+	@echo "$(BLUE)Cleaning development artifacts...$(NC)"
+	@rm -rf tmp/chrome-dev-profile
+	@rm -f tmp/dev-server.pid tmp/chrome-dev.pid
+	@rm -rf tmp/logs
+	@echo "$(GREEN)✓ Development artifacts cleaned$(NC)"
 
 # Service-specific commands for debugging
 debug-services: ## Show service container status
@@ -154,14 +228,42 @@ debug-websocket: ## Test WebSocket connection
 	@echo "$(BLUE)Testing WebSocket on port 8875...$(NC)"
 	python -c "import asyncio, websockets; asyncio.run(websockets.connect('ws://localhost:8875'))" || echo "$(YELLOW)Server not running - use 'make dev' first$(NC)"
 
-# Version management
-version: ## Show current version
-	@echo "$(BLUE)Current version:$(NC)"
-	python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])"
+# Docker development commands
+docker-dev: ## Start development environment with Docker
+	@echo "$(BLUE)Starting Docker development environment...$(NC)"
+	docker-compose up --build
 
-bump-version: ## Bump version (requires manual edit of pyproject.toml)
-	@echo "$(YELLOW)Manual version bump required in pyproject.toml$(NC)"
-	@echo "Current version: $$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")"
+docker-dev-bg: ## Start development environment with Docker in background
+	@echo "$(BLUE)Starting Docker development environment in background...$(NC)"
+	docker-compose up --build -d
+
+docker-dev-chrome: ## Start development environment with Chrome container
+	@echo "$(BLUE)Starting Docker development environment with Chrome...$(NC)"
+	docker-compose --profile chrome up --build
+
+docker-dev-tools: ## Start development tools container
+	@echo "$(BLUE)Starting development tools container...$(NC)"
+	docker-compose --profile tools run --rm dev-tools bash
+
+docker-logs: ## Show Docker development logs
+	@echo "$(BLUE)Docker Development Logs$(NC)"
+	docker-compose logs -f mcp-server
+
+docker-status: ## Show Docker development status
+	@echo "$(BLUE)Docker Development Status$(NC)"
+	docker-compose ps
+
+docker-clean: ## Clean Docker development environment
+	@echo "$(BLUE)Cleaning Docker development environment...$(NC)"
+	docker-compose down -v
+	docker system prune -f
+
+docker-rebuild: ## Rebuild Docker development environment
+	@echo "$(BLUE)Rebuilding Docker development environment...$(NC)"
+	docker-compose down
+	docker-compose build --no-cache
+	docker-compose up
+
 
 # Quick health check
 health: ## Quick health check of all components

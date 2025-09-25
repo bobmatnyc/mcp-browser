@@ -129,10 +129,10 @@
 ## ADR-007: MCP Python SDK Integration
 
 **Status**: Implemented
-**Decision**: Use official MCP Python SDK for Claude Desktop integration
+**Decision**: Use official MCP Python SDK for Claude Code integration
 
 **Context**:
-- Need Claude Desktop integration
+- Need Claude Code integration
 - Want standard protocol compliance
 - Official SDK provides proper types and patterns
 

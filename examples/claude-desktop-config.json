@@ -1,0 +1,30 @@
+{
+  "comment": "Example configuration for Claude Desktop App",
+  "comment2": "Add this to your Claude Desktop config file",
+  "comment3": "Usually located at ~/Library/Application Support/Claude/claude_desktop_config.json on macOS",
+
+  "mcpServers": {
+    "mcp-browser": {
+      "command": "mcp-browser",
+      "args": ["mcp"],
+      "env": {
+        "MCP_BROWSER_HOME": "~/.mcp-browser"
+      }
+    }
+  },
+
+  "alternative_configurations": {
+    "with_explicit_python": {
+      "command": "python3",
+      "args": ["-m", "mcp_browser.cli.main", "mcp"]
+    },
+    "with_pipx": {
+      "command": "pipx",
+      "args": ["run", "mcp-browser", "mcp"]
+    },
+    "with_venv": {
+      "command": "/path/to/project/.venv/bin/mcp-browser",
+      "args": ["mcp"]
+    }
+  }
+}

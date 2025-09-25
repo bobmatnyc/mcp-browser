@@ -3,8 +3,9 @@
 import asyncio
 import base64
 import logging
-from typing import Optional, Dict, Any
-from playwright.async_api import async_playwright, Browser, Page
+from typing import Any, Dict, Optional
+
+from playwright.async_api import Browser, Page, async_playwright
 
 logger = logging.getLogger(__name__)
 

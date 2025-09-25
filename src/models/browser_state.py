@@ -1,9 +1,9 @@
 """Browser state tracking model."""
 
+import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Dict, Any
-import asyncio
+from typing import Any, Dict, Optional
 
 
 @dataclass

@@ -3,11 +3,11 @@
 import asyncio
 import json
 import logging
-from typing import Dict, Any, List, Optional
-from datetime import datetime
 from collections import deque
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from ..models import ConsoleMessage, BrowserState
+from ..models import BrowserState, ConsoleMessage
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,7 @@ class BrowserService:
         self._message_buffer: Dict[int, deque] = {}
         self._buffer_tasks: Dict[int, asyncio.Task] = {}
         self._buffer_interval = 2.5  # seconds
+        self._pending_requests: Dict[str, asyncio.Future] = {}  # For async request/response
 
     async def handle_browser_connect(self, connection_info: Dict[str, Any]) -> None:
         """Handle browser connection event.
@@ -136,6 +137,59 @@ class BrowserService:
 
         logger.debug(f"Processed batch of {len(messages)} messages from port {port}")
 
+    async def handle_dom_response(self, data: Dict[str, Any]) -> None:
+        """Handle DOM operation response from browser.
+
+        Args:
+            data: DOM response data
+        """
+        # Forward to DOM interaction service if available
+        if hasattr(self, 'dom_interaction_service'):
+            await self.dom_interaction_service.handle_dom_response(data)
+        else:
+            logger.warning("DOM response received but no DOM interaction service available")
+
+    async def send_dom_command(
+        self,
+        port: int,
+        command: Dict[str, Any],
+        tab_id: Optional[int] = None
+    ) -> bool:
+        """Send a DOM command to the browser.
+
+        Args:
+            port: Port number
+            command: DOM command to send
+            tab_id: Optional specific tab ID
+
+        Returns:
+            True if command was sent successfully
+        """
+        connection = await self.browser_state.get_connection(port)
+
+        if not connection or not connection.websocket:
+            logger.warning(f"No active browser connection on port {port}")
+            return False
+
+        try:
+            import uuid
+            request_id = str(uuid.uuid4())
+
+            await connection.websocket.send(json.dumps({
+                'type': 'dom_command',
+                'requestId': request_id,
+                'tabId': tab_id,
+                'command': command,
+                'timestamp': datetime.now().isoformat()
+            }))
+
+            logger.debug(f"Sent DOM command to port {port}: {command.get('type')}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to send DOM command: {e}")
+            return False
+
     async def navigate_browser(self, port: int, url: str) -> bool:
         """Navigate browser to a URL.
 
@@ -203,6 +257,85 @@ class BrowserService:
 
         # Return last N messages
         return messages[-last_n:] if last_n else messages
+
+    async def extract_content(
+        self,
+        port: int,
+        tab_id: Optional[int] = None,
+        timeout: float = 10.0
+    ) -> Dict[str, Any]:
+        """Extract readable content from a browser tab using Readability.
+
+        Args:
+            port: Port number
+            tab_id: Optional specific tab ID
+            timeout: Timeout for extraction operation
+
+        Returns:
+            Dict containing extracted content or error information
+        """
+        connection = await self.browser_state.get_connection(port)
+
+        if not connection or not connection.websocket:
+            logger.warning(f"No active browser connection on port {port}")
+            return {
+                'success': False,
+                'error': 'No active browser connection'
+            }
+
+        try:
+            import uuid
+            request_id = str(uuid.uuid4())
+
+            # Create a future to wait for response
+            response_future = asyncio.Future()
+            self._pending_requests[request_id] = response_future
+
+            await connection.websocket.send(json.dumps({
+                'type': 'extract_content',
+                'requestId': request_id,
+                'tabId': tab_id,
+                'timestamp': datetime.now().isoformat()
+            }))
+
+            logger.info(f"Sent content extraction request to port {port}, tab {tab_id or 'active'}")
+
+            try:
+                # Wait for response with timeout
+                result = await asyncio.wait_for(response_future, timeout=timeout)
+                return result
+            except asyncio.TimeoutError:
+                logger.warning(f"Content extraction timed out after {timeout}s")
+                return {
+                    'success': False,
+                    'error': f'Content extraction timed out after {timeout} seconds'
+                }
+            finally:
+                # Clean up pending request
+                self._pending_requests.pop(request_id, None)
+
+        except Exception as e:
+            logger.error(f"Failed to send content extraction command: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
+    async def handle_content_extracted(self, data: Dict[str, Any]) -> None:
+        """Handle content extraction response from browser.
+
+        Args:
+            data: Response data including extracted content
+        """
+        request_id = data.get('requestId')
+        if request_id and request_id in self._pending_requests:
+            future = self._pending_requests[request_id]
+            if not future.done():
+                response = data.get('response', {})
+                future.set_result(response)
+                logger.info(f"Received content extraction response for request {request_id}")
+        else:
+            logger.warning(f"Received content extraction response for unknown request: {request_id}")
 
     async def _flush_buffer(self, port: int) -> None:
         """Flush message buffer for a port.
@@ -281,3 +414,11 @@ class BrowserService:
         }
 
         return stats
+
+    def set_dom_interaction_service(self, dom_service) -> None:
+        """Set the DOM interaction service.
+
+        Args:
+            dom_service: DOM interaction service instance
+        """
+        self.dom_interaction_service = dom_service

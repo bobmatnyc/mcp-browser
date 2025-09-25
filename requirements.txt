@@ -3,6 +3,13 @@ mcp>=0.1.0
 websockets>=11.0,<13.0
 playwright>=1.40.0
 aiofiles>=23.0.0,<24.0
+aiohttp>=3.8.0,<4.0
+click>=8.1.0
+rich>=13.7.0
+
+# Development dependencies
+watchdog>=3.0.0
+pillow>=10.0.0  # For icon generation
 
 # Development dependencies (optional)
 # Install with: pip install -r requirements-dev.txt

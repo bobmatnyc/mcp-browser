@@ -17,16 +17,10 @@ make dev
 # Navigate to chrome://extensions/
 # Enable "Developer mode" → "Load unpacked" → Select extension/ folder
 
-# 4. Configure Claude Desktop
-# Add to claude_desktop_config.json:
-# {
-#   "mcpServers": {
-#     "browserpymcp": {
-#       "command": "browserpymcp",
-#       "args": ["mcp"]
-#     }
-#   }
-# }
+# 4. Configure Claude Code
+# The MCP server integrates directly with Claude Code.
+# Start the MCP server with:
+# browserpymcp mcp
 ```
 
 ## Service Architecture Deep Dive
@@ -171,7 +165,7 @@ class StorageConfig:
 
 #### MCPService
 **File**: `src/services/mcp_service.py`
-**Responsibility**: Claude Desktop tool integration
+**Responsibility**: Claude Code tool integration
 
 ```python
 class MCPService:
@@ -186,7 +180,7 @@ class MCPService:
         """Handle browser_screenshot tool"""
 
     async def run_stdio() -> None:
-        """Run MCP server with stdio transport for Claude Desktop"""
+        """Run MCP server with stdio transport for Claude Code"""
 ```
 
 **Tool Registration Pattern**:
@@ -558,16 +552,13 @@ export BROWSERPYMCP_LOG_LEVEL=INFO
 export BROWSERPYMCP_STORAGE_PATH=/custom/path/browser
 ```
 
-### Claude Desktop Configuration
-```json
-{
-  "mcpServers": {
-    "browserpymcp": {
-      "command": "browserpymcp",
-      "args": ["mcp"]
-    }
-  }
-}
+### Claude Code Configuration
+```bash
+# Start the MCP server for Claude Code
+browserpymcp mcp
+
+# The server will automatically be discovered
+# by Claude Code in this environment
 ```
 
 ## Security Considerations

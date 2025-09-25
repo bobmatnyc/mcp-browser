@@ -1,0 +1,24 @@
+{
+  "name": "mcp-browser",
+  "version": "1.0.0",
+  "description": "Browser Console Log Capture via Claude Code Integration",
+  "command": "/Users/masa/Projects/managed/mcp-browser/.venv/bin/python",
+  "args": ["/Users/masa/Projects/managed/mcp-browser/mcp-server.py"],
+  "env": {
+    "MCP_BROWSER_HOME": "/Users/masa/.mcp-browser",
+    "PYTHONPATH": "/Users/masa/Projects/managed/mcp-browser",
+    "PYTHONUNBUFFERED": "1"
+  },
+  "tools": [
+    "browser_navigate",
+    "browser_query_logs",
+    "browser_screenshot",
+    "browser_click",
+    "browser_fill_field",
+    "browser_select_option",
+    "browser_scroll",
+    "browser_get_page_content",
+    "browser_execute_javascript",
+    "browser_get_element_info"
+  ]
+}

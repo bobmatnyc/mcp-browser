@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Browser Functionality Test Page</title>
+    <style>
+        body {
+            font-family: 'SF Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f7f9fc;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        .test-section h2 {
+            color: #667eea;
+            margin-top: 0;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        input, select, textarea {
+            padding: 8px;
+            margin: 5px;
+            border: 2px solid #e2e8f0;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        #console-output {
+            background: #1a202c;
+            color: #68d391;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .status.success {
+            background: #c6f6d5;
+            color: #22543d;
+            border: 1px solid #9ae6b4;
+        }
+        .status.error {
+            background: #fed7d7;
+            color: #742a2a;
+            border: 1px solid #fc8181;
+        }
+        .info-box {
+            background: #e6fffa;
+            border: 1px solid #81e6d9;
+            color: #234e52;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .article-content {
+            padding: 20px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .article-content h3 {
+            color: #2d3748;
+            margin-top: 0;
+        }
+        .article-content p {
+            line-height: 1.6;
+            color: #4a5568;
+        }
+        #click-counter {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 MCP Browser Functionality Test Page</h1>
+
+        <div class="info-box">
+            <strong>Instructions:</strong> This page tests all MCP Browser tools functionality.
+            Open your browser's console to see the logs that will be captured by MCP Browser.
+        </div>
+
+        <!-- Console Logging Tests -->
+        <div class="test-section">
+            <h2>📋 Console Logging Tests</h2>
+            <button onclick="testConsoleLogs()">Generate Console Logs</button>
+            <button onclick="testError()">Generate Error</button>
+            <button onclick="testWarning()">Generate Warning</button>
+            <button onclick="clearConsole()">Clear Console</button>
+            <div id="console-output"></div>
+        </div>
+
+        <!-- Navigation Tests -->
+        <div class="test-section">
+            <h2>🌐 Navigation Tests</h2>
+            <button onclick="testNavigation('https://example.com')">Navigate to Example.com</button>
+            <button onclick="testNavigation('https://google.com')">Navigate to Google</button>
+            <button onclick="testNavigation('#article')">Scroll to Article</button>
+            <div id="nav-status" class="status" style="display:none;"></div>
+        </div>
+
+        <!-- Click Interaction Tests -->
+        <div class="test-section">
+            <h2>🖱️ Click Interaction Tests</h2>
+            <button id="click-target" onclick="handleClick()">Click Me!</button>
+            <button id="click-target-2" onclick="handleClick2()">Another Button</button>
+            <a href="#" onclick="handleLinkClick(event)">Test Link</a>
+            <div id="click-counter">Clicks: 0</div>
+        </div>
+
+        <!-- Form Interaction Tests -->
+        <div class="test-section">
+            <h2>✏️ Form Interaction Tests</h2>
+            <form id="test-form" onsubmit="handleFormSubmit(event)">
+                <div>
+                    <label>Text Input:</label>
+                    <input type="text" name="username" id="text-input" placeholder="Enter username">
+                </div>
+                <div>
+                    <label>Email:</label>
+                    <input type="email" name="email" id="email-input" placeholder="Enter email">
+                </div>
+                <div>
+                    <label>Password:</label>
+                    <input type="password" name="password" id="password-input" placeholder="Enter password">
+                </div>
+                <div>
+                    <label>Select Option:</label>
+                    <select name="category" id="select-input">
+                        <option value="">Choose...</option>
+                        <option value="option1">Option 1</option>
+                        <option value="option2">Option 2</option>
+                        <option value="option3">Option 3</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Comments:</label>
+                    <textarea name="comments" id="textarea-input" rows="3" placeholder="Enter comments"></textarea>
+                </div>
+                <button type="submit">Submit Form</button>
+                <button type="button" onclick="fillTestData()">Fill Test Data</button>
+                <button type="reset">Reset Form</button>
+            </form>
+            <div id="form-status" class="status" style="display:none;"></div>
+        </div>
+
+        <!-- Element Information Tests -->
+        <div class="test-section">
+            <h2>🔍 Element Information Tests</h2>
+            <div id="info-target" class="info-element" data-test="sample-data">
+                <strong>Sample Element</strong>
+                <p>This element has various attributes and content for testing.</p>
+                <span class="hidden-element" style="display:none;">Hidden content</span>
+            </div>
+            <button onclick="getElementInfo()">Get Element Info</button>
+        </div>
+
+        <!-- Content Extraction Tests -->
+        <div class="test-section" id="article">
+            <h2>📖 Content Extraction (Readability) Test</h2>
+            <div class="article-content">
+                <h3>Test Article Title</h3>
+                <p class="byline">By Test Author • Published: <time>2024-01-15</time></p>
+                <p>This is a test article with multiple paragraphs designed to test the Mozilla Readability
+                   content extraction feature. The content should be extracted cleanly without navigation
+                   elements or other page clutter.</p>
+                <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt
+                   ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation
+                   ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+                <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat
+                   nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui
+                   officia deserunt mollit anim id est laborum.</p>
+            </div>
+            <button onclick="testReadability()">Test Content Extraction</button>
+        </div>
+
+        <!-- Screenshot Test -->
+        <div class="test-section">
+            <h2>📸 Screenshot Test</h2>
+            <p>The screenshot tool should capture this entire page.</p>
+            <button onclick="console.log('Ready for screenshot capture')">Mark Ready for Screenshot</button>
+        </div>
+
+        <!-- Status Display -->
+        <div class="test-section">
+            <h2>📊 Connection Status</h2>
+            <div id="connection-status" class="status success">
+                WebSocket Status: <span id="ws-status">Not checked</span>
+            </div>
+            <button onclick="checkConnection()">Check WebSocket Connection</button>
+        </div>
+    </div>
+
+    <script>
+        let clickCount = 0;
+
+        // Console logging tests
+        function testConsoleLogs() {
+            console.log('📝 Regular log message');
+            console.info('ℹ️ Info message with details');
+            console.debug('🔍 Debug message for troubleshooting');
+            console.log('Multiple', 'arguments', 'in', 'one', 'log');
+            console.log({ object: 'data', nested: { value: 123 } });
+            console.log(['array', 'of', 'items']);
+
+            updateConsoleOutput('Generated various console logs');
+        }
+
+        function testError() {
+            console.error('❌ Error message test');
+            try {
+                throw new Error('Test error with stack trace');
+            } catch (e) {
+                console.error('Caught error:', e);
+            }
+            updateConsoleOutput('Generated error logs');
+        }
+
+        function testWarning() {
+            console.warn('⚠️ Warning message test');
+            console.warn('Deprecation warning:', 'This feature will be removed');
+            updateConsoleOutput('Generated warning logs');
+        }
+
+        function clearConsole() {
+            console.clear();
+            updateConsoleOutput('Console cleared');
+        }
+
+        function updateConsoleOutput(message) {
+            const output = document.getElementById('console-output');
+            const timestamp = new Date().toLocaleTimeString();
+            output.innerHTML += `[${timestamp}] ${message}<br>`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        // Navigation tests
+        function testNavigation(url) {
+            console.log(`Navigation request to: ${url}`);
+            const status = document.getElementById('nav-status');
+            status.className = 'status success';
+            status.textContent = `Navigation logged for: ${url}`;
+            status.style.display = 'block';
+
+            if (url.startsWith('#')) {
+                const element = document.querySelector(url);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth' });
+                }
+            }
+        }
+
+        // Click interaction tests
+        function handleClick() {
+            clickCount++;
+            document.getElementById('click-counter').textContent = `Clicks: ${clickCount}`;
+            console.log(`Button clicked! Count: ${clickCount}`);
+        }
+
+        function handleClick2() {
+            console.log('Second button clicked');
+            alert('Button 2 was clicked!');
+        }
+
+        function handleLinkClick(event) {
+            event.preventDefault();
+            console.log('Link clicked and prevented default');
+        }
+
+        // Form interaction tests
+        function handleFormSubmit(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const data = Object.fromEntries(formData);
+            console.log('Form submitted:', data);
+
+            const status = document.getElementById('form-status');
+            status.className = 'status success';
+            status.textContent = 'Form submitted successfully! Check console for data.';
+            status.style.display = 'block';
+        }
+
+        function fillTestData() {
+            document.getElementById('text-input').value = 'testuser';
+            document.getElementById('email-input').value = 'test@example.com';
+            document.getElementById('password-input').value = 'password123';
+            document.getElementById('select-input').value = 'option2';
+            document.getElementById('textarea-input').value = 'This is a test comment.';
+            console.log('Form filled with test data');
+        }
+
+        // Element information tests
+        function getElementInfo() {
+            const element = document.getElementById('info-target');
+            const info = {
+                id: element.id,
+                className: element.className,
+                tagName: element.tagName,
+                innerHTML: element.innerHTML,
+                textContent: element.textContent,
+                dataset: element.dataset,
+                attributes: Array.from(element.attributes).map(a => ({
+                    name: a.name,
+                    value: a.value
+                }))
+            };
+            console.log('Element information:', info);
+        }
+
+        // Content extraction test
+        function testReadability() {
+            console.log('Testing content extraction...');
+            const article = document.querySelector('.article-content');
+            if (article) {
+                console.log('Article found:', {
+                    title: article.querySelector('h3')?.textContent,
+                    byline: article.querySelector('.byline')?.textContent,
+                    wordCount: article.textContent.split(' ').length
+                });
+            }
+        }
+
+        // Connection check
+        function checkConnection() {
+            const wsStatus = document.getElementById('ws-status');
+
+            // Check if extension is installed
+            if (window.MCPBrowserExtension) {
+                wsStatus.textContent = 'Extension detected, checking WebSocket...';
+                // Extension would handle the actual connection
+                console.log('MCP Browser Extension is installed');
+            } else {
+                wsStatus.textContent = 'Extension not detected';
+                console.log('MCP Browser Extension not found - please install it');
+            }
+        }
+
+        // Initialize page
+        window.addEventListener('load', () => {
+            console.log('🚀 MCP Browser Test Page Loaded');
+            console.log('Page URL:', window.location.href);
+            console.log('User Agent:', navigator.userAgent);
+            console.log('Timestamp:', new Date().toISOString());
+
+            // Auto-generate some logs for testing
+            setTimeout(() => {
+                console.log('⏰ Delayed log after 2 seconds');
+            }, 2000);
+
+            setTimeout(() => {
+                console.info('📊 Page metrics:', {
+                    loadTime: performance.timing.loadEventEnd - performance.timing.navigationStart,
+                    domElements: document.getElementsByTagName('*').length
+                });
+            }, 3000);
+        });
+
+        // Error handling
+        window.addEventListener('error', (event) => {
+            console.error('Global error caught:', event.error);
+        });
+
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('Unhandled promise rejection:', event.reason);
+        });
+    </script>
+</body>
+</html>

@@ -1,17 +1,16 @@
 """Storage service for persisting console logs."""
 
-import os
-import json
 import asyncio
-import aiofiles
-from pathlib import Path
-from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any
+import json
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import aiofiles
 
 from ..models import ConsoleMessage
-
 
 logger = logging.getLogger(__name__)
 

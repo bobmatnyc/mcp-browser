@@ -2,7 +2,7 @@
 
 **Type**: Python MCP Server + Chrome Extension
 **Architecture**: Service-Oriented Architecture (SOA) with Dependency Injection
-**Focus**: Browser console log capture and control via Claude Desktop integration
+**Focus**: Browser console log capture and control via Claude Code integration
 
 ## 🔴 CRITICAL: Core Architecture Requirements
 
@@ -24,7 +24,7 @@
 1. **WebSocketService**: Browser connection management, port discovery (8875-8895)
 2. **BrowserService**: Console message handling, navigation commands
 3. **StorageService**: JSONL persistence with 50MB rotation, 7-day retention
-4. **MCPService**: Claude Desktop tool exposure (navigate, query_logs, screenshot)
+4. **MCPService**: Claude Code tool exposure (navigate, query_logs, screenshot)
 5. **ScreenshotService**: Playwright integration for browser captures
 
 ### Async Patterns
@@ -113,7 +113,7 @@ src/
 │   ├── browser_service.py         # Console handling, navigation
 │   ├── websocket_service.py       # Connection management
 │   ├── storage_service.py         # JSONL persistence
-│   ├── mcp_service.py             # Claude Desktop integration
+│   ├── mcp_service.py             # Claude Code integration
 │   └── screenshot_service.py      # Playwright screenshots
 └── models/                        # Data models
     ├── console_message.py         # Console log structure

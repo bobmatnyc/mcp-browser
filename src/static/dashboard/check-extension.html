@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Browser Extension Check</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .status-box {
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .status-box.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .status-box.warning {
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #856404;
+        }
+        .status-box.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .install-button {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            margin-top: 20px;
+            transition: background 0.3s;
+        }
+        .install-button:hover {
+            background: #5a67d8;
+        }
+        .install-steps {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .install-steps ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .install-steps li {
+            margin: 10px 0;
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MCP Browser Extension Status</h1>
+
+        <div id="checking" class="status-box warning">
+            <div class="spinner"></div>
+            Checking for extension...
+        </div>
+
+        <div id="status" style="display: none;"></div>
+
+        <div id="install-info" style="display: none;" class="install-steps">
+            <h3>Installation Instructions:</h3>
+            <ol>
+                <li>Download the extension ZIP file using the button below</li>
+                <li>Open Chrome and navigate to <code>chrome://extensions/</code></li>
+                <li>Enable "Developer mode" in the top right corner</li>
+                <li>Drag and drop the downloaded ZIP file onto the extensions page, OR</li>
+                <li>Click "Load unpacked" and select the extracted extension folder</li>
+                <li>The MCP Browser extension should appear in your extensions list</li>
+                <li>Refresh this page to verify the connection</li>
+            </ol>
+
+            <a id="download-btn" href="/api/download-extension" class="install-button">
+                Download Extension
+            </a>
+        </div>
+
+        <div id="connection-details" style="display: none; margin-top: 30px;">
+            <h3>Connection Details:</h3>
+            <pre id="details" style="background: #f8f9fa; padding: 15px; border-radius: 8px; overflow-x: auto;"></pre>
+        </div>
+    </div>
+
+    <script>
+        // Check if extension is installed by trying to detect it
+        async function checkExtension() {
+            const checkingDiv = document.getElementById('checking');
+            const statusDiv = document.getElementById('status');
+            const installInfo = document.getElementById('install-info');
+            const connectionDetails = document.getElementById('connection-details');
+            const detailsPre = document.getElementById('details');
+
+            // Try to detect the extension
+            let extensionDetected = false;
+
+            // Method 1: Check if extension has injected any markers
+            if (window.__MCP_BROWSER_EXTENSION__) {
+                extensionDetected = true;
+            }
+
+            // Method 2: Try to connect to WebSocket (if extension is forwarding)
+            try {
+                const response = await fetch('/api/status');
+                const status = await response.json();
+
+                checkingDiv.style.display = 'none';
+
+                if (status.extension && status.extension.connected) {
+                    statusDiv.innerHTML = `
+                        <div class="status-box success">
+                            ✓ Extension is installed and connected!<br>
+                            WebSocket Port: ${status.websocket.port || 'Not available'}<br>
+                            Logs captured: ${status.logs.total || 0}
+                        </div>
+                    `;
+                    connectionDetails.style.display = 'block';
+                    detailsPre.textContent = JSON.stringify(status, null, 2);
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="status-box warning">
+                            ⚠ Extension not connected<br>
+                            ${status.websocket.port ? `WebSocket server is running on port ${status.websocket.port}` : 'WebSocket server not running'}
+                        </div>
+                    `;
+                    installInfo.style.display = 'block';
+                }
+
+                statusDiv.style.display = 'block';
+
+            } catch (error) {
+                checkingDiv.style.display = 'none';
+                statusDiv.innerHTML = `
+                    <div class="status-box error">
+                        ✗ Failed to check status: ${error.message}
+                    </div>
+                `;
+                statusDiv.style.display = 'block';
+                installInfo.style.display = 'block';
+            }
+        }
+
+        // Auto-check on load
+        setTimeout(checkExtension, 500);
+
+        // Auto-refresh every 5 seconds
+        setInterval(checkExtension, 5000);
+    </script>
+</body>
+</html>

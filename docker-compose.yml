@@ -1,0 +1,113 @@
+# Docker Compose for MCP Browser Development
+# Provides containerized development environment with volume mounts for hot reload
+
+services:
+  # MCP Browser Server
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        - PYTHON_VERSION=3.11
+    container_name: mcp-browser-dev
+    ports:
+      - "8875-8895:8875-8895"  # WebSocket port range
+      - "9222:9222"             # Chrome DevTools protocol (optional)
+    volumes:
+      # Source code for hot reload
+      - ./src:/app/src:ro
+      - ./extension:/app/extension:ro
+      - ./tests:/app/tests:ro
+
+      # Configuration files
+      - ./.env.development:/app/.env.development:ro
+      - ./pyproject.toml:/app/pyproject.toml:ro
+      - ./requirements.txt:/app/requirements.txt:ro
+
+      # Development data (persistent)
+      - mcp-logs:/app/logs
+      - mcp-tmp:/app/tmp
+
+      # Cache directories (performance)
+      - mcp-pip-cache:/root/.cache/pip
+      - mcp-playwright:/root/.cache/ms-playwright
+
+    environment:
+      - MCP_DEBUG=true
+      - MCP_LOG_LEVEL=DEBUG
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8875
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+
+    networks:
+      - mcp-network
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8875/health", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    restart: unless-stopped
+
+    # Development mode command
+    command: ["python", "-m", "src.dev_runner"]
+
+  # Chrome for testing (optional)
+  chrome:
+    image: zenika/alpine-chrome:latest
+    container_name: mcp-chrome-dev
+    ports:
+      - "9223:9222"  # Chrome DevTools
+    volumes:
+      - ./extension:/extension:ro
+      - chrome-data:/data
+    environment:
+      - CHROME_OPTS=--no-sandbox --disable-gpu --disable-dev-shm-usage --remote-debugging-address=0.0.0.0 --remote-debugging-port=9222 --load-extension=/extension
+    networks:
+      - mcp-network
+    depends_on:
+      - mcp-server
+    profiles:
+      - chrome  # Optional service, start with: docker-compose --profile chrome up
+
+  # Development tools container
+  dev-tools:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev-tools
+    container_name: mcp-dev-tools
+    volumes:
+      - ./:/workspace
+      - dev-tools-cache:/root/.cache
+    working_dir: /workspace
+    networks:
+      - mcp-network
+    profiles:
+      - tools  # Optional service for development tools
+    command: ["tail", "-f", "/dev/null"]  # Keep container running
+
+# Networks
+networks:
+  mcp-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# Volumes
+volumes:
+  mcp-logs:
+    driver: local
+  mcp-tmp:
+    driver: local
+  mcp-pip-cache:
+    driver: local
+  mcp-playwright:
+    driver: local
+  chrome-data:
+    driver: local
+  dev-tools-cache:
+    driver: local

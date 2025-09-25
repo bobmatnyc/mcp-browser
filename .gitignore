@@ -160,3 +160,10 @@ test_*.log
 
 # Temporary files directory
 tmp/
+.env.local
+
+# MCP Browser specific
+data/console_*.jsonl
+logs/
+*.pid
+.mcp.json

@@ -1,8 +1,8 @@
 """Tests for service container dependency injection."""
 
-import pytest
 import asyncio
-from unittest.mock import AsyncMock, Mock
+
+import pytest
 
 from src.container.service_container import ServiceContainer, ServiceNotFoundError
 

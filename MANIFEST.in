@@ -5,7 +5,7 @@ include requirements.txt
 include pyproject.toml
 
 recursive-include src *.py
-recursive-include extension *.json *.js *.html *.css
+recursive-include extension *.json *.js *.html *.css *.png
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
 recursive-exclude * .DS_Store

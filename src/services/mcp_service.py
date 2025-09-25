@@ -4,7 +4,6 @@ import logging
 from typing import Any, Dict, List
 
 from mcp.server import Server
-from mcp.server.models import InitializationOptions
 from mcp.types import ImageContent, TextContent, Tool
 
 logger = logging.getLogger(__name__)
@@ -29,7 +28,12 @@ class MCPService:
         self.browser_service = browser_service
         self.screenshot_service = screenshot_service
         self.dom_interaction_service = dom_interaction_service
-        self.server = Server("browserpymcp")
+        # Initialize server with version info
+        self.server = Server(
+            name="mcp-browser",
+            version="1.0.3",
+            instructions="Browser control and console log capture for web automation"
+        )
         self._setup_tools()
 
     def _setup_tools(self) -> None:
@@ -290,6 +294,24 @@ class MCPService:
                         },
                         "required": ["port", "selector"]
                     }
+                ),
+                Tool(
+                    name="browser_extract_content",
+                    description="Extract readable content from the current page using Mozilla's Readability",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "port": {
+                                "type": "integer",
+                                "description": "Browser port number"
+                            },
+                            "tab_id": {
+                                "type": "integer",
+                                "description": "Optional specific tab ID to extract from"
+                            }
+                        },
+                        "required": ["port"]
+                    }
                 )
             ]
 
@@ -320,6 +342,8 @@ class MCPService:
                 return await self._handle_wait_for_element(arguments)
             elif name == "browser_select_option":
                 return await self._handle_select_option(arguments)
+            elif name == "browser_extract_content":
+                return await self._handle_extract_content(arguments)
             else:
                 return [TextContent(
                     type="text",
@@ -742,6 +766,98 @@ class MCPService:
                 text=f"Failed to select option: {result.get('error', 'Unknown error')}"
             )]
 
+    async def _handle_extract_content(
+        self,
+        arguments: Dict[str, Any]
+    ) -> List[TextContent]:
+        """Handle content extraction using Readability.
+
+        Args:
+            arguments: Tool arguments
+
+        Returns:
+            List of text content responses
+        """
+        if not self.browser_service:
+            return [TextContent(
+                type="text",
+                text="Browser service not available"
+            )]
+
+        port = arguments.get("port")
+        tab_id = arguments.get("tab_id")
+
+        result = await self.browser_service.extract_content(
+            port=port,
+            tab_id=tab_id
+        )
+
+        if result.get("success"):
+            content = result.get("content", {})
+
+            # Format the extracted content for output
+            output_lines = [
+                f"# {content.get('title', 'Untitled')}",
+                ""
+            ]
+
+            # Add metadata if available
+            metadata = content.get('metadata', {})
+            if content.get('byline'):
+                output_lines.append(f"**Author:** {content['byline']}")
+            if metadata.get('publishDate'):
+                output_lines.append(f"**Published:** {metadata['publishDate']}")
+            if content.get('siteName'):
+                output_lines.append(f"**Source:** {content['siteName']}")
+            if metadata.get('url'):
+                output_lines.append(f"**URL:** {metadata['url']}")
+            if content.get('wordCount'):
+                output_lines.append(f"**Word Count:** {content['wordCount']:,}")
+            if content.get('length'):
+                output_lines.append(f"**Reading Time:** ~{content['length']} minutes")
+
+            output_lines.extend(["", "---", ""])
+
+            # Add excerpt if available
+            if content.get('excerpt'):
+                output_lines.extend([
+                    "**Excerpt:**",
+                    f"> {content['excerpt']}",
+                    ""
+                ])
+
+            # Add main text content
+            output_lines.append("## Content")
+            output_lines.append("")
+
+            text = content.get('textContent', '')
+            if text:
+                # Limit text length for LLM consumption
+                max_chars = 50000  # ~12,500 tokens
+                if len(text) > max_chars:
+                    text = text[:max_chars] + f"\n\n[Content truncated - {len(text) - max_chars:,} characters omitted]"
+                output_lines.append(text)
+            else:
+                output_lines.append("[No readable content extracted]")
+
+            # Add fallback notice if applicable
+            if content.get('fallback'):
+                output_lines.extend([
+                    "",
+                    "---",
+                    "*Note: This is a fallback extraction. The page may not be optimized for article reading.*"
+                ])
+
+            return [TextContent(
+                type="text",
+                text="\n".join(output_lines)
+            )]
+        else:
+            return [TextContent(
+                type="text",
+                text=f"Failed to extract content: {result.get('error', 'Unknown error')}"
+            )]
+
     async def start(self) -> None:
         """Start the MCP server."""
         # Initialize server with options
@@ -753,15 +869,25 @@ class MCPService:
     async def run_stdio(self) -> None:
         """Run the MCP server with stdio transport."""
         from mcp.server.stdio import stdio_server
-        from mcp.types import ServerCapabilities
+        from mcp.server import NotificationOptions
 
         async with stdio_server() as (read_stream, write_stream):
+            # Use the server's create_initialization_options method to properly
+            # register all handlers with correct capabilities
+            init_options = self.server.create_initialization_options(
+                notification_options=NotificationOptions(
+                    tools_changed=False,
+                    prompts_changed=False,
+                    resources_changed=False
+                ),
+                experimental_capabilities={}
+            )
+
+            # Run with stateless=True to avoid initialization state issues
             await self.server.run(
                 read_stream,
                 write_stream,
-                InitializationOptions(
-                    server_name="browserpymcp",
-                    server_version="1.0.0",
-                    capabilities=ServerCapabilities()
-                )
+                init_options,
+                raise_exceptions=False,
+                stateless=False  # Keep stateful for now, but could try True if issues persist
             )

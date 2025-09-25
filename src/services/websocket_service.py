@@ -3,7 +3,8 @@
 import asyncio
 import json
 import logging
-from typing import Optional, Dict, Any, Callable, Set
+from typing import Any, Callable, Dict, Optional, Set
+
 import websockets
 from websockets.server import WebSocketServerProtocol
 
@@ -113,7 +114,7 @@ class WebSocketService:
 
         Args:
             websocket: WebSocket connection
-            path: Request path
+            path: Request path (required by websockets library)
         """
         self._connections.add(websocket)
         connection_info = {

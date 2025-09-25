@@ -86,7 +86,7 @@ async with self._get_file_lock(port):
 - JSONL format for streaming reads
 
 #### 4. MCPService (`src/services/mcp_service.py`)
-**Responsibility**: Claude Desktop integration
+**Responsibility**: Claude Code integration
 ```python
 # Tool registration pattern
 @self.server.list_tools()
@@ -272,7 +272,7 @@ finally:
 1. Add tool definition to `MCPService._setup_tools()`
 2. Implement handler method with service delegation
 3. Add validation and error responses
-4. Test via Claude Desktop integration
+4. Test via Claude Code integration
 
 ### Chrome Extension Modifications
 1. Update content script for new console capture patterns

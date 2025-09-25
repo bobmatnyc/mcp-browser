@@ -1,0 +1,46 @@
+[Unit]
+Description=MCP Browser Server - Browser Console Log Capture
+Documentation=https://github.com/yourusername/mcp-browser
+After=network.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/opt/mcp-browser
+Environment="PATH=/opt/mcp-browser/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONPATH=/opt/mcp-browser"
+Environment="MCP_BROWSER_HOME=/home/%i/.mcp-browser"
+
+# Start command
+ExecStart=/opt/mcp-browser/.venv/bin/python -m src.cli.main start
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
+
+# Process management
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Security settings
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/%i/.mcp-browser
+
+# Resource limits
+LimitNOFILE=4096
+MemoryLimit=1G
+CPUQuota=50%
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mcp-browser
+
+[Install]
+WantedBy=multi-user.target

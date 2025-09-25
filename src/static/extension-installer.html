@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Browser Extension Installer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        .status-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 25px;
+            border-left: 4px solid #dee2e6;
+        }
+        .status-card.connected {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+        .status-card.not-installed {
+            border-left-color: #ffc107;
+            background: #fff3cd;
+        }
+        .status-card.error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+        .status-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #495057;
+        }
+        .status-message {
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .project-info {
+            background: #e3f2fd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 25px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        .project-info strong {
+            color: #1976d2;
+        }
+        .steps {
+            margin: 25px 0;
+        }
+        .step {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .step-number {
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            flex-shrink: 0;
+            margin-right: 15px;
+        }
+        .step-content {
+            flex: 1;
+        }
+        .step-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        .step-description {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .code-block {
+            background: #263238;
+            color: #aed581;
+            padding: 12px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 25px;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 500;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s;
+            text-align: center;
+            flex: 1;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .btn-secondary {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        .btn-secondary:hover {
+            background: #bbdefb;
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #218838;
+        }
+        .warning-box {
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #856404;
+            font-size: 14px;
+        }
+        .warning-box strong {
+            color: #7c5a0b;
+        }
+        .check-icon {
+            color: #28a745;
+            font-size: 20px;
+            margin-right: 5px;
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MCP Browser Extension</h1>
+        <p class="subtitle">Install the Chrome extension for console log capture</p>
+
+        <div id="status-card" class="status-card">
+            <div id="status-content">
+                <span class="spinner"></span>
+                <span class="status-title">Checking extension status...</span>
+            </div>
+        </div>
+
+        <div class="project-info">
+            <strong>Project Extension Path:</strong><br>
+            <span id="extension-path">.mcp-browser/extension/</span>
+        </div>
+
+        <div id="install-section" style="display: none;">
+            <h3>Installation Steps</h3>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <div class="step-title">Initialize Project Extension</div>
+                        <div class="step-description">
+                            Run this command in your project directory to copy the extension:
+                            <div class="code-block">mcp-browser init</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <div class="step-title">Open Chrome Extensions</div>
+                        <div class="step-description">
+                            Navigate to Chrome's extension management page:
+                            <div class="code-block">chrome://extensions</div>
+                            Or click: Menu → More Tools → Extensions
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <div class="step-title">Enable Developer Mode</div>
+                        <div class="step-description">
+                            Toggle the "Developer mode" switch in the top-right corner of the extensions page.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <div class="step-title">Load Unpacked Extension</div>
+                        <div class="step-description">
+                            Click "Load unpacked" and select your project's extension folder:
+                            <div class="code-block" id="extension-folder-path">.mcp-browser/extension</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <div class="step-content">
+                        <div class="step-title">Verify Connection</div>
+                        <div class="step-description">
+                            The extension icon should appear in your toolbar. Click it to see the connection status.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="warning-box">
+                <strong>Note:</strong> Each project has its own extension instance. This allows for project-specific configuration and prevents conflicts between different MCP Browser projects.
+            </div>
+        </div>
+
+        <div id="success-section" style="display: none;">
+            <h3><span class="check-icon">✓</span>Extension Installed!</h3>
+            <p style="color: #666; margin: 15px 0;">
+                The MCP Browser extension is successfully installed and ready to capture console logs.
+            </p>
+        </div>
+
+        <div class="button-group">
+            <button class="btn btn-secondary" onclick="checkStatus()">Refresh Status</button>
+            <a href="/test-page" class="btn btn-primary">Open Test Page</a>
+            <a href="/" class="btn btn-secondary">Dashboard</a>
+        </div>
+    </div>
+
+    <script>
+        let projectPath = '';
+
+        async function checkStatus() {
+            const statusCard = document.getElementById('status-card');
+            const statusContent = document.getElementById('status-content');
+            const installSection = document.getElementById('install-section');
+            const successSection = document.getElementById('success-section');
+
+            // Show checking status
+            statusCard.className = 'status-card';
+            statusContent.innerHTML = '<span class="spinner"></span><span class="status-title">Checking extension status...</span>';
+
+            // Get project info
+            try {
+                const response = await fetch('/api/project-info');
+                const data = await response.json();
+                projectPath = data.projectPath;
+
+                document.getElementById('extension-path').textContent = data.extensionPath;
+                document.getElementById('extension-folder-path').textContent = data.extensionPath;
+            } catch (error) {
+                console.error('Failed to get project info:', error);
+            }
+
+            // Simulate checking for extension
+            setTimeout(() => {
+                if (window.__MCP_BROWSER_EXTENSION__) {
+                    // Extension is installed
+                    statusCard.className = 'status-card connected';
+                    statusContent.innerHTML = `
+                        <div class="status-title">✓ Extension Installed</div>
+                        <div class="status-message">The MCP Browser extension is active and ready.</div>
+                    `;
+                    installSection.style.display = 'none';
+                    successSection.style.display = 'block';
+                } else {
+                    // Extension not installed
+                    statusCard.className = 'status-card not-installed';
+                    statusContent.innerHTML = `
+                        <div class="status-title">⚠ Extension Not Detected</div>
+                        <div class="status-message">Follow the steps below to install the extension.</div>
+                    `;
+                    installSection.style.display = 'block';
+                    successSection.style.display = 'none';
+                }
+            }, 1000);
+        }
+
+        // Check status on load
+        window.addEventListener('load', checkStatus);
+
+        // Recheck periodically
+        setInterval(checkStatus, 5000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Browser Console Test Page</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button.warning {
+            background: #ffc107;
+            color: #333;
+        }
+        button.warning:hover {
+            background: #e0a800;
+        }
+        button.error {
+            background: #dc3545;
+        }
+        button.error:hover {
+            background: #c82333;
+        }
+        .section {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .output {
+            background: #263238;
+            color: #aed581;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            margin-top: 10px;
+            min-height: 100px;
+            white-space: pre-wrap;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            display: block;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MCP Browser Console Test Page</h1>
+        <p class="subtitle">Test console logging and browser interaction capabilities</p>
+
+        <div id="status" class="status disconnected">
+            Extension Status: Checking...
+        </div>
+
+        <div class="section">
+            <h3>Console Logging Tests</h3>
+            <button onclick="testLog()">Log Message</button>
+            <button onclick="testInfo()">Info Message</button>
+            <button class="warning" onclick="testWarn()">Warning Message</button>
+            <button class="error" onclick="testError()">Error Message</button>
+            <button onclick="testDebug()">Debug Message</button>
+            <button onclick="testTable()">Log Table</button>
+            <button onclick="testGroup()">Log Group</button>
+        </div>
+
+        <div class="section">
+            <h3>Complex Console Tests</h3>
+            <button onclick="testObject()">Log Complex Object</button>
+            <button onclick="testArray()">Log Array</button>
+            <button onclick="testMultipleArgs()">Log Multiple Arguments</button>
+            <button onclick="testTiming()">Time Measurement</button>
+            <button onclick="testTrace()">Stack Trace</button>
+        </div>
+
+        <div class="section">
+            <h3>Stress Tests</h3>
+            <button onclick="testBurst()">Burst 100 Messages</button>
+            <button onclick="testLargePayload()">Large Payload</button>
+            <button onclick="testRapidFire()">Rapid Fire (1msg/10ms)</button>
+        </div>
+
+        <div class="section">
+            <h3>Console Output</h3>
+            <div id="output" class="output">Console messages will appear here...</div>
+        </div>
+    </div>
+
+    <script>
+        let extensionDetected = false;
+        let detectionMethods = {
+            windowVariable: false,
+            domMarker: false,
+            htmlClass: false,
+            postMessage: false,
+            customEvent: false
+        };
+
+        // Enhanced extension detection with multiple methods
+        function checkExtension() {
+            const status = document.getElementById('status');
+
+            // Method 1: Check window variable (injected by content script)
+            if (window.__MCP_BROWSER_EXTENSION__) {
+                detectionMethods.windowVariable = true;
+                extensionDetected = true;
+                console.log('[Detection] Window variable found:', window.__MCP_BROWSER_EXTENSION__);
+            }
+
+            // Method 2: Check for DOM markers
+            const hasMarker = document.querySelector('[data-mcp-browser-extension="installed"]') ||
+                             document.getElementById('mcp-browser-extension-marker');
+            if (hasMarker) {
+                detectionMethods.domMarker = true;
+                extensionDetected = true;
+                console.log('[Detection] DOM marker found');
+            }
+
+            // Method 3: Check HTML classes
+            const hasClass = document.documentElement.classList.contains('mcp-browser-extension-installed') ||
+                           document.documentElement.classList.contains('mcp-browser-extension-active');
+            if (hasClass) {
+                detectionMethods.htmlClass = true;
+                extensionDetected = true;
+                console.log('[Detection] HTML class found');
+            }
+
+            // Update status display
+            if (extensionDetected) {
+                status.className = 'status connected';
+                const version = hasMarker ? hasMarker.getAttribute('data-extension-version') : '1.0.0';
+                const methodsUsed = Object.keys(detectionMethods).filter(m => detectionMethods[m]).join(', ');
+                status.innerHTML = `Extension Status: <strong>Connected</strong> (v${version})<br><small>Detection: ${methodsUsed}</small>`;
+            } else {
+                status.className = 'status disconnected';
+                status.innerHTML = 'Extension Status: <strong>Not Detected</strong><br><small>Please install/reload the MCP Browser extension</small>';
+            }
+        }
+
+        // Method 4: PostMessage detection
+        function checkViaPostMessage() {
+            // Send ping
+            window.postMessage({ type: 'MCP_BROWSER_PING' }, '*');
+
+            // Listen for pong (with timeout)
+            const timeout = setTimeout(() => {
+                console.log('[Detection] No PostMessage response received');
+            }, 1000);
+
+            window.addEventListener('message', function handlePong(event) {
+                if (event.data && event.data.type === 'MCP_BROWSER_PONG') {
+                    clearTimeout(timeout);
+                    detectionMethods.postMessage = true;
+                    extensionDetected = true;
+                    console.log('[Detection] PostMessage response received:', event.data);
+                    checkExtension(); // Update display
+                    window.removeEventListener('message', handlePong);
+                }
+            });
+        }
+
+        // Method 5: Custom event detection
+        function checkViaCustomEvent() {
+            // Listen for response first
+            document.addEventListener('mcp-browser-test-pong', function handlePong(event) {
+                detectionMethods.customEvent = true;
+                extensionDetected = true;
+                console.log('[Detection] Custom event response received:', event.detail);
+                checkExtension(); // Update display
+                document.removeEventListener('mcp-browser-test-pong', handlePong);
+            });
+
+            // Send ping
+            const pingEvent = new CustomEvent('mcp-browser-test-ping', {
+                detail: { timestamp: Date.now() }
+            });
+            document.dispatchEvent(pingEvent);
+        }
+
+        // Listen for extension ready event
+        document.addEventListener('mcp-browser-extension-ready', function(event) {
+            console.log('[Detection] Extension ready event received:', event.detail);
+            extensionDetected = true;
+            checkExtension();
+        });
+
+        // Update local output
+        function updateOutput(message) {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            output.textContent += `[${timestamp}] ${message}\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        // Test functions
+        function testLog() {
+            const msg = 'This is a regular console.log message';
+            console.log(msg);
+            updateOutput(`LOG: ${msg}`);
+        }
+
+        function testInfo() {
+            const msg = 'This is an info message with useful information';
+            console.info(msg);
+            updateOutput(`INFO: ${msg}`);
+        }
+
+        function testWarn() {
+            const msg = 'This is a warning about something important';
+            console.warn(msg);
+            updateOutput(`WARN: ${msg}`);
+        }
+
+        function testError() {
+            const msg = 'This is an error message indicating a problem';
+            console.error(msg);
+            updateOutput(`ERROR: ${msg}`);
+        }
+
+        function testDebug() {
+            const msg = 'This is a debug message for development';
+            console.debug(msg);
+            updateOutput(`DEBUG: ${msg}`);
+        }
+
+        function testTable() {
+            const data = [
+                { name: 'Alice', age: 30, city: 'New York' },
+                { name: 'Bob', age: 25, city: 'San Francisco' },
+                { name: 'Charlie', age: 35, city: 'Chicago' }
+            ];
+            console.table(data);
+            updateOutput(`TABLE: Displayed table with ${data.length} rows`);
+        }
+
+        function testGroup() {
+            console.group('User Details');
+            console.log('Name: John Doe');
+            console.log('Email: john@example.com');
+            console.log('Role: Administrator');
+            console.groupEnd();
+            updateOutput('GROUP: Logged grouped messages');
+        }
+
+        function testObject() {
+            const complexObject = {
+                user: {
+                    id: 123,
+                    name: 'Test User',
+                    settings: {
+                        theme: 'dark',
+                        notifications: true,
+                        preferences: ['email', 'sms']
+                    }
+                },
+                timestamp: new Date().toISOString(),
+                metadata: {
+                    version: '1.0.0',
+                    environment: 'testing'
+                }
+            };
+            console.log('Complex Object:', complexObject);
+            updateOutput('OBJECT: Logged complex nested object');
+        }
+
+        function testArray() {
+            const array = [1, 'two', { three: 3 }, [4, 5], true, null, undefined];
+            console.log('Mixed Array:', array);
+            updateOutput('ARRAY: Logged mixed-type array');
+        }
+
+        function testMultipleArgs() {
+            console.log('Multiple', 'arguments', 'in', 'one', 'call', { key: 'value' }, [1, 2, 3]);
+            updateOutput('MULTI: Logged message with multiple arguments');
+        }
+
+        function testTiming() {
+            console.time('Operation');
+            setTimeout(() => {
+                console.timeEnd('Operation');
+                updateOutput('TIMING: Completed time measurement');
+            }, 1000);
+            updateOutput('TIMING: Started time measurement (1 second)...');
+        }
+
+        function testTrace() {
+            function innerFunction() {
+                console.trace('Stack trace from innerFunction');
+            }
+            function outerFunction() {
+                innerFunction();
+            }
+            outerFunction();
+            updateOutput('TRACE: Generated stack trace');
+        }
+
+        function testBurst() {
+            updateOutput('BURST: Sending 100 messages...');
+            for (let i = 0; i < 100; i++) {
+                console.log(`Burst message ${i + 1}/100`);
+            }
+            updateOutput('BURST: Completed sending 100 messages');
+        }
+
+        function testLargePayload() {
+            const largeString = 'x'.repeat(10000);
+            const largeObject = {
+                data: largeString,
+                nested: {
+                    moreData: largeString,
+                    array: Array(100).fill('test')
+                }
+            };
+            console.log('Large payload:', largeObject);
+            updateOutput('LARGE: Sent large payload (10KB+ string)');
+        }
+
+        function testRapidFire() {
+            let count = 0;
+            updateOutput('RAPID: Starting rapid fire (50 messages at 10ms intervals)...');
+            const interval = setInterval(() => {
+                console.log(`Rapid message ${++count}`);
+                if (count >= 50) {
+                    clearInterval(interval);
+                    updateOutput('RAPID: Completed rapid fire test');
+                }
+            }, 10);
+        }
+
+        // Run all detection methods on load
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('[Detection] Starting extension detection...');
+
+            // Run immediate checks
+            checkExtension();
+
+            // Run async checks
+            checkViaPostMessage();
+            checkViaCustomEvent();
+
+            // Recheck periodically (for late-loading extensions)
+            setTimeout(() => {
+                if (!extensionDetected) {
+                    console.log('[Detection] Retrying detection methods...');
+                    checkExtension();
+                    checkViaPostMessage();
+                    checkViaCustomEvent();
+                }
+            }, 500);
+
+            // Final check after 2 seconds
+            setTimeout(() => {
+                if (!extensionDetected) {
+                    console.log('[Detection] Final detection attempt...');
+                    checkExtension();
+                }
+            }, 2000);
+        });
+
+        // Also check immediately in case DOM is already loaded
+        if (document.readyState !== 'loading') {
+            console.log('[Detection] DOM already loaded, checking immediately...');
+            checkExtension();
+            checkViaPostMessage();
+            checkViaCustomEvent();
+        }
+    </script>
+</body>
+</html>

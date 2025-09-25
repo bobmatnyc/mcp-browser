@@ -1,7 +1,7 @@
 """Data models for mcp-browser."""
 
-from .console_message import ConsoleMessage, ConsoleLevel
-from .browser_state import BrowserState, BrowserConnection
+from .browser_state import BrowserConnection, BrowserState
+from .console_message import ConsoleLevel, ConsoleMessage
 
 __all__ = [
     'ConsoleMessage',

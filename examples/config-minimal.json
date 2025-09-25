@@ -1,0 +1,14 @@
+{
+  "storage": {
+    "base_path": "~/.mcp-browser/data",
+    "max_file_size_mb": 50,
+    "retention_days": 7
+  },
+  "websocket": {
+    "port_range": [8875, 8895],
+    "host": "localhost"
+  },
+  "logging": {
+    "level": "INFO"
+  }
+}

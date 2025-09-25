@@ -1,0 +1,112 @@
+#!/bin/bash
+
+# mcp-browser - Smart launcher script
+# Automatically uses local venv when in project directory, pipx version elsewhere
+
+set -e
+
+# Get the absolute path of this script and its directory
+SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_PATH")"
+
+# Function to check if we're in the project directory or a subdirectory
+is_in_project() {
+    local current_dir="$(pwd)"
+    # Check if current directory starts with the project root path
+    [[ "$current_dir" == "$PROJECT_ROOT"* ]]
+}
+
+# Function to check if pipx mcp-browser is installed
+has_pipx_version() {
+    command -v pipx >/dev/null 2>&1 && pipx list 2>/dev/null | grep -q "mcp-browser"
+}
+
+# Function to run local venv version
+run_local_version() {
+    local venv_path="$PROJECT_ROOT/.venv"
+    local python_bin="$venv_path/bin/python"
+
+    if [[ ! -f "$python_bin" ]]; then
+        echo "Error: Virtual environment not found at $venv_path" >&2
+        echo "Please run 'make install' in the project directory first." >&2
+        exit 1
+    fi
+
+    # Check if mcp-browser is installed in the venv
+    if [[ ! -f "$venv_path/bin/mcp-browser" ]]; then
+        echo "Installing mcp-browser in local venv..." >&2
+        "$python_bin" -m pip install -e "$PROJECT_ROOT" >/dev/null 2>&1
+    fi
+
+    # Activate venv and run mcp-browser
+    export VIRTUAL_ENV="$venv_path"
+    export PATH="$venv_path/bin:$PATH"
+    unset PYTHONHOME 2>/dev/null || true
+
+    exec "$venv_path/bin/mcp-browser" "$@"
+}
+
+# Function to run pipx version
+run_pipx_version() {
+    if ! has_pipx_version; then
+        echo "Error: mcp-browser is not installed via pipx" >&2
+        echo "Install it with: pipx install git+https://github.com/yourusername/mcp-browser.git" >&2
+        exit 1
+    fi
+
+    # Find pipx-installed mcp-browser
+    local pipx_bin="$(pipx environment --value PIPX_BIN_DIR 2>/dev/null)/mcp-browser"
+
+    if [[ ! -f "$pipx_bin" ]]; then
+        # Fallback to searching PATH
+        pipx_bin="$(which mcp-browser 2>/dev/null | grep -v "$SCRIPT_PATH" | head -1)"
+    fi
+
+    if [[ -z "$pipx_bin" || ! -f "$pipx_bin" ]]; then
+        echo "Error: Could not find pipx-installed mcp-browser" >&2
+        exit 1
+    fi
+
+    exec "$pipx_bin" "$@"
+}
+
+# Main logic
+main() {
+    # Special flag to force pipx version
+    if [[ "$1" == "--use-pipx" ]]; then
+        shift
+        run_pipx_version "$@"
+    # Special flag to force local version
+    elif [[ "$1" == "--use-local" ]]; then
+        shift
+        run_local_version "$@"
+    # Auto-detect based on current directory
+    elif is_in_project; then
+        # echo "Using local development version of mcp-browser" >&2
+        run_local_version "$@"
+    else
+        # echo "Using system-wide pipx version of mcp-browser" >&2
+        run_pipx_version "$@"
+    fi
+}
+
+# Show version info with special flag
+if [[ "$1" == "--version-info" ]]; then
+    echo "mcp-browser smart launcher"
+    echo "Project root: $PROJECT_ROOT"
+    echo "Current directory: $(pwd)"
+
+    if is_in_project; then
+        echo "Mode: Local development version"
+    else
+        echo "Mode: System-wide pipx version"
+    fi
+
+    echo ""
+    echo "To force a specific version:"
+    echo "  mcp-browser --use-local [args]  # Force local venv version"
+    echo "  mcp-browser --use-pipx [args]   # Force pipx version"
+    exit 0
+fi
+
+main "$@"

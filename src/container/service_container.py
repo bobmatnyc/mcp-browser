@@ -1,10 +1,9 @@
 """Service container for dependency injection."""
 
-from typing import Any, Callable, Dict, Optional, TypeVar, Type
 import asyncio
 import inspect
 from functools import wraps
-
+from typing import Any, Callable, Dict, TypeVar
 
 T = TypeVar('T')
 

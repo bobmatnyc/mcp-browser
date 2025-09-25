@@ -1,10 +1,10 @@
 """Console message data model."""
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Dict, Any, List
-import json
+from typing import Any, Dict, List, Optional
 
 
 class ConsoleLevel(Enum):
