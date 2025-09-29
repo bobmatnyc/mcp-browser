@@ -1,4 +1,4 @@
-"""BrowserPyMCP - MCP server for browser console log capture and control."""
+"""mcp-browser - MCP server for browser console log capture and control."""
 
 # Import version from single source of truth
 from ._version import __author__, __description__, __version__, version_string

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MCP Browser",
-  "version": "1.0.0",
+  "version": "2.0.4",
   "description": "Captures browser console logs and sends them to local MCP server",
   "permissions": [
     "activeTab",
@@ -17,18 +17,23 @@
     "ws://[::1]/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background-enhanced.js"
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["Readability.js", "content.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "Readability.js",
+        "content.js"
+      ],
       "run_at": "document_start",
       "all_frames": true
     }
   ],
   "action": {
-    "default_popup": "popup.html",
+    "default_popup": "popup-enhanced.html",
     "default_icon": {
       "16": "icon-16.png",
       "48": "icon-48.png",

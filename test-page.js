@@ -126,7 +126,7 @@ class MCPBrowserTester {
                     try {
                         // This will only work if we're running as part of the extension
                         const manifest = chrome.runtime.getManifest();
-                        if (manifest && manifest.name && manifest.name.includes('BrowserPyMCP')) {
+                        if (manifest && manifest.name && manifest.name.includes('mcp-browser')) {
                             this.extensionVersion = manifest.version;
                             return true;
                         }
@@ -154,7 +154,7 @@ class MCPBrowserTester {
         // Check if console has been intercepted by looking at console message in buffer
         if (!this.extensionDetected && this.consoleBuffer.length > 0) {
             const hasExtensionMessage = this.consoleBuffer.some(entry =>
-                entry.message.includes('[BrowserPyMCP]')
+                entry.message.includes('[mcp-browser]')
             );
             if (hasExtensionMessage) {
                 this.extensionDetected = true;

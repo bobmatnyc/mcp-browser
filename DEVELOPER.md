@@ -470,7 +470,7 @@ async def test_service_integration():
 2. **Debug Console Capture**:
    - Open browser DevTools (F12)
    - Check console for extension messages
-   - Look for "[BrowserPyMCP] Console capture initialized"
+   - Look for "[mcp-browser] Console capture initialized"
 
 3. **Test WebSocket Connection**:
    - Open extension popup
@@ -533,8 +533,8 @@ console.log('Message queue length:', messageQueue.length);
 console.log('Last error:', lastError);
 
 // In content script
-console.log('[BrowserPyMCP] Console capture active');
-console.log('[BrowserPyMCP] Messages captured:', messageCount);
+console.log('[mcp-browser] Console capture active');
+console.log('[mcp-browser] Messages captured:', messageCount);
 ```
 
 ## Configuration

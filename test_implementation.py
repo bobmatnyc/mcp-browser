@@ -24,7 +24,7 @@ from datetime import datetime
 async def test_services():
     """Test that all services can be instantiated and basic operations work."""
 
-    print("Testing BrowserPyMCP Implementation\n" + "=" * 40)
+    print("Testing mcp-browser Implementation\n" + "=" * 40)
 
     # Test 1: Service Container
     print("\n1. Testing Service Container...")

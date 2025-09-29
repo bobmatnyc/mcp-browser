@@ -161,9 +161,58 @@ extension-test: ## Test extension connection
 extension-reload: ## Instructions for reloading extension during development
 	@echo "$(BLUE)Extension Reload Instructions:$(NC)"
 	@echo "1. Open chrome://extensions/"
-	@echo "2. Find 'BrowserPyMCP Console Capture'"
+	@echo "2. Find 'mcp-browser Console Capture'"
 	@echo "3. Click the reload button (🔄)"
 	@echo "4. Or use the reload shortcut: Ctrl+R on the extensions page"
+
+# Extension build and packaging commands
+ext-build: ## Build extension package with current version
+	@echo "$(BLUE)Building Chrome extension package...$(NC)"
+	@python scripts/build_extension.py build
+
+ext-build-auto: ## Build with auto-version if changes detected
+	@echo "$(BLUE)Building extension with auto-versioning...$(NC)"
+	@python scripts/build_extension.py build --auto-version
+
+ext-release: ## Auto-increment patch version and build
+	@echo "$(BLUE)Releasing extension (patch increment)...$(NC)"
+	@python scripts/build_extension.py release
+
+ext-release-patch: ## Release with patch version bump
+	@echo "$(BLUE)Releasing extension (patch: x.x.N+1)...$(NC)"
+	@python scripts/build_extension.py release --bump patch
+
+ext-release-minor: ## Release with minor version bump
+	@echo "$(BLUE)Releasing extension (minor: x.N+1.0)...$(NC)"
+	@python scripts/build_extension.py release --bump minor
+
+ext-release-major: ## Release with major version bump
+	@echo "$(BLUE)Releasing extension (major: N+1.0.0)...$(NC)"
+	@python scripts/build_extension.py release --bump major
+
+ext-version-patch: ## Increment patch version and build (backward compat)
+	@echo "$(BLUE)Bumping patch version and building...$(NC)"
+	@python scripts/build_extension.py version patch
+
+ext-version-minor: ## Increment minor version and build (backward compat)
+	@echo "$(BLUE)Bumping minor version and building...$(NC)"
+	@python scripts/build_extension.py version minor
+
+ext-version-major: ## Increment major version and build (backward compat)
+	@echo "$(BLUE)Bumping major version and building...$(NC)"
+	@python scripts/build_extension.py version major
+
+ext-clean: ## Clean extension build artifacts
+	@echo "$(BLUE)Cleaning extension packages...$(NC)"
+	@python scripts/build_extension.py clean
+	@echo "$(GREEN)✓ Extension packages cleaned$(NC)"
+
+ext-sync: ## Sync extension version with project version
+	@echo "$(BLUE)Syncing extension version with project...$(NC)"
+	@python scripts/build_extension.py sync
+
+ext-info: ## Show extension version information and change status
+	@python scripts/build_extension.py info
 
 # Documentation generation
 docs: ## Generate documentation

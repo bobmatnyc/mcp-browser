@@ -1,5 +1,6 @@
 /**
  * Popup script for status display
+ * Version: 1.0.4 - Fixed connection detection
  */
 
 let sessionStartTime = Date.now();
@@ -18,6 +19,7 @@ function updateStatus() {
     const statusIndicator = document.getElementById('status-indicator');
     const statusText = document.getElementById('status-text');
     const portValue = document.getElementById('port-value');
+    const portSelect = document.getElementById('port-select');
     const messageCount = document.getElementById('message-count');
     const errorContainer = document.getElementById('error-container');
 
@@ -25,6 +27,13 @@ function updateStatus() {
       statusIndicator.className = 'status-indicator connected';
       statusText.textContent = 'Connected';
       portValue.textContent = response.port || '-';
+
+      // Update port select to show current port
+      if (response.port && portSelect.value === 'auto') {
+        // Don't change if user manually selected a port
+        portValue.textContent = `(${response.port})`;
+      }
+
       messageCount.textContent = response.messageCount || '0';
       errorContainer.innerHTML = '';
 
@@ -91,9 +100,9 @@ document.getElementById('test-button').addEventListener('click', () => {
       chrome.scripting.executeScript({
         target: { tabId: tabs[0].id },
         func: () => {
-          console.log('[BrowserPyMCP Test] Test message generated at', new Date().toISOString());
-          console.info('[BrowserPyMCP Test] Extension is working correctly!');
-          console.warn('[BrowserPyMCP Test] This is a test warning');
+          console.log('[mcp-browser Test] Test message generated at', new Date().toISOString());
+          console.info('[mcp-browser Test] Extension is working correctly!');
+          console.warn('[mcp-browser Test] This is a test warning');
         }
       }, () => {
         // Update button text temporarily
@@ -109,6 +118,28 @@ document.getElementById('test-button').addEventListener('click', () => {
       });
     }
   });
+});
+
+// Port selection handler
+document.getElementById('port-select').addEventListener('change', (e) => {
+  const selectedPort = e.target.value;
+
+  if (selectedPort === 'auto') {
+    // Send auto-connect message
+    chrome.runtime.sendMessage({ type: 'set_port_mode', mode: 'auto' });
+  } else {
+    // Send specific port message
+    chrome.runtime.sendMessage({ type: 'connect_to_port', port: parseInt(selectedPort) });
+  }
+
+  // Update button text temporarily
+  const portSelect = document.getElementById('port-select');
+  portSelect.disabled = true;
+
+  setTimeout(() => {
+    portSelect.disabled = false;
+    updateStatus();
+  }, 2000);
 });
 
 // Update status on load

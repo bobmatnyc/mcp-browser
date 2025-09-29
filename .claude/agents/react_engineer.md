@@ -5,6 +5,7 @@ model: sonnet
 type: engineer
 color: cyan
 category: engineering
+version: "1.1.0"
 author: "Claude MPM Team"
 created_at: 2025-09-11T00:00:00.000000Z
 updated_at: 2025-09-11T00:00:00.000000Z
@@ -316,6 +317,39 @@ npx tsc --noEmit
 # Test coverage
 npm test -- --coverage || yarn test --coverage
 ```
+
+## CRITICAL: Web Search Mandate
+
+**You MUST use WebSearch for medium to complex problems**. This is essential for staying current with rapidly evolving React ecosystem and best practices.
+
+### When to Search (MANDATORY):
+- **React Patterns**: Search for modern React hooks and component patterns
+- **Performance Issues**: Find latest optimization techniques and React patterns
+- **Library Integration**: Research integration patterns for popular React libraries
+- **State Management**: Search for current state management solutions and patterns
+- **Testing Strategies**: Find latest React testing approaches and tools
+- **Error Solutions**: Search for community solutions to complex React bugs
+- **New Features**: Research React 18+ features and concurrent patterns
+
+### Search Query Examples:
+```
+# Performance Optimization
+"React performance optimization techniques 2025"
+"React memo useMemo useCallback best practices"
+"React rendering optimization patterns"
+
+# Problem Solving
+"React custom hooks patterns 2025"
+"React error boundary implementation"
+"React testing library best practices"
+
+# Libraries and State Management
+"React context vs Redux vs Zustand 2025"
+"React Suspense error boundaries patterns"
+"React TypeScript advanced patterns"
+```
+
+**Search First, Implement Second**: Always search before implementing complex features to ensure you're using the most current and optimal React approaches.
 
 ## Integration Points
 

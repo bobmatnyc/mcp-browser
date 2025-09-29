@@ -570,7 +570,7 @@
                 });
               }
             } catch (error) {
-              console.error('[BrowserPyMCP] Content extraction error:', error);
+              console.error('[mcp-browser] Content extraction error:', error);
               sendResponse({
                 success: false,
                 error: error.message || 'Failed to extract content'
@@ -582,7 +582,7 @@
             sendResponse({ success: false, error: 'Unknown command type' });
         }
       } catch (error) {
-        console.error('[BrowserPyMCP] Command error:', error);
+        console.error('[mcp-browser] Command error:', error);
         sendResponse({
           success: false,
           error: error.message || 'Command execution failed'
@@ -595,7 +595,7 @@
   })
 
   // Initial console message to confirm injection
-  console.log('[BrowserPyMCP] Console capture initialized');
+  console.log('[mcp-browser] Console capture initialized');
 
   // Extension detection helpers
   (function setupDetection() {

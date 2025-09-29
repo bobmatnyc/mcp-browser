@@ -161,8 +161,14 @@ class BrowserMCPServer:
             )
         ))
 
-        # Register WebSocket service
-        self.container.register('websocket_service', lambda c: WebSocketService())
+        # Register WebSocket service with configuration
+        websocket_config = self.config.get('websocket', {})
+        port_range = websocket_config.get('port_range', [8875, 8895])
+        self.container.register('websocket_service', lambda c: WebSocketService(
+            start_port=port_range[0],
+            end_port=port_range[-1],
+            host=websocket_config.get('host', 'localhost')
+        ))
 
         # Register browser service with storage dependency
         async def create_browser_service(c):

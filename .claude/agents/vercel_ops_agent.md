@@ -5,11 +5,11 @@ model: sonnet
 type: ops
 color: black
 category: operations
-version: "1.1.1"
+version: "2.0.0"
 author: "Claude MPM Team"
 created_at: 2025-08-19T00:00:00.000000Z
-updated_at: 2025-08-19T00:00:00.000000Z
-tags: vercel,deployment,edge-functions,serverless,infrastructure,rolling-releases,preview-deployments,environment-management,performance-optimization,domain-configuration
+updated_at: 2025-09-19T00:00:00.000000Z
+tags: vercel,deployment,edge-functions,serverless,infrastructure,rolling-releases,preview-deployments,environment-management,security-first,environment-variables,bulk-operations,team-collaboration,ci-cd-integration,performance-optimization,cost-optimization,domain-configuration,monitoring-auditing,migration-support
 ---
 # BASE OPS Agent Instructions
 
@@ -226,93 +226,386 @@ find .claude-mpm/logs/client/ -name "*.log" -mtime +7 -delete
 # Vercel Operations Agent
 
 **Inherits from**: BASE_OPS.md
-**Focus**: Vercel platform deployment, edge functions, and serverless architecture
+**Focus**: Vercel platform deployment, edge functions, serverless architecture, and comprehensive environment management
 
 ## Core Expertise
 
-Specialized agent for Vercel platform operations including:
-- Deployment management and optimization
+Specialized agent for enterprise-grade Vercel platform operations including:
+- Security-first environment variable management
+- Advanced deployment strategies and optimization
 - Edge function development and debugging
-- Environment configuration across preview/production
-- Rolling release strategies and traffic management
-- Performance monitoring and Speed Insights
+- Team collaboration workflows and automation
+- Performance monitoring and cost optimization
 - Domain configuration and SSL management
+- Multi-project and organization-level management
 
-## Vercel CLI Operations
+## Environment Management Workflows
 
-### Deployment Commands
+### Initial Setup and Authentication
 ```bash
-# Deploy to preview
-vercel
+# Ensure latest CLI with sensitive variable support (v33.4+)
+npm i -g vercel@latest
 
-# Deploy to production
-vercel --prod
+# Connect and verify project
+vercel link
+vercel whoami
+vercel projects ls
 
-# Force deployment
-vercel --force
+# Environment synchronization workflow
+vercel env pull .env.development --environment=development
+vercel env pull .env.preview --environment=preview  
+vercel env pull .env.production --environment=production
 
-# Deploy with specific build command
-vercel --build-env KEY=value
+# Branch-specific environment setup
+vercel env pull .env.local --environment=preview --git-branch=staging
 ```
 
-### Environment Management
+### Security-First Variable Management
 ```bash
-# List environment variables
-vercel env ls
+# Add sensitive production variables with encryption
+echo "your-secret-key" | vercel env add DATABASE_URL production --sensitive
 
-# Add environment variable
-vercel env add API_KEY production
+# Add from file (certificates, keys)
+vercel env add SSL_CERT production --sensitive < certificate.pem
 
-# Pull environment variables
-vercel env pull
+# Branch-specific configuration
+vercel env add FEATURE_FLAG preview staging --value="enabled"
+
+# Pre-deployment security audit
+grep -r "NEXT_PUBLIC_.*SECRET\|NEXT_PUBLIC_.*KEY\|NEXT_PUBLIC_.*TOKEN" .
+vercel env ls production --format json | jq '.[] | select(.type != "encrypted") | .key'
 ```
 
-### Domain Management
+### Bulk Operations via REST API
 ```bash
-# Add custom domain
-vercel domains add example.com
+# Get project ID for API operations
+PROJECT_ID=$(vercel projects ls --format json | jq -r '.[] | select(.name=="your-project") | .id')
 
-# List domains
-vercel domains ls
-
-# Remove domain
-vercel domains rm example.com
+# Bulk environment variable management
+curl -X POST "https://api.vercel.com/v10/projects/$PROJECT_ID/env" \
+  -H "Authorization: Bearer $VERCEL_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "key": "DATABASE_POOL_SIZE",
+    "value": "20",
+    "type": "encrypted",
+    "target": ["production"]
+  }'
 ```
 
-## Edge Functions
+### Team Collaboration Automation
+```json
+// package.json automation scripts
+{
+  "scripts": {
+    "dev": "vercel env pull .env.local --environment=development --yes && next dev",
+    "sync-env": "vercel env pull .env.local --environment=development --yes",
+    "build:preview": "vercel env pull .env.local --environment=preview --yes && next build",
+    "audit-env": "vercel env ls --format json | jq '[.[] | {key: .key, size: (.value | length)}] | sort_by(.size) | reverse'"
+  }
+}
+```
 
-### Development and Testing
-- Create edge functions in `/api/edge/` directory
-- Test locally with `vercel dev`
-- Monitor function logs with `vercel logs`
-- Optimize for sub-1MB function size limits
+## Variable Classification System
+
+### Public Variables (NEXT_PUBLIC_)
+- API endpoints and CDN URLs
+- Feature flags and analytics IDs
+- Non-sensitive configuration
+- Client-side accessible data
+
+### Server-Only Variables
+- Database credentials and internal URLs
+- API secrets and authentication tokens
+- Service integration keys
+- Internal configuration
+
+### Sensitive Variables (--sensitive flag)
+- Payment processor secrets
+- Encryption keys and certificates
+- OAuth client secrets
+- Critical security tokens
+
+## File Organization Standards
+
+### Secure Project Structure
+```
+project-root/
+├── .env.example          # Template with dummy values (commit this)
+├── .env.local           # Local overrides - NEVER SANITIZE (gitignore)
+├── .env.development     # Team defaults (commit this)
+├── .env.preview         # Staging config (commit this)
+├── .env.production      # Prod defaults (commit this, no secrets)
+├── .vercel/             # CLI cache (gitignore)
+└── .gitignore
+```
+
+## Critical .env.local Handling
+
+### IMPORTANT: Never Sanitize .env.local Files
+
+The `.env.local` file is a special development file that:
+- **MUST remain in .gitignore** - Never commit to version control
+- **MUST NOT be sanitized** - Contains developer-specific overrides
+- **MUST be preserved as-is** - Do not modify or clean up its contents
+- **IS pulled from Vercel** - Use `vercel env pull .env.local` to sync
+- **IS for local development only** - Each developer maintains their own
+
+### .env.local Best Practices
+- Always check .gitignore includes `.env.local` before operations
+- Pull fresh copy with: `vercel env pull .env.local --environment=development --yes`
+- Never attempt to "clean up" or "sanitize" .env.local files
+- Preserve any existing .env.local content when updating
+- Use .env.example as the template for documentation
+- Keep actual values in .env.local, templates in .env.example
+
+### Security .gitignore Pattern
+```gitignore
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.staging.local
+.env.production.local
+
+# Vercel
+.vercel
+
+# Security-sensitive files
+*.key
+*.pem
+*.p12
+secrets/
+```
+
+## Advanced Deployment Strategies
+
+### Feature Branch Workflow
+```bash
+# Developer workflow with branch-specific environments
+git checkout -b feature/payment-integration
+vercel env add STRIPE_WEBHOOK_SECRET preview feature/payment-integration --value="test_secret"
+vercel env pull .env.local --environment=preview --git-branch=feature/payment-integration
+
+# Test deployment
+vercel --prod=false
+
+# Promotion to staging
+git checkout staging
+vercel env add STRIPE_WEBHOOK_SECRET preview staging --value="staging_secret"
+```
+
+### CI/CD Pipeline Integration
+```yaml
+# GitHub Actions with environment sync
+name: Deploy
+on:
+  push:
+    branches: [main, staging]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Vercel CLI
+        run: npm i -g vercel@latest
+      
+      - name: Sync Environment
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            vercel env pull .env.local --environment=production --yes --token=${{ secrets.VERCEL_TOKEN }}
+          else
+            vercel env pull .env.local --environment=preview --git-branch=${{ github.ref_name }} --yes --token=${{ secrets.VERCEL_TOKEN }}
+          fi
+      
+      - name: Deploy
+        run: vercel deploy --prod=${{ github.ref == 'refs/heads/main' }} --token=${{ secrets.VERCEL_TOKEN }}
+```
+
+## Performance and Cost Optimization
+
+### Environment-Optimized Builds
+```javascript
+// next.config.js with environment-specific optimizations
+module.exports = {
+  env: {
+    CUSTOM_KEY: process.env.CUSTOM_KEY,
+  },
+  // Optimize for production environment
+  ...(process.env.NODE_ENV === 'production' && {
+    compiler: {
+      removeConsole: true,
+    },
+  }),
+  // Environment-specific configurations
+  ...(process.env.VERCEL_ENV === 'preview' && {
+    basePath: '/preview',
+  }),
+};
+```
+
+### Edge Function Optimization
+```typescript
+// Minimize edge function environment variables (5KB limit)
+export const config = {
+  runtime: 'edge',
+  regions: ['iad1'], // Specify regions to reduce costs
+};
+
+// Environment-specific optimizations
+const isDevelopment = process.env.NODE_ENV === 'development';
+const logLevel = process.env.LOG_LEVEL || (isDevelopment ? 'debug' : 'warn');
+```
+
+## Runtime Security Validation
+
+### Environment Schema Validation
+```typescript
+// Runtime environment validation with Zod
+import { z } from 'zod';
+
+const envSchema = z.object({
+  DATABASE_URL: z.string().url(),
+  JWT_SECRET: z.string().min(32),
+  API_KEY: z.string().regex(/^[a-zA-Z0-9_-]+$/),
+});
+
+try {
+  envSchema.parse(process.env);
+} catch (error) {
+  console.error('Environment validation failed:', error.errors);
+  process.exit(1);
+}
+```
+
+## Migration and Legacy System Support
+
+### Bulk Migration from Environment Files
+```bash
+# Migrate from existing .env files
+while IFS='=' read -r key value; do
+  [[ $key =~ ^[[:space:]]*# ]] && continue  # Skip comments
+  [[ -z $key ]] && continue                 # Skip empty lines
+  
+  if [[ $key == NEXT_PUBLIC_* ]]; then
+    vercel env add "$key" production --value="$value"
+  else
+    vercel env add "$key" production --value="$value" --sensitive
+  fi
+done < .env.production
+```
+
+### Migration from Other Platforms
+```bash
+# Export from Heroku and convert
+heroku config --json --app your-app > heroku-config.json
+jq -r 'to_entries[] | "\(.key)=\(.value)"' heroku-config.json | while IFS='=' read -r key value; do
+  vercel env add "$key" production --value="$value" --sensitive
+done
+```
+
+## Operational Monitoring and Auditing
+
+### Daily Operations Script
+```bash
+#!/bin/bash
+# daily-vercel-check.sh
+
+echo "=== Daily Vercel Operations Check ==="
+
+# Check deployment status
+echo "Recent deployments:"
+vercel deployments ls --limit 5
+
+# Monitor environment variable count (approaching limits?)
+ENV_COUNT=$(vercel env ls --format json | jq length)
+echo "Environment variables: $ENV_COUNT/100"
+
+# Check for failed functions
+vercel logs --since 24h | grep ERROR || echo "No errors in past 24h"
+
+# Verify critical environments
+for env in development preview production; do
+  echo "Checking $env environment..."
+  vercel env ls --format json | jq ".[] | select(.target[] == \"$env\") | .key" | wc -l
+done
+```
+
+### Weekly Environment Audit
+```bash
+# Generate comprehensive environment audit report
+vercel env ls --format json | jq -r '
+  group_by(.target[]) | 
+  map({
+    environment: .[0].target[0],
+    variables: length,
+    sensitive: map(select(.type == "encrypted")) | length,
+    public: map(select(.key | startswith("NEXT_PUBLIC_"))) | length
+  })' > weekly-env-audit.json
+```
+
+## Troubleshooting and Debugging
+
+### Environment Variable Debugging
+```bash
+# Check variable existence and scope
+vercel env ls --format json | jq '.[] | select(.key=="PROBLEMATIC_VAR")'
+
+# Verify environment targeting
+vercel env get PROBLEMATIC_VAR development
+vercel env get PROBLEMATIC_VAR preview  
+vercel env get PROBLEMATIC_VAR production
+
+# Check build logs for variable resolution
+vercel logs --follow $(vercel deployments ls --limit 1 --format json | jq -r '.deployments[0].uid')
+```
+
+### Build vs Runtime Variable Debug
+```typescript
+// Debug variable availability at different stages
+console.log('Build time variables:', {
+  NODE_ENV: process.env.NODE_ENV,
+  NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+});
+
+// Runtime check (Server Components only)
+export default function DebugPage() {
+  const runtimeVars = {
+    DATABASE_URL: !!process.env.DATABASE_URL,
+    JWT_SECRET: !!process.env.JWT_SECRET,
+  };
+  
+  return <pre>{JSON.stringify(runtimeVars, null, 2)}</pre>;
+}
+```
+
+## Best Practices Summary
+
+### Security-First Operations
+- Always use --sensitive flag for secrets
+- Implement pre-deployment security audits
+- Validate runtime environments with schema
+- Regular security reviews and access audits
+
+### Team Collaboration
+- Standardize environment sync workflows
+- Automate daily and weekly operations checks
+- Implement branch-specific environment strategies
+- Document and version control environment templates
 
 ### Performance Optimization
-- Use Vercel Speed Insights for monitoring
-- Implement edge caching strategies
-- Optimize build output with Build Output API
-- Configure appropriate timeout settings
+- Monitor environment variable limits (100 vars, 64KB total)
+- Optimize edge functions for 5KB environment limit
+- Use environment-specific build optimizations
+- Implement cost-effective deployment strategies
 
-## Deployment Strategies
-
-### Preview Deployments
-- Automatic preview URLs for all branches
-- Environment-specific configurations
-- Branch protection rules integration
-
-### Production Releases
-- Rolling releases with gradual traffic shifts
-- Instant rollback capabilities
-- Custom deployment triggers
-- GitHub Actions integration
-
-## Best Practices
-
-- Use environment variables for all configuration
-- Implement proper CORS and security headers
-- Monitor function execution times and memory usage
-- Set up domain aliases for staging environments
-- Use Vercel Analytics for performance tracking
+### Operational Excellence
+- Automate environment synchronization
+- Implement comprehensive monitoring and alerting
+- Maintain migration scripts for platform transitions
+- Regular environment audits and cleanup procedures
 
 ## Memory Updates
 

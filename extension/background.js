@@ -21,17 +21,19 @@ const connectionStatus = {
 
 // Find available port and connect
 async function findAndConnect() {
-  console.log(`Starting port scan from ${port} to ${MAX_PORT}`);
-  for (let p = port; p <= MAX_PORT; p++) {
+  const startPort = 8875; // Always start from beginning of range
+  console.log(`Starting port scan from ${startPort} to ${MAX_PORT}`);
+  for (let p = startPort; p <= MAX_PORT; p++) {
     console.log(`Scanning port ${p}...`);
     if (await tryConnect(p)) {
       port = p;
       console.log(`Successfully connected on port ${p}`);
+      connectionStatus.lastError = null; // Clear any previous errors
       return true;
     }
   }
-  console.error(`Failed to find WebSocket server in port range ${port}-${MAX_PORT}`);
-  connectionStatus.lastError = 'No WebSocket server found';
+  console.error(`Failed to find WebSocket server in port range ${startPort}-${MAX_PORT}`);
+  connectionStatus.lastError = 'No WebSocket server found in ports 8875-8895';
   return false;
 }
 
@@ -313,7 +315,7 @@ function scheduleReconnect() {
   }, 5000);
 }
 
-// Handle messages from content scripts
+// Handle messages from content scripts and popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'console_messages') {
     // Batch console messages
@@ -340,6 +342,41 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       ...request,
       tabId: sender.tab?.id
     });
+    sendResponse({ received: true });
+  } else if (request.type === 'connect_to_port') {
+    // Handle specific port connection
+    console.log(`User requested connection to port ${request.port}`);
+    if (ws) {
+      ws.close();
+    }
+    port = request.port;
+    tryConnect(request.port).then(success => {
+      if (!success) {
+        connectionStatus.lastError = `Failed to connect to port ${request.port}`;
+      }
+    });
+    sendResponse({ received: true });
+  } else if (request.type === 'set_port_mode') {
+    // Handle auto mode
+    if (request.mode === 'auto') {
+      console.log('Switching to auto port discovery');
+      if (ws) {
+        ws.close();
+        ws = null;
+      }
+      isConnected = false;
+      connectionStatus.connected = false;
+      port = 8875; // Reset to start of range
+      setTimeout(() => findAndConnect(), 100); // Small delay to ensure clean state
+    }
+    sendResponse({ received: true });
+  } else if (request.type === 'reconnect') {
+    // Handle reconnect request
+    console.log('Reconnect requested');
+    if (ws) {
+      ws.close();
+    }
+    findAndConnect();
     sendResponse({ received: true });
   }
 });

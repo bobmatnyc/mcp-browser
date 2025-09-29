@@ -108,14 +108,18 @@ class WebSocketService:
     async def _handle_connection(
         self,
         websocket: WebSocketServerProtocol,
-        path: str
+        path: str = None
     ) -> None:
         """Handle a WebSocket connection.
 
         Args:
             websocket: WebSocket connection
-            path: Request path (required by websockets library)
+            path: Request path (optional for newer websockets versions)
         """
+        # Handle both old and new websockets library signatures
+        if path is None:
+            path = websocket.path if hasattr(websocket, 'path') else '/'
+
         self._connections.add(websocket)
         connection_info = {
             'remote_address': websocket.remote_address,
@@ -161,6 +165,19 @@ class WebSocketService:
         try:
             data = json.loads(message)
             message_type = data.get('type', 'unknown')
+
+            # Handle server info request
+            if message_type == 'server_info':
+                import os
+                server_info = {
+                    'type': 'server_info_response',
+                    'port': self.port,
+                    'project_path': os.getcwd(),
+                    'project_name': os.path.basename(os.getcwd()),
+                    'version': '1.0.3'
+                }
+                await self.send_message(websocket, server_info)
+                return
 
             # Add connection info to data
             data['_websocket'] = websocket

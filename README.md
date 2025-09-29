@@ -420,7 +420,7 @@ Environment variables:
 1. Verify extension is installed and enabled
 2. Refresh the target web page
 3. Check extension popup for connection status
-4. Look for test message: "[BrowserPyMCP] Console capture initialized"
+4. Look for test message: "[mcp-browser] Console capture initialized"
 
 ### Screenshot Failures
 
