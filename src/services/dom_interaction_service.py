@@ -29,7 +29,7 @@ class DOMInteractionService:
         xpath: Optional[str] = None,
         text: Optional[str] = None,
         index: int = 0,
-        tab_id: Optional[int] = None
+        tab_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Click an element on the page.
 
@@ -46,14 +46,9 @@ class DOMInteractionService:
         """
         return await self._send_dom_command(
             port=port,
-            command_type='click',
-            params={
-                'selector': selector,
-                'xpath': xpath,
-                'text': text,
-                'index': index
-            },
-            tab_id=tab_id
+            command_type="click",
+            params={"selector": selector, "xpath": xpath, "text": text, "index": index},
+            tab_id=tab_id,
         )
 
     async def fill_field(
@@ -63,7 +58,7 @@ class DOMInteractionService:
         selector: Optional[str] = None,
         xpath: Optional[str] = None,
         index: int = 0,
-        tab_id: Optional[int] = None
+        tab_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Fill a form field with a value.
 
@@ -80,14 +75,14 @@ class DOMInteractionService:
         """
         return await self._send_dom_command(
             port=port,
-            command_type='fill',
+            command_type="fill",
             params={
-                'selector': selector,
-                'xpath': xpath,
-                'value': value,
-                'index': index
+                "selector": selector,
+                "xpath": xpath,
+                "value": value,
+                "index": index,
             },
-            tab_id=tab_id
+            tab_id=tab_id,
         )
 
     async def submit_form(
@@ -95,7 +90,7 @@ class DOMInteractionService:
         port: int,
         selector: Optional[str] = None,
         xpath: Optional[str] = None,
-        tab_id: Optional[int] = None
+        tab_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Submit a form.
 
@@ -110,12 +105,9 @@ class DOMInteractionService:
         """
         return await self._send_dom_command(
             port=port,
-            command_type='submit',
-            params={
-                'selector': selector,
-                'xpath': xpath
-            },
-            tab_id=tab_id
+            command_type="submit",
+            params={"selector": selector, "xpath": xpath},
+            tab_id=tab_id,
         )
 
     async def get_element(
@@ -125,7 +117,7 @@ class DOMInteractionService:
         xpath: Optional[str] = None,
         text: Optional[str] = None,
         index: int = 0,
-        tab_id: Optional[int] = None
+        tab_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Get information about an element.
 
@@ -142,22 +134,13 @@ class DOMInteractionService:
         """
         return await self._send_dom_command(
             port=port,
-            command_type='get_element',
-            params={
-                'selector': selector,
-                'xpath': xpath,
-                'text': text,
-                'index': index
-            },
-            tab_id=tab_id
+            command_type="get_element",
+            params={"selector": selector, "xpath": xpath, "text": text, "index": index},
+            tab_id=tab_id,
         )
 
     async def get_elements(
-        self,
-        port: int,
-        selector: str,
-        limit: int = 10,
-        tab_id: Optional[int] = None
+        self, port: int, selector: str, limit: int = 10, tab_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """Get information about multiple elements.
 
@@ -172,12 +155,9 @@ class DOMInteractionService:
         """
         return await self._send_dom_command(
             port=port,
-            command_type='get_elements',
-            params={
-                'selector': selector,
-                'limit': limit
-            },
-            tab_id=tab_id
+            command_type="get_elements",
+            params={"selector": selector, "limit": limit},
+            tab_id=tab_id,
         )
 
     async def wait_for_element(
@@ -185,7 +165,7 @@ class DOMInteractionService:
         port: int,
         selector: str,
         timeout: int = 5000,
-        tab_id: Optional[int] = None
+        tab_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Wait for an element to appear.
 
@@ -200,12 +180,9 @@ class DOMInteractionService:
         """
         return await self._send_dom_command(
             port=port,
-            command_type='wait_for_element',
-            params={
-                'selector': selector,
-                'timeout': timeout
-            },
-            tab_id=tab_id
+            command_type="wait_for_element",
+            params={"selector": selector, "timeout": timeout},
+            tab_id=tab_id,
         )
 
     async def select_option(
@@ -215,7 +192,7 @@ class DOMInteractionService:
         option_value: Optional[str] = None,
         option_text: Optional[str] = None,
         option_index: Optional[int] = None,
-        tab_id: Optional[int] = None
+        tab_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Select an option in a dropdown.
 
@@ -232,14 +209,14 @@ class DOMInteractionService:
         """
         return await self._send_dom_command(
             port=port,
-            command_type='select_option',
+            command_type="select_option",
             params={
-                'selector': selector,
-                'optionValue': option_value,
-                'optionText': option_text,
-                'optionIndex': option_index
+                "selector": selector,
+                "optionValue": option_value,
+                "optionText": option_text,
+                "optionIndex": option_index,
             },
-            tab_id=tab_id
+            tab_id=tab_id,
         )
 
     async def check_checkbox(
@@ -248,7 +225,7 @@ class DOMInteractionService:
         selector: Optional[str] = None,
         xpath: Optional[str] = None,
         checked: Optional[bool] = None,
-        tab_id: Optional[int] = None
+        tab_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Check or uncheck a checkbox.
 
@@ -264,13 +241,9 @@ class DOMInteractionService:
         """
         return await self._send_dom_command(
             port=port,
-            command_type='check_checkbox',
-            params={
-                'selector': selector,
-                'xpath': xpath,
-                'checked': checked
-            },
-            tab_id=tab_id
+            command_type="check_checkbox",
+            params={"selector": selector, "xpath": xpath, "checked": checked},
+            tab_id=tab_id,
         )
 
     async def scroll_to(
@@ -279,8 +252,8 @@ class DOMInteractionService:
         selector: Optional[str] = None,
         top: Optional[int] = None,
         left: Optional[int] = None,
-        block: str = 'center',
-        tab_id: Optional[int] = None
+        block: str = "center",
+        tab_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Scroll to an element or position.
 
@@ -297,14 +270,9 @@ class DOMInteractionService:
         """
         return await self._send_dom_command(
             port=port,
-            command_type='scroll_to',
-            params={
-                'selector': selector,
-                'top': top,
-                'left': left,
-                'block': block
-            },
-            tab_id=tab_id
+            command_type="scroll_to",
+            params={"selector": selector, "top": top, "left": left, "block": block},
+            tab_id=tab_id,
         )
 
     async def fill_form(
@@ -312,7 +280,7 @@ class DOMInteractionService:
         port: int,
         form_data: Dict[str, Any],
         submit: bool = False,
-        tab_id: Optional[int] = None
+        tab_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Fill multiple form fields.
 
@@ -325,42 +293,33 @@ class DOMInteractionService:
         Returns:
             Result dictionary with field results
         """
-        results = {
-            'success': True,
-            'fields': {},
-            'errors': []
-        }
+        results = {"success": True, "fields": {}, "errors": []}
 
         # Fill each field
         for selector, value in form_data.items():
             try:
                 result = await self.fill_field(
-                    port=port,
-                    selector=selector,
-                    value=value,
-                    tab_id=tab_id
+                    port=port, selector=selector, value=value, tab_id=tab_id
                 )
-                results['fields'][selector] = result
-                if not result.get('success'):
-                    results['errors'].append(f"{selector}: {result.get('error')}")
+                results["fields"][selector] = result
+                if not result.get("success"):
+                    results["errors"].append(f"{selector}: {result.get('error')}")
             except Exception as e:
-                results['errors'].append(f"{selector}: {str(e)}")
-                results['success'] = False
+                results["errors"].append(f"{selector}: {str(e)}")
+                results["success"] = False
 
         # Submit form if requested
-        if submit and results['success']:
+        if submit and results["success"]:
             try:
                 # Find form from one of the filled fields
                 first_selector = list(form_data.keys())[0]
                 submit_result = await self.submit_form(
-                    port=port,
-                    selector=first_selector,
-                    tab_id=tab_id
+                    port=port, selector=first_selector, tab_id=tab_id
                 )
-                results['submitted'] = submit_result.get('success', False)
+                results["submitted"] = submit_result.get("success", False)
             except Exception as e:
-                results['submitted'] = False
-                results['errors'].append(f"Submit failed: {str(e)}")
+                results["submitted"] = False
+                results["errors"].append(f"Submit failed: {str(e)}")
 
         return results
 
@@ -383,14 +342,13 @@ class DOMInteractionService:
             return []
 
         try:
-            await connection.websocket.send(json.dumps({
-                'type': 'get_tabs',
-                'requestId': request_id
-            }))
+            await connection.websocket.send(
+                json.dumps({"type": "get_tabs", "requestId": request_id})
+            )
 
             # Wait for response
             result = await asyncio.wait_for(future, timeout=5)
-            return result.get('tabs', [])
+            return result.get("tabs", [])
 
         except asyncio.TimeoutError:
             logger.error("Timeout getting browser tabs")
@@ -418,15 +376,15 @@ class DOMInteractionService:
             return False
 
         try:
-            await connection.websocket.send(json.dumps({
-                'type': 'activate_tab',
-                'tabId': tab_id,
-                'requestId': request_id
-            }))
+            await connection.websocket.send(
+                json.dumps(
+                    {"type": "activate_tab", "tabId": tab_id, "requestId": request_id}
+                )
+            )
 
             # Wait for response
             result = await asyncio.wait_for(future, timeout=5)
-            return result.get('success', False)
+            return result.get("success", False)
 
         except asyncio.TimeoutError:
             logger.error(f"Timeout activating tab {tab_id}")
@@ -439,7 +397,7 @@ class DOMInteractionService:
         port: int,
         command_type: str,
         params: Dict[str, Any],
-        tab_id: Optional[int] = None
+        tab_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Send a DOM command to the browser.
 
@@ -453,16 +411,13 @@ class DOMInteractionService:
             Command response dictionary
         """
         if not self.browser_service:
-            return {
-                'success': False,
-                'error': 'Browser service not available'
-            }
+            return {"success": False, "error": "Browser service not available"}
 
         connection = await self.browser_service.browser_state.get_connection(port)
         if not connection or not connection.websocket:
             return {
-                'success': False,
-                'error': f'No active browser connection on port {port}'
+                "success": False,
+                "error": f"No active browser connection on port {port}",
             }
 
         # Generate request ID
@@ -473,36 +428,32 @@ class DOMInteractionService:
         try:
             # Send DOM command via WebSocket
             import json
-            await connection.websocket.send(json.dumps({
-                'type': 'dom_command',
-                'requestId': request_id,
-                'tabId': tab_id,
-                'command': {
-                    'type': command_type,
-                    'params': params
-                }
-            }))
+
+            await connection.websocket.send(
+                json.dumps(
+                    {
+                        "type": "dom_command",
+                        "requestId": request_id,
+                        "tabId": tab_id,
+                        "command": {"type": command_type, "params": params},
+                    }
+                )
+            )
 
             # Wait for response with timeout
-            result = await asyncio.wait_for(
-                future,
-                timeout=self._request_timeout
-            )
+            result = await asyncio.wait_for(future, timeout=self._request_timeout)
 
             return result
 
         except asyncio.TimeoutError:
             logger.error(f"Timeout waiting for DOM command response: {command_type}")
             return {
-                'success': False,
-                'error': f'Command timeout after {self._request_timeout} seconds'
+                "success": False,
+                "error": f"Command timeout after {self._request_timeout} seconds",
             }
         except Exception as e:
             logger.error(f"Error sending DOM command: {e}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
+            return {"success": False, "error": str(e)}
         finally:
             # Clean up pending request
             self._pending_requests.pop(request_id, None)
@@ -513,10 +464,10 @@ class DOMInteractionService:
         Args:
             data: Response data from browser
         """
-        request_id = data.get('requestId')
+        request_id = data.get("requestId")
         if request_id and request_id in self._pending_requests:
             future = self._pending_requests[request_id]
-            response = data.get('response', {})
+            response = data.get("response", {})
 
             if not future.done():
                 future.set_result(response)

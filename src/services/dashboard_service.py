@@ -164,7 +164,11 @@ class DashboardService:
         if self.websocket_service:
             try:
                 ws_port = getattr(self.websocket_service, "port", None)
-                connection_count = self.websocket_service.get_connection_count() if hasattr(self.websocket_service, 'get_connection_count') else 0
+                connection_count = (
+                    self.websocket_service.get_connection_count()
+                    if hasattr(self.websocket_service, "get_connection_count")
+                    else 0
+                )
                 status["websocket"]["port"] = ws_port
                 status["extension"]["connected"] = connection_count > 0
             except Exception as e:
@@ -174,11 +178,13 @@ class DashboardService:
         if self.browser_service:
             try:
                 # Get message count if browser service has the method
-                if hasattr(self.browser_service, 'get_message_count'):
+                if hasattr(self.browser_service, "get_message_count"):
                     status["logs"]["total"] = self.browser_service.get_message_count()
                 # Get buffer size if available
-                if hasattr(self.browser_service, 'get_buffer_size'):
-                    status["logs"]["bufferSize"] = self.browser_service.get_buffer_size()
+                if hasattr(self.browser_service, "get_buffer_size"):
+                    status["logs"][
+                        "bufferSize"
+                    ] = self.browser_service.get_buffer_size()
             except Exception as e:
                 logger.error(f"Failed to get log stats: {e}")
 
@@ -318,8 +324,12 @@ class DashboardService:
 
         if self.websocket_service:
             try:
-                ws_port = await self._safe_get_attr(self.websocket_service, "current_port")
-                connected = await self._safe_get_attr(self.websocket_service, "is_connected")
+                ws_port = await self._safe_get_attr(
+                    self.websocket_service, "current_port"
+                )
+                connected = await self._safe_get_attr(
+                    self.websocket_service, "is_connected"
+                )
                 status["websocket"]["port"] = ws_port
                 status["extension"]["connected"] = connected or False
             except Exception:
@@ -327,7 +337,9 @@ class DashboardService:
 
         if self.browser_service:
             try:
-                total_logs = await self._safe_call_method(self.browser_service, "get_log_count")
+                total_logs = await self._safe_call_method(
+                    self.browser_service, "get_log_count"
+                )
                 buffer_size = await self._safe_call_method(
                     self.browser_service, "get_buffer_size"
                 )

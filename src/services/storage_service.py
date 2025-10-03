@@ -18,7 +18,8 @@ logger = logging.getLogger(__name__)
 @dataclass
 class StorageConfig:
     """Configuration for storage service."""
-    base_path: Path = Path.home() / '.browserPYMCP' / 'browser'
+
+    base_path: Path = Path.home() / ".browserPYMCP" / "browser"
     max_file_size_mb: int = 50
     retention_days: int = 7
     rotation_check_interval: int = 300  # 5 minutes
@@ -67,9 +68,9 @@ class StorageService:
         """
         port_dir = self._get_port_directory(port)
         if archived:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            return port_dir / f'console_{timestamp}.jsonl'
-        return port_dir / 'console.jsonl'
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            return port_dir / f"console_{timestamp}.jsonl"
+        return port_dir / "console.jsonl"
 
     async def _get_file_lock(self, port: int) -> asyncio.Lock:
         """Get or create a lock for a port's file.
@@ -99,8 +100,8 @@ class StorageService:
                 await self._rotate_log_file(message.port)
 
             # Append message to file
-            async with aiofiles.open(file_path, 'a') as f:
-                await f.write(message.to_jsonl() + '\n')
+            async with aiofiles.open(file_path, "a") as f:
+                await f.write(message.to_jsonl() + "\n")
 
     async def store_messages_batch(self, messages: List[ConsoleMessage]) -> None:
         """Store multiple console messages.
@@ -123,9 +124,7 @@ class StorageService:
         await asyncio.gather(*tasks)
 
     async def _store_port_messages(
-        self,
-        port: int,
-        messages: List[ConsoleMessage]
+        self, port: int, messages: List[ConsoleMessage]
     ) -> None:
         """Store messages for a specific port.
 
@@ -142,9 +141,9 @@ class StorageService:
                 await self._rotate_log_file(port)
 
             # Append all messages
-            async with aiofiles.open(file_path, 'a') as f:
+            async with aiofiles.open(file_path, "a") as f:
                 for msg in messages:
-                    await f.write(msg.to_jsonl() + '\n')
+                    await f.write(msg.to_jsonl() + "\n")
 
     async def query_messages(
         self,
@@ -152,7 +151,7 @@ class StorageService:
         last_n: int = 100,
         level_filter: Optional[List[str]] = None,
         start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None
+        end_time: Optional[datetime] = None,
     ) -> List[ConsoleMessage]:
         """Query stored messages.
 
@@ -174,7 +173,7 @@ class StorageService:
                 return []
 
             messages = []
-            async with aiofiles.open(file_path, 'r') as f:
+            async with aiofiles.open(file_path, "r") as f:
                 async for line in f:
                     try:
                         msg = ConsoleMessage.from_jsonl(line.strip())
@@ -231,11 +230,11 @@ class StorageService:
             if not port_dir.is_dir():
                 continue
 
-            for file_path in port_dir.glob('console_*.jsonl'):
+            for file_path in port_dir.glob("console_*.jsonl"):
                 # Parse timestamp from filename
                 try:
-                    timestamp_str = file_path.stem.replace('console_', '')
-                    file_time = datetime.strptime(timestamp_str, '%Y%m%d_%H%M%S')
+                    timestamp_str = file_path.stem.replace("console_", "")
+                    file_time = datetime.strptime(timestamp_str, "%Y%m%d_%H%M%S")
 
                     if file_time < cutoff_time:
                         file_path.unlink()
@@ -291,10 +290,10 @@ class StorageService:
             Dictionary with storage statistics
         """
         stats = {
-            'base_path': str(self.config.base_path),
-            'ports': [],
-            'total_size_mb': 0,
-            'total_messages': 0
+            "base_path": str(self.config.base_path),
+            "ports": [],
+            "total_size_mb": 0,
+            "total_messages": 0,
         }
 
         for port_dir in self.config.base_path.iterdir():
@@ -302,33 +301,32 @@ class StorageService:
                 continue
 
             port_stats = {
-                'port': int(port_dir.name),
-                'files': [],
-                'size_mb': 0,
-                'message_count': 0
+                "port": int(port_dir.name),
+                "files": [],
+                "size_mb": 0,
+                "message_count": 0,
             }
 
-            for file_path in port_dir.glob('*.jsonl'):
+            for file_path in port_dir.glob("*.jsonl"):
                 size_mb = file_path.stat().st_size / (1024 * 1024)
-                port_stats['files'].append({
-                    'name': file_path.name,
-                    'size_mb': round(size_mb, 2)
-                })
-                port_stats['size_mb'] += size_mb
+                port_stats["files"].append(
+                    {"name": file_path.name, "size_mb": round(size_mb, 2)}
+                )
+                port_stats["size_mb"] += size_mb
 
                 # Count messages asynchronously with periodic yielding
                 line_count = 0
-                async with aiofiles.open(file_path, 'r') as f:
+                async with aiofiles.open(file_path, "r") as f:
                     async for i, _ in self._enumerate_async(f):
                         line_count += 1
                         # Yield control every 1000 lines to prevent blocking
                         if i % 1000 == 0:
                             await asyncio.sleep(0)
-                port_stats['message_count'] += line_count
+                port_stats["message_count"] += line_count
 
-            stats['ports'].append(port_stats)
-            stats['total_size_mb'] += port_stats['size_mb']
-            stats['total_messages'] += port_stats['message_count']
+            stats["ports"].append(port_stats)
+            stats["total_size_mb"] += port_stats["size_mb"]
+            stats["total_messages"] += port_stats["message_count"]
 
-        stats['total_size_mb'] = round(stats['total_size_mb'], 2)
+        stats["total_size_mb"] = round(stats["total_size_mb"], 2)
         return stats

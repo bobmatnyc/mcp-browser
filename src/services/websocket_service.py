@@ -15,10 +15,7 @@ class WebSocketService:
     """WebSocket server with port auto-discovery."""
 
     def __init__(
-        self,
-        start_port: int = 8875,
-        end_port: int = 8895,
-        host: str = 'localhost'
+        self, start_port: int = 8875, end_port: int = 8895, host: str = "localhost"
     ):
         """Initialize WebSocket service.
 
@@ -52,7 +49,7 @@ class WebSocketService:
                     self.host,
                     port,
                     ping_interval=20,
-                    ping_timeout=10
+                    ping_timeout=10,
                 )
                 self.port = port
                 logger.info(f"WebSocket server started on {self.host}:{port}")
@@ -79,11 +76,7 @@ class WebSocketService:
             self.port = None
             logger.info("WebSocket server stopped")
 
-    def register_message_handler(
-        self,
-        message_type: str,
-        handler: Callable
-    ) -> None:
+    def register_message_handler(self, message_type: str, handler: Callable) -> None:
         """Register a handler for a specific message type.
 
         Args:
@@ -92,11 +85,7 @@ class WebSocketService:
         """
         self._message_handlers[message_type] = handler
 
-    def register_connection_handler(
-        self,
-        event: str,
-        handler: Callable
-    ) -> None:
+    def register_connection_handler(self, event: str, handler: Callable) -> None:
         """Register a handler for connection events.
 
         Args:
@@ -106,9 +95,7 @@ class WebSocketService:
         self._connection_handlers[event] = handler
 
     async def _handle_connection(
-        self,
-        websocket: WebSocketServerProtocol,
-        path: str = None
+        self, websocket: WebSocketServerProtocol, path: str = None
     ) -> None:
         """Handle a WebSocket connection.
 
@@ -118,19 +105,19 @@ class WebSocketService:
         """
         # Handle both old and new websockets library signatures
         if path is None:
-            path = websocket.path if hasattr(websocket, 'path') else '/'
+            path = websocket.path if hasattr(websocket, "path") else "/"
 
         self._connections.add(websocket)
         connection_info = {
-            'remote_address': websocket.remote_address,
-            'path': path,
-            'websocket': websocket
+            "remote_address": websocket.remote_address,
+            "path": path,
+            "websocket": websocket,
         }
 
         # Notify connection handler
-        if 'connect' in self._connection_handlers:
+        if "connect" in self._connection_handlers:
             try:
-                await self._connection_handlers['connect'](connection_info)
+                await self._connection_handlers["connect"](connection_info)
             except Exception as e:
                 logger.error(f"Error in connection handler: {e}")
 
@@ -145,16 +132,14 @@ class WebSocketService:
             self._connections.discard(websocket)
 
             # Notify disconnection handler
-            if 'disconnect' in self._connection_handlers:
+            if "disconnect" in self._connection_handlers:
                 try:
-                    await self._connection_handlers['disconnect'](connection_info)
+                    await self._connection_handlers["disconnect"](connection_info)
                 except Exception as e:
                     logger.error(f"Error in disconnection handler: {e}")
 
     async def _handle_message(
-        self,
-        websocket: WebSocketServerProtocol,
-        message: str
+        self, websocket: WebSocketServerProtocol, message: str
     ) -> None:
         """Handle an incoming WebSocket message.
 
@@ -164,29 +149,29 @@ class WebSocketService:
         """
         try:
             data = json.loads(message)
-            message_type = data.get('type', 'unknown')
+            message_type = data.get("type", "unknown")
 
             # Handle server info request
-            if message_type == 'server_info':
+            if message_type == "server_info":
                 import os
+
                 server_info = {
-                    'type': 'server_info_response',
-                    'port': self.port,
-                    'project_path': os.getcwd(),
-                    'project_name': os.path.basename(os.getcwd()),
-                    'version': '1.0.3'
+                    "type": "server_info_response",
+                    "port": self.port,
+                    "project_path": os.getcwd(),
+                    "project_name": os.path.basename(os.getcwd()),
+                    "version": "1.0.3",
                 }
                 await self.send_message(websocket, server_info)
                 return
 
             # Add connection info to data
-            data['_websocket'] = websocket
-            data['_remote_address'] = websocket.remote_address
+            data["_websocket"] = websocket
+            data["_remote_address"] = websocket.remote_address
 
             # Find and call appropriate handler
             handler = self._message_handlers.get(
-                message_type,
-                self._message_handlers.get('default')
+                message_type, self._message_handlers.get("default")
             )
 
             if handler:
@@ -200,9 +185,7 @@ class WebSocketService:
             logger.error(f"Error handling message: {e}")
 
     async def send_message(
-        self,
-        websocket: WebSocketServerProtocol,
-        message: Dict[str, Any]
+        self, websocket: WebSocketServerProtocol, message: Dict[str, Any]
     ) -> None:
         """Send a message to a specific WebSocket connection.
 
@@ -253,9 +236,9 @@ class WebSocketService:
             Dictionary with server information
         """
         return {
-            'host': self.host,
-            'port': self.port,
-            'is_running': self.server is not None,
-            'connection_count': self.get_connection_count(),
-            'port_range': f"{self.start_port}-{self.end_port}"
+            "host": self.host,
+            "port": self.port,
+            "is_running": self.server is not None,
+            "connection_count": self.get_connection_count(),
+            "port_range": f"{self.start_port}-{self.end_port}",
         }

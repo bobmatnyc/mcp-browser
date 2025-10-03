@@ -8,10 +8,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 # Default paths
-HOME_DIR = Path.home() / '.mcp-browser'
-CONFIG_FILE = HOME_DIR / 'config' / 'settings.json'
-LOG_DIR = HOME_DIR / 'logs'
-DATA_DIR = HOME_DIR / 'data'
+HOME_DIR = Path.home() / ".mcp-browser"
+CONFIG_FILE = HOME_DIR / "config" / "settings.json"
+LOG_DIR = HOME_DIR / "logs"
+DATA_DIR = HOME_DIR / "data"
 
 
 def is_first_run() -> bool:
@@ -26,7 +26,13 @@ async def check_system_requirements() -> List[Tuple[str, bool, str]]:
     # Python version
     py_version = sys.version_info
     py_ok = py_version >= (3, 10)
-    checks.append(("Python 3.10+", py_ok, f"Python {py_version.major}.{py_version.minor}.{py_version.micro}"))
+    checks.append(
+        (
+            "Python 3.10+",
+            py_ok,
+            f"Python {py_version.major}.{py_version.minor}.{py_version.micro}",
+        )
+    )
 
     # Chrome/Chromium
     chrome_paths = [
@@ -35,7 +41,11 @@ async def check_system_requirements() -> List[Tuple[str, bool, str]]:
         "/usr/bin/google-chrome",  # Linux
         "/usr/bin/chromium",  # Linux Chromium
     ]
-    chrome_found = any(Path(p).exists() for p in chrome_paths) or shutil.which("chrome") or shutil.which("chromium")
+    chrome_found = (
+        any(Path(p).exists() for p in chrome_paths)
+        or shutil.which("chrome")
+        or shutil.which("chromium")
+    )
     checks.append(("Chrome/Chromium", chrome_found, "Required for extension"))
 
     # Node.js (optional but useful)
@@ -43,9 +53,11 @@ async def check_system_requirements() -> List[Tuple[str, bool, str]]:
     node_version = "Not installed"
     if node_found:
         try:
-            result = subprocess.run(["node", "--version"], capture_output=True, text=True)
+            result = subprocess.run(
+                ["node", "--version"], capture_output=True, text=True
+            )
             node_version = result.stdout.strip()
-        except:
+        except Exception:
             pass
     checks.append(("Node.js (optional)", node_found, node_version))
 
@@ -53,7 +65,7 @@ async def check_system_requirements() -> List[Tuple[str, bool, str]]:
     playwright_ok = False
     try:
         playwright_ok = True
-    except:
+    except Exception:
         pass
     checks.append(("Playwright", playwright_ok, "For screenshots"))
 
@@ -62,10 +74,10 @@ async def check_system_requirements() -> List[Tuple[str, bool, str]]:
     for port in range(8875, 8896):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             try:
-                s.bind(('', port))
+                s.bind(("", port))
                 port_available = True
                 break
-            except:
+            except Exception:
                 pass
     checks.append(("Port availability", port_available, "Ports 8875-8895"))
 
@@ -92,7 +104,7 @@ async def check_installation_status() -> Dict[str, Any]:
     for port in range(8875, 8896):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(0.1)
-            if s.connect_ex(('localhost', port)) == 0:
+            if s.connect_ex(("localhost", port)) == 0:
                 status["server_running"] = True
                 status["server_port"] = port
                 break

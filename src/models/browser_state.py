@@ -49,10 +49,7 @@ class BrowserState:
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
     async def add_connection(
-        self,
-        port: int,
-        websocket: Any,
-        user_agent: Optional[str] = None
+        self, port: int, websocket: Any, user_agent: Optional[str] = None
     ) -> BrowserConnection:
         """Add a new browser connection.
 
@@ -69,7 +66,7 @@ class BrowserState:
                 port=port,
                 connected_at=datetime.now(),
                 websocket=websocket,
-                user_agent=user_agent
+                user_agent=user_agent,
             )
             self.connections[port] = connection
             return connection
@@ -126,9 +123,7 @@ class BrowserState:
         """
         async with self._lock:
             return {
-                port: conn
-                for port, conn in self.connections.items()
-                if conn.is_active
+                port: conn for port, conn in self.connections.items() if conn.is_active
             }
 
     async def get_connection_stats(self) -> Dict[str, Any]:
@@ -142,20 +137,20 @@ class BrowserState:
             total_messages = sum(c.message_count for c in self.connections.values())
 
             return {
-                'total_connections': len(self.connections),
-                'active_connections': len(active_connections),
-                'total_messages': total_messages,
-                'ports': list(self.connections.keys()),
-                'connections': [
+                "total_connections": len(self.connections),
+                "active_connections": len(active_connections),
+                "total_messages": total_messages,
+                "ports": list(self.connections.keys()),
+                "connections": [
                     {
-                        'port': c.port,
-                        'connected_at': c.connected_at.isoformat(),
-                        'message_count': c.message_count,
-                        'url': c.url,
-                        'is_active': c.is_active,
-                        'duration': c.connection_duration,
-                        'idle_time': c.idle_time
+                        "port": c.port,
+                        "connected_at": c.connected_at.isoformat(),
+                        "message_count": c.message_count,
+                        "url": c.url,
+                        "is_active": c.is_active,
+                        "duration": c.connection_duration,
+                        "idle_time": c.idle_time,
                     }
                     for c in self.connections.values()
-                ]
+                ],
             }

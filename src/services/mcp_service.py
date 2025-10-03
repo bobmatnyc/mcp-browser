@@ -16,7 +16,7 @@ class MCPService:
         self,
         browser_service=None,
         screenshot_service=None,
-        dom_interaction_service=None
+        dom_interaction_service=None,
     ):
         """Initialize MCP service.
 
@@ -32,7 +32,7 @@ class MCPService:
         self.server = Server(
             name="mcp-browser",
             version="1.0.3",
-            instructions="Browser control and console log capture for web automation"
+            instructions="Browser control and console log capture for web automation",
         )
         self._setup_tools()
 
@@ -51,15 +51,15 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number"
+                                "description": "Browser port number",
                             },
                             "url": {
                                 "type": "string",
-                                "description": "URL to navigate to"
-                            }
+                                "description": "URL to navigate to",
+                            },
                         },
-                        "required": ["port", "url"]
-                    }
+                        "required": ["port", "url"],
+                    },
                 ),
                 Tool(
                     name="browser_query_logs",
@@ -69,24 +69,24 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number"
+                                "description": "Browser port number",
                             },
                             "last_n": {
                                 "type": "integer",
                                 "description": "Number of recent logs to return",
-                                "default": 100
+                                "default": 100,
                             },
                             "level_filter": {
                                 "type": "array",
                                 "items": {
                                     "type": "string",
-                                    "enum": ["debug", "info", "log", "warn", "error"]
+                                    "enum": ["debug", "info", "log", "warn", "error"],
                                 },
-                                "description": "Filter by log levels"
-                            }
+                                "description": "Filter by log levels",
+                            },
                         },
-                        "required": ["port"]
-                    }
+                        "required": ["port"],
+                    },
                 ),
                 Tool(
                     name="browser_screenshot",
@@ -96,15 +96,15 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number"
+                                "description": "Browser port number",
                             },
                             "url": {
                                 "type": "string",
-                                "description": "Optional URL to navigate to before screenshot"
-                            }
+                                "description": "Optional URL to navigate to before screenshot",
+                            },
                         },
-                        "required": ["port"]
-                    }
+                        "required": ["port"],
+                    },
                 ),
                 Tool(
                     name="browser_click",
@@ -114,28 +114,28 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number"
+                                "description": "Browser port number",
                             },
                             "selector": {
                                 "type": "string",
-                                "description": "CSS selector for the element"
+                                "description": "CSS selector for the element",
                             },
                             "xpath": {
                                 "type": "string",
-                                "description": "XPath expression for the element"
+                                "description": "XPath expression for the element",
                             },
                             "text": {
                                 "type": "string",
-                                "description": "Text content to match"
+                                "description": "Text content to match",
                             },
                             "index": {
                                 "type": "integer",
                                 "description": "Element index if multiple matches",
-                                "default": 0
-                            }
+                                "default": 0,
+                            },
                         },
-                        "required": ["port"]
-                    }
+                        "required": ["port"],
+                    },
                 ),
                 Tool(
                     name="browser_fill_field",
@@ -145,28 +145,28 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number"
+                                "description": "Browser port number",
                             },
                             "selector": {
                                 "type": "string",
-                                "description": "CSS selector for the field"
+                                "description": "CSS selector for the field",
                             },
                             "xpath": {
                                 "type": "string",
-                                "description": "XPath expression for the field"
+                                "description": "XPath expression for the field",
                             },
                             "value": {
                                 "type": "string",
-                                "description": "Value to fill in the field"
+                                "description": "Value to fill in the field",
                             },
                             "index": {
                                 "type": "integer",
                                 "description": "Field index if multiple matches",
-                                "default": 0
-                            }
+                                "default": 0,
+                            },
                         },
-                        "required": ["port", "value"]
-                    }
+                        "required": ["port", "value"],
+                    },
                 ),
                 Tool(
                     name="browser_fill_form",
@@ -176,23 +176,21 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number"
+                                "description": "Browser port number",
                             },
                             "form_data": {
                                 "type": "object",
                                 "description": "Object mapping selectors to values",
-                                "additionalProperties": {
-                                    "type": "string"
-                                }
+                                "additionalProperties": {"type": "string"},
                             },
                             "submit": {
                                 "type": "boolean",
                                 "description": "Submit form after filling",
-                                "default": False
-                            }
+                                "default": False,
+                            },
                         },
-                        "required": ["port", "form_data"]
-                    }
+                        "required": ["port", "form_data"],
+                    },
                 ),
                 Tool(
                     name="browser_submit_form",
@@ -202,19 +200,19 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number"
+                                "description": "Browser port number",
                             },
                             "selector": {
                                 "type": "string",
-                                "description": "CSS selector for form or form element"
+                                "description": "CSS selector for form or form element",
                             },
                             "xpath": {
                                 "type": "string",
-                                "description": "XPath expression for form"
-                            }
+                                "description": "XPath expression for form",
+                            },
                         },
-                        "required": ["port"]
-                    }
+                        "required": ["port"],
+                    },
                 ),
                 Tool(
                     name="browser_get_element",
@@ -224,23 +222,23 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number"
+                                "description": "Browser port number",
                             },
                             "selector": {
                                 "type": "string",
-                                "description": "CSS selector for the element"
+                                "description": "CSS selector for the element",
                             },
                             "xpath": {
                                 "type": "string",
-                                "description": "XPath expression for the element"
+                                "description": "XPath expression for the element",
                             },
                             "text": {
                                 "type": "string",
-                                "description": "Text content to match"
-                            }
+                                "description": "Text content to match",
+                            },
                         },
-                        "required": ["port"]
-                    }
+                        "required": ["port"],
+                    },
                 ),
                 Tool(
                     name="browser_wait_for_element",
@@ -250,20 +248,20 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number"
+                                "description": "Browser port number",
                             },
                             "selector": {
                                 "type": "string",
-                                "description": "CSS selector for the element"
+                                "description": "CSS selector for the element",
                             },
                             "timeout": {
                                 "type": "integer",
                                 "description": "Timeout in milliseconds",
-                                "default": 5000
-                            }
+                                "default": 5000,
+                            },
                         },
-                        "required": ["port", "selector"]
-                    }
+                        "required": ["port", "selector"],
+                    },
                 ),
                 Tool(
                     name="browser_select_option",
@@ -273,27 +271,27 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number"
+                                "description": "Browser port number",
                             },
                             "selector": {
                                 "type": "string",
-                                "description": "CSS selector for select element"
+                                "description": "CSS selector for select element",
                             },
                             "option_value": {
                                 "type": "string",
-                                "description": "Option value attribute"
+                                "description": "Option value attribute",
                             },
                             "option_text": {
                                 "type": "string",
-                                "description": "Option text content"
+                                "description": "Option text content",
                             },
                             "option_index": {
                                 "type": "integer",
-                                "description": "Option index"
-                            }
+                                "description": "Option index",
+                            },
                         },
-                        "required": ["port", "selector"]
-                    }
+                        "required": ["port", "selector"],
+                    },
                 ),
                 Tool(
                     name="browser_extract_content",
@@ -303,22 +301,21 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number"
+                                "description": "Browser port number",
                             },
                             "tab_id": {
                                 "type": "integer",
-                                "description": "Optional specific tab ID to extract from"
-                            }
+                                "description": "Optional specific tab ID to extract from",
+                            },
                         },
-                        "required": ["port"]
-                    }
-                )
+                        "required": ["port"],
+                    },
+                ),
             ]
 
         @self.server.call_tool()
         async def handle_call_tool(
-            name: str,
-            arguments: dict
+            name: str, arguments: dict
         ) -> list[TextContent | ImageContent]:
             """Handle tool calls."""
 
@@ -345,15 +342,9 @@ class MCPService:
             elif name == "browser_extract_content":
                 return await self._handle_extract_content(arguments)
             else:
-                return [TextContent(
-                    type="text",
-                    text=f"Unknown tool: {name}"
-                )]
+                return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
-    async def _handle_navigate(
-        self,
-        arguments: Dict[str, Any]
-    ) -> List[TextContent]:
+    async def _handle_navigate(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle browser navigation.
 
         Args:
@@ -366,29 +357,27 @@ class MCPService:
         url = arguments.get("url")
 
         if not self.browser_service:
-            return [TextContent(
-                type="text",
-                text="Browser service not available"
-            )]
+            return [TextContent(type="text", text="Browser service not available")]
 
         success = await self.browser_service.navigate_browser(port, url)
 
         if success:
-            return [TextContent(
-                type="text",
-                text=f"Successfully navigated browser on port {port} to {url}"
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Successfully navigated browser on port {port} to {url}",
+                )
+            ]
         else:
-            return [TextContent(
-                type="text",
-                text=f"Failed to navigate browser on port {port}. "
-                     f"No active connection found."
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Failed to navigate browser on port {port}. "
+                    f"No active connection found.",
+                )
+            ]
 
-    async def _handle_query_logs(
-        self,
-        arguments: Dict[str, Any]
-    ) -> List[TextContent]:
+    async def _handle_query_logs(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle log query.
 
         Args:
@@ -402,22 +391,16 @@ class MCPService:
         level_filter = arguments.get("level_filter")
 
         if not self.browser_service:
-            return [TextContent(
-                type="text",
-                text="Browser service not available"
-            )]
+            return [TextContent(type="text", text="Browser service not available")]
 
         messages = await self.browser_service.query_logs(
-            port=port,
-            last_n=last_n,
-            level_filter=level_filter
+            port=port, last_n=last_n, level_filter=level_filter
         )
 
         if not messages:
-            return [TextContent(
-                type="text",
-                text=f"No console logs found for port {port}"
-            )]
+            return [
+                TextContent(type="text", text=f"No console logs found for port {port}")
+            ]
 
         # Format messages
         log_lines = []
@@ -431,14 +414,15 @@ class MCPService:
 
         log_text = "\n".join(log_lines)
 
-        return [TextContent(
-            type="text",
-            text=f"Console logs from port {port} (last {len(messages)} messages):\n\n{log_text}"
-        )]
+        return [
+            TextContent(
+                type="text",
+                text=f"Console logs from port {port} (last {len(messages)} messages):\n\n{log_text}",
+            )
+        ]
 
     async def _handle_screenshot(
-        self,
-        arguments: Dict[str, Any]
+        self, arguments: Dict[str, Any]
     ) -> List[ImageContent | TextContent]:
         """Handle screenshot capture.
 
@@ -452,32 +436,24 @@ class MCPService:
         url = arguments.get("url")
 
         if not self.screenshot_service:
-            return [TextContent(
-                type="text",
-                text="Screenshot service not available"
-            )]
+            return [TextContent(type="text", text="Screenshot service not available")]
 
         screenshot_base64 = await self.screenshot_service.capture_screenshot(
-            port=port,
-            url=url
+            port=port, url=url
         )
 
         if screenshot_base64:
-            return [ImageContent(
-                type="image",
-                data=screenshot_base64,
-                mimeType="image/png"
-            )]
+            return [
+                ImageContent(type="image", data=screenshot_base64, mimeType="image/png")
+            ]
         else:
-            return [TextContent(
-                type="text",
-                text=f"Failed to capture screenshot for port {port}"
-            )]
+            return [
+                TextContent(
+                    type="text", text=f"Failed to capture screenshot for port {port}"
+                )
+            ]
 
-    async def _handle_click(
-        self,
-        arguments: Dict[str, Any]
-    ) -> List[TextContent]:
+    async def _handle_click(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle element click.
 
         Args:
@@ -487,10 +463,9 @@ class MCPService:
             List of text content responses
         """
         if not self.dom_interaction_service:
-            return [TextContent(
-                type="text",
-                text="DOM interaction service not available"
-            )]
+            return [
+                TextContent(type="text", text="DOM interaction service not available")
+            ]
 
         port = arguments.get("port")
         result = await self.dom_interaction_service.click(
@@ -498,26 +473,27 @@ class MCPService:
             selector=arguments.get("selector"),
             xpath=arguments.get("xpath"),
             text=arguments.get("text"),
-            index=arguments.get("index", 0)
+            index=arguments.get("index", 0),
         )
 
         if result.get("success"):
             element_info = result.get("elementInfo", {})
-            return [TextContent(
-                type="text",
-                text=f"Successfully clicked element: {element_info.get('tagName', 'unknown')} "
-                     f"with text '{element_info.get('text', '')[:50]}'"
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Successfully clicked element: {element_info.get('tagName', 'unknown')} "
+                    f"with text '{element_info.get('text', '')[:50]}'",
+                )
+            ]
         else:
-            return [TextContent(
-                type="text",
-                text=f"Failed to click element: {result.get('error', 'Unknown error')}"
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Failed to click element: {result.get('error', 'Unknown error')}",
+                )
+            ]
 
-    async def _handle_fill_field(
-        self,
-        arguments: Dict[str, Any]
-    ) -> List[TextContent]:
+    async def _handle_fill_field(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle form field filling.
 
         Args:
@@ -527,10 +503,9 @@ class MCPService:
             List of text content responses
         """
         if not self.dom_interaction_service:
-            return [TextContent(
-                type="text",
-                text="DOM interaction service not available"
-            )]
+            return [
+                TextContent(type="text", text="DOM interaction service not available")
+            ]
 
         port = arguments.get("port")
         value = arguments.get("value")
@@ -539,24 +514,24 @@ class MCPService:
             value=value,
             selector=arguments.get("selector"),
             xpath=arguments.get("xpath"),
-            index=arguments.get("index", 0)
+            index=arguments.get("index", 0),
         )
 
         if result.get("success"):
-            return [TextContent(
-                type="text",
-                text=f"Successfully filled field with value: {value}"
-            )]
+            return [
+                TextContent(
+                    type="text", text=f"Successfully filled field with value: {value}"
+                )
+            ]
         else:
-            return [TextContent(
-                type="text",
-                text=f"Failed to fill field: {result.get('error', 'Unknown error')}"
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Failed to fill field: {result.get('error', 'Unknown error')}",
+                )
+            ]
 
-    async def _handle_fill_form(
-        self,
-        arguments: Dict[str, Any]
-    ) -> List[TextContent]:
+    async def _handle_fill_form(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle multiple form fields filling.
 
         Args:
@@ -566,19 +541,16 @@ class MCPService:
             List of text content responses
         """
         if not self.dom_interaction_service:
-            return [TextContent(
-                type="text",
-                text="DOM interaction service not available"
-            )]
+            return [
+                TextContent(type="text", text="DOM interaction service not available")
+            ]
 
         port = arguments.get("port")
         form_data = arguments.get("form_data", {})
         submit = arguments.get("submit", False)
 
         result = await self.dom_interaction_service.fill_form(
-            port=port,
-            form_data=form_data,
-            submit=submit
+            port=port, form_data=form_data, submit=submit
         )
 
         if result.get("success"):
@@ -587,21 +559,17 @@ class MCPService:
             msg = f"Successfully filled {filled_count} form fields"
             if submit and submitted:
                 msg += " and submitted the form"
-            return [TextContent(
-                type="text",
-                text=msg
-            )]
+            return [TextContent(type="text", text=msg)]
         else:
             errors = result.get("errors", [])
-            return [TextContent(
-                type="text",
-                text=f"Failed to fill form. Errors: {'; '.join(errors)}"
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Failed to fill form. Errors: {'; '.join(errors)}",
+                )
+            ]
 
-    async def _handle_submit_form(
-        self,
-        arguments: Dict[str, Any]
-    ) -> List[TextContent]:
+    async def _handle_submit_form(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle form submission.
 
         Args:
@@ -611,33 +579,26 @@ class MCPService:
             List of text content responses
         """
         if not self.dom_interaction_service:
-            return [TextContent(
-                type="text",
-                text="DOM interaction service not available"
-            )]
+            return [
+                TextContent(type="text", text="DOM interaction service not available")
+            ]
 
         port = arguments.get("port")
         result = await self.dom_interaction_service.submit_form(
-            port=port,
-            selector=arguments.get("selector"),
-            xpath=arguments.get("xpath")
+            port=port, selector=arguments.get("selector"), xpath=arguments.get("xpath")
         )
 
         if result.get("success"):
-            return [TextContent(
-                type="text",
-                text="Successfully submitted form"
-            )]
+            return [TextContent(type="text", text="Successfully submitted form")]
         else:
-            return [TextContent(
-                type="text",
-                text=f"Failed to submit form: {result.get('error', 'Unknown error')}"
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Failed to submit form: {result.get('error', 'Unknown error')}",
+                )
+            ]
 
-    async def _handle_get_element(
-        self,
-        arguments: Dict[str, Any]
-    ) -> List[TextContent]:
+    async def _handle_get_element(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle getting element information.
 
         Args:
@@ -647,17 +608,16 @@ class MCPService:
             List of text content responses
         """
         if not self.dom_interaction_service:
-            return [TextContent(
-                type="text",
-                text="DOM interaction service not available"
-            )]
+            return [
+                TextContent(type="text", text="DOM interaction service not available")
+            ]
 
         port = arguments.get("port")
         result = await self.dom_interaction_service.get_element(
             port=port,
             selector=arguments.get("selector"),
             xpath=arguments.get("xpath"),
-            text=arguments.get("text")
+            text=arguments.get("text"),
         )
 
         if result.get("success"):
@@ -671,24 +631,22 @@ class MCPService:
                 f"  Enabled: {element_info.get('isEnabled', False)}"
             )
 
-            if element_info.get('value'):
+            if element_info.get("value"):
                 info_text += f"\n  Value: {element_info['value']}"
-            if element_info.get('href'):
+            if element_info.get("href"):
                 info_text += f"\n  Href: {element_info['href']}"
 
-            return [TextContent(
-                type="text",
-                text=info_text
-            )]
+            return [TextContent(type="text", text=info_text)]
         else:
-            return [TextContent(
-                type="text",
-                text=f"Element not found: {result.get('error', 'Unknown error')}"
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Element not found: {result.get('error', 'Unknown error')}",
+                )
+            ]
 
     async def _handle_wait_for_element(
-        self,
-        arguments: Dict[str, Any]
+        self, arguments: Dict[str, Any]
     ) -> List[TextContent]:
         """Handle waiting for element.
 
@@ -699,37 +657,37 @@ class MCPService:
             List of text content responses
         """
         if not self.dom_interaction_service:
-            return [TextContent(
-                type="text",
-                text="DOM interaction service not available"
-            )]
+            return [
+                TextContent(type="text", text="DOM interaction service not available")
+            ]
 
         port = arguments.get("port")
         selector = arguments.get("selector")
         timeout = arguments.get("timeout", 5000)
 
         result = await self.dom_interaction_service.wait_for_element(
-            port=port,
-            selector=selector,
-            timeout=timeout
+            port=port, selector=selector, timeout=timeout
         )
 
         if result.get("success"):
             element_info = result.get("elementInfo", {})
-            return [TextContent(
-                type="text",
-                text=f"Element appeared: {element_info.get('tagName', 'unknown')} "
-                     f"with selector '{selector}'"
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Element appeared: {element_info.get('tagName', 'unknown')} "
+                    f"with selector '{selector}'",
+                )
+            ]
         else:
-            return [TextContent(
-                type="text",
-                text=f"Element did not appear within {timeout}ms: {result.get('error', '')}"
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Element did not appear within {timeout}ms: {result.get('error', '')}",
+                )
+            ]
 
     async def _handle_select_option(
-        self,
-        arguments: Dict[str, Any]
+        self, arguments: Dict[str, Any]
     ) -> List[TextContent]:
         """Handle dropdown option selection.
 
@@ -740,10 +698,9 @@ class MCPService:
             List of text content responses
         """
         if not self.dom_interaction_service:
-            return [TextContent(
-                type="text",
-                text="DOM interaction service not available"
-            )]
+            return [
+                TextContent(type="text", text="DOM interaction service not available")
+            ]
 
         port = arguments.get("port")
         result = await self.dom_interaction_service.select_option(
@@ -751,24 +708,27 @@ class MCPService:
             selector=arguments.get("selector"),
             option_value=arguments.get("option_value"),
             option_text=arguments.get("option_text"),
-            option_index=arguments.get("option_index")
+            option_index=arguments.get("option_index"),
         )
 
         if result.get("success"):
-            return [TextContent(
-                type="text",
-                text=f"Selected option: {result.get('selectedText', '')} "
-                     f"(value: {result.get('selectedValue', '')})"
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Selected option: {result.get('selectedText', '')} "
+                    f"(value: {result.get('selectedValue', '')})",
+                )
+            ]
         else:
-            return [TextContent(
-                type="text",
-                text=f"Failed to select option: {result.get('error', 'Unknown error')}"
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Failed to select option: {result.get('error', 'Unknown error')}",
+                )
+            ]
 
     async def _handle_extract_content(
-        self,
-        arguments: Dict[str, Any]
+        self, arguments: Dict[str, Any]
     ) -> List[TextContent]:
         """Handle content extraction using Readability.
 
@@ -779,84 +739,75 @@ class MCPService:
             List of text content responses
         """
         if not self.browser_service:
-            return [TextContent(
-                type="text",
-                text="Browser service not available"
-            )]
+            return [TextContent(type="text", text="Browser service not available")]
 
         port = arguments.get("port")
         tab_id = arguments.get("tab_id")
 
-        result = await self.browser_service.extract_content(
-            port=port,
-            tab_id=tab_id
-        )
+        result = await self.browser_service.extract_content(port=port, tab_id=tab_id)
 
         if result.get("success"):
             content = result.get("content", {})
 
             # Format the extracted content for output
-            output_lines = [
-                f"# {content.get('title', 'Untitled')}",
-                ""
-            ]
+            output_lines = [f"# {content.get('title', 'Untitled')}", ""]
 
             # Add metadata if available
-            metadata = content.get('metadata', {})
-            if content.get('byline'):
+            metadata = content.get("metadata", {})
+            if content.get("byline"):
                 output_lines.append(f"**Author:** {content['byline']}")
-            if metadata.get('publishDate'):
+            if metadata.get("publishDate"):
                 output_lines.append(f"**Published:** {metadata['publishDate']}")
-            if content.get('siteName'):
+            if content.get("siteName"):
                 output_lines.append(f"**Source:** {content['siteName']}")
-            if metadata.get('url'):
+            if metadata.get("url"):
                 output_lines.append(f"**URL:** {metadata['url']}")
-            if content.get('wordCount'):
+            if content.get("wordCount"):
                 output_lines.append(f"**Word Count:** {content['wordCount']:,}")
-            if content.get('length'):
+            if content.get("length"):
                 output_lines.append(f"**Reading Time:** ~{content['length']} minutes")
 
             output_lines.extend(["", "---", ""])
 
             # Add excerpt if available
-            if content.get('excerpt'):
-                output_lines.extend([
-                    "**Excerpt:**",
-                    f"> {content['excerpt']}",
-                    ""
-                ])
+            if content.get("excerpt"):
+                output_lines.extend(["**Excerpt:**", f"> {content['excerpt']}", ""])
 
             # Add main text content
             output_lines.append("## Content")
             output_lines.append("")
 
-            text = content.get('textContent', '')
+            text = content.get("textContent", "")
             if text:
                 # Limit text length for LLM consumption
                 max_chars = 50000  # ~12,500 tokens
                 if len(text) > max_chars:
-                    text = text[:max_chars] + f"\n\n[Content truncated - {len(text) - max_chars:,} characters omitted]"
+                    text = (
+                        text[:max_chars]
+                        + f"\n\n[Content truncated - {len(text) - max_chars:,} characters omitted]"
+                    )
                 output_lines.append(text)
             else:
                 output_lines.append("[No readable content extracted]")
 
             # Add fallback notice if applicable
-            if content.get('fallback'):
-                output_lines.extend([
-                    "",
-                    "---",
-                    "*Note: This is a fallback extraction. The page may not be optimized for article reading.*"
-                ])
+            if content.get("fallback"):
+                output_lines.extend(
+                    [
+                        "",
+                        "---",
+                        "*Note: This is a fallback extraction. The page may not be optimized for article reading.*",
+                    ]
+                )
 
-            return [TextContent(
-                type="text",
-                text="\n".join(output_lines)
-            )]
+            return [TextContent(type="text", text="\n".join(output_lines))]
         else:
-            return [TextContent(
-                type="text",
-                text=f"Failed to extract content: {result.get('error', 'Unknown error')}"
-            )]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Failed to extract content: {result.get('error', 'Unknown error')}",
+                )
+            ]
 
     async def start(self) -> None:
         """Start the MCP server."""
@@ -868,19 +819,17 @@ class MCPService:
 
     async def run_stdio(self) -> None:
         """Run the MCP server with stdio transport."""
-        from mcp.server.stdio import stdio_server
         from mcp.server import NotificationOptions
+        from mcp.server.stdio import stdio_server
 
         async with stdio_server() as (read_stream, write_stream):
             # Use the server's create_initialization_options method to properly
             # register all handlers with correct capabilities
             init_options = self.server.create_initialization_options(
                 notification_options=NotificationOptions(
-                    tools_changed=False,
-                    prompts_changed=False,
-                    resources_changed=False
+                    tools_changed=False, prompts_changed=False, resources_changed=False
                 ),
-                experimental_capabilities={}
+                experimental_capabilities={},
             )
 
             # Run with stateless=True to avoid initialization state issues
@@ -889,5 +838,5 @@ class MCPService:
                 write_stream,
                 init_options,
                 raise_exceptions=False,
-                stateless=False  # Keep stateful for now, but could try True if issues persist
+                stateless=False,  # Keep stateful for now, but could try True if issues persist
             )

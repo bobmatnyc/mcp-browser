@@ -23,29 +23,33 @@ async def run_dashboard_only(config=None) -> None:
     # Set up basic logging
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     # Create minimal container
     container = ServiceContainer()
 
     # Register minimal services for dashboard
-    container.register('storage_service', lambda c: StorageService(
-        StorageConfig(base_path=Path.cwd() / ".mcp-browser" / "data")
-    ))
-    container.register('websocket_service', lambda c: WebSocketService())
-    container.register('browser_service', lambda c: BrowserService(
-        storage_service=container.get('storage_service')
-    ))
+    container.register(
+        "storage_service",
+        lambda c: StorageService(
+            StorageConfig(base_path=Path.cwd() / ".mcp-browser" / "data")
+        ),
+    )
+    container.register("websocket_service", lambda c: WebSocketService())
+    container.register(
+        "browser_service",
+        lambda c: BrowserService(storage_service=container.get("storage_service")),
+    )
 
     # Register dashboard service
     async def create_dashboard_service(c):
         return DashboardService()
 
-    container.register('dashboard_service', create_dashboard_service)
+    container.register("dashboard_service", create_dashboard_service)
 
     # Get and start dashboard
-    dashboard = await container.get('dashboard_service')
+    dashboard = await container.get("dashboard_service")
     await dashboard.start(port=8080)
 
     print("Dashboard running at http://localhost:8080")
@@ -62,8 +66,12 @@ async def run_dashboard_only(config=None) -> None:
 
 
 @click.command()
-@click.option('--port', '-p', default=8080, type=int, help='Dashboard port (default: 8080)')
-@click.option('--open', '-o', 'open_browser', is_flag=True, help='Open dashboard in browser')
+@click.option(
+    "--port", "-p", default=8080, type=int, help="Dashboard port (default: 8080)"
+)
+@click.option(
+    "--open", "-o", "open_browser", is_flag=True, help="Open dashboard in browser"
+)
 @click.pass_context
 def dashboard(ctx, port, open_browser):
     """🎯 Run the monitoring dashboard.
@@ -90,19 +98,23 @@ def dashboard(ctx, port, open_browser):
     Access the dashboard at:
       http://localhost:8080 (or your chosen port)
     """
-    console.print(Panel.fit(
-        f"[bold cyan]Starting Dashboard[/bold cyan]\n\n"
-        f"Port: {port}\n"
-        f"URL: http://localhost:{port}",
-        title="Dashboard",
-        border_style="cyan"
-    ))
+    console.print(
+        Panel.fit(
+            f"[bold cyan]Starting Dashboard[/bold cyan]\n\n"
+            f"Port: {port}\n"
+            f"URL: http://localhost:{port}",
+            title="Dashboard",
+            border_style="cyan",
+        )
+    )
 
     if open_browser:
         # Wait a moment for server to start
-        threading.Timer(1.0, lambda: webbrowser.open(f"http://localhost:{port}")).start()
+        threading.Timer(
+            1.0, lambda: webbrowser.open(f"http://localhost:{port}")
+        ).start()
 
-    config = ctx.obj.get('config')
+    config = ctx.obj.get("config")
 
     try:
         asyncio.run(run_dashboard_only(config))
@@ -110,6 +122,7 @@ def dashboard(ctx, port, open_browser):
         console.print("\n[yellow]Dashboard stopped[/yellow]")
     except Exception as e:
         console.print(f"[red]Dashboard error: {e}[/red]")
-        if ctx.obj.get('debug'):
+        if ctx.obj.get("debug"):
             import traceback
+
             traceback.print_exc()

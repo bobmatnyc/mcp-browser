@@ -12,10 +12,20 @@ from ..utils import DATA_DIR, console
 
 
 @click.command()
-@click.option('--port', '-p', default=None, type=int, help='WebSocket port (default: auto 8875-8895)')
-@click.option('--dashboard/--no-dashboard', default=True, help='Enable/disable dashboard')
-@click.option('--dashboard-port', default=8080, type=int, help='Dashboard port (default: 8080)')
-@click.option('--background', '-b', is_flag=True, help='Run server in background')
+@click.option(
+    "--port",
+    "-p",
+    default=None,
+    type=int,
+    help="WebSocket port (default: auto 8875-8895)",
+)
+@click.option(
+    "--dashboard/--no-dashboard", default=True, help="Enable/disable dashboard"
+)
+@click.option(
+    "--dashboard-port", default=8080, type=int, help="Dashboard port (default: 8080)"
+)
+@click.option("--background", "-b", is_flag=True, help="Run server in background")
 @click.pass_context
 def start(ctx, port, dashboard, dashboard_port, background):
     """🚀 Start the MCP Browser server.
@@ -51,7 +61,7 @@ def start(ctx, port, dashboard, dashboard_port, background):
     """
     from ...cli.main import BrowserMCPServer
 
-    config = ctx.obj.get('config')
+    config = ctx.obj.get("config")
 
     if background:
         console.print("[yellow]Background mode not yet implemented[/yellow]")
@@ -62,16 +72,18 @@ def start(ctx, port, dashboard, dashboard_port, background):
     if port and config is None:
         config = {}
     if port:
-        config.setdefault('websocket', {})['port_range'] = [port, port]
+        config.setdefault("websocket", {})["port_range"] = [port, port]
 
-    console.print(Panel.fit(
-        f"[bold green]Starting MCP Browser Server v{__version__}[/bold green]\n\n"
-        f"WebSocket: Ports {config.get('websocket', {}).get('port_range', [8875, 8895]) if config else [8875, 8895]}\n"
-        f"Dashboard: {'Enabled' if dashboard else 'Disabled'} (port {dashboard_port})\n"
-        f"Data: {DATA_DIR}",
-        title="Server Starting",
-        border_style="green"
-    ))
+    console.print(
+        Panel.fit(
+            f"[bold green]Starting MCP Browser Server v{__version__}[/bold green]\n\n"
+            f"WebSocket: Ports {config.get('websocket', {}).get('port_range', [8875, 8895]) if config else [8875, 8895]}\n"
+            f"Dashboard: {'Enabled' if dashboard else 'Disabled'} (port {dashboard_port})\n"
+            f"Data: {DATA_DIR}",
+            title="Server Starting",
+            border_style="green",
+        )
+    )
 
     server = BrowserMCPServer(config=config, mcp_mode=False)
 
@@ -95,7 +107,8 @@ def start(ctx, port, dashboard, dashboard_port, background):
         console.print("\n[yellow]Server stopped by user[/yellow]")
     except Exception as e:
         console.print(f"\n[red]Server error: {e}[/red]")
-        if ctx.obj.get('debug'):
+        if ctx.obj.get("debug"):
             import traceback
+
             traceback.print_exc()
         sys.exit(1)

@@ -7,7 +7,6 @@ from rich.prompt import Prompt
 
 from ..utils import console
 
-
 # Tutorial lessons data
 LESSONS = [
     {
@@ -26,7 +25,7 @@ The flow:
 2. Extension captures all console.log messages
 3. Server stores messages and exposes them via MCP
 4. Claude Code can query logs and control browser
-"""
+""",
     },
     {
         "title": "Lesson 2: Installation",
@@ -45,7 +44,7 @@ Let's verify your installation:
 
 4. **Verify installation**:
    $ mcp-browser doctor
-"""
+""",
     },
     {
         "title": "Lesson 3: Starting the Server",
@@ -63,7 +62,7 @@ Options:
 • --no-dashboard: Skip dashboard
 • --port 8880: Use specific WebSocket port
 • --debug: Enable debug logging
-"""
+""",
     },
     {
         "title": "Lesson 4: Installing Chrome Extension",
@@ -80,7 +79,7 @@ Install the Chrome extension:
    d. Select .mcp-browser/extension folder
 
 5. Verify connection in extension popup (puzzle icon)
-"""
+""",
     },
     {
         "title": "Lesson 5: Capturing Console Logs",
@@ -98,7 +97,7 @@ Captured data includes:
 • URL and title
 • Log level (log, warn, error)
 • Stack traces for errors
-"""
+""",
     },
     {
         "title": "Lesson 6: Using with Claude Code",
@@ -122,7 +121,7 @@ Configure Claude Code to use MCP Browser:
 
 3. **Example usage in Claude**:
    "Navigate to example.com and show me any console errors"
-"""
+""",
     },
     {
         "title": "Lesson 7: Troubleshooting",
@@ -143,7 +142,7 @@ Common issues and solutions:
 • Port in use: Server auto-tries next port
 • Permission issues: Check directory permissions
 • Run `mcp-browser doctor --fix`
-"""
+""",
     },
 ]
 
@@ -164,12 +163,14 @@ def tutorial(ctx):
 
     Perfect for new users who want to learn by doing!
     """
-    console.print(Panel.fit(
-        "[bold magenta]📚 MCP Browser Interactive Tutorial[/bold magenta]\n\n"
-        "This tutorial will guide you through using MCP Browser step by step.",
-        title="Tutorial",
-        border_style="magenta"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold magenta]📚 MCP Browser Interactive Tutorial[/bold magenta]\n\n"
+            "This tutorial will guide you through using MCP Browser step by step.",
+            title="Tutorial",
+            border_style="magenta",
+        )
+    )
 
     current_lesson = 0
 
@@ -177,12 +178,14 @@ def tutorial(ctx):
         lesson = LESSONS[current_lesson]
 
         console.clear()
-        console.print(Panel(
-            Markdown(lesson["content"]),
-            title=f"[bold]{lesson['title']}[/bold]",
-            border_style="blue",
-            padding=(1, 2)
-        ))
+        console.print(
+            Panel(
+                Markdown(lesson["content"]),
+                title=f"[bold]{lesson['title']}[/bold]",
+                border_style="blue",
+                padding=(1, 2),
+            )
+        )
 
         console.print("\n" + "─" * 50)
 
@@ -190,13 +193,13 @@ def tutorial(ctx):
             choice = Prompt.ask(
                 "\n[bold]Continue?[/bold]",
                 choices=["next", "previous", "quit", "practice"],
-                default="next"
+                default="next",
             )
         else:
             choice = Prompt.ask(
                 "\n[bold]Tutorial complete![/bold]",
                 choices=["previous", "quit", "restart"],
-                default="quit"
+                default="quit",
             )
 
         if choice == "next":
@@ -216,4 +219,6 @@ def tutorial(ctx):
     console.print("\nNext steps:")
     console.print("  • Run [cyan]mcp-browser quickstart[/cyan] for setup")
     console.print("  • Run [cyan]mcp-browser start[/cyan] to begin")
-    console.print("  • Visit [link=https://docs.mcp-browser.dev]documentation[/link] for more info")
+    console.print(
+        "  • Visit [link=https://docs.mcp-browser.dev]documentation[/link] for more info"
+    )

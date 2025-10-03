@@ -28,8 +28,7 @@ class ScreenshotService:
         async with self._lock:
             self._playwright = await async_playwright().start()
             self._browser = await self._playwright.chromium.launch(
-                headless=True,
-                args=['--no-sandbox', '--disable-setuid-sandbox']
+                headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"]
             )
             logger.info("Playwright browser started")
 
@@ -58,10 +57,7 @@ class ScreenshotService:
             logger.info("Playwright browser stopped")
 
     async def capture_screenshot(
-        self,
-        port: int,
-        url: Optional[str] = None,
-        viewport_only: bool = True
+        self, port: int, url: Optional[str] = None, viewport_only: bool = True
     ) -> Optional[str]:
         """Capture a screenshot of a browser page.
 
@@ -82,17 +78,16 @@ class ScreenshotService:
 
             # Navigate if URL provided
             if url:
-                await page.goto(url, wait_until='networkidle', timeout=30000)
+                await page.goto(url, wait_until="networkidle", timeout=30000)
                 await asyncio.sleep(1)  # Allow page to stabilize
 
             # Capture screenshot
             screenshot_bytes = await page.screenshot(
-                full_page=not viewport_only,
-                type='png'
+                full_page=not viewport_only, type="png"
             )
 
             # Convert to base64
-            screenshot_base64 = base64.b64encode(screenshot_bytes).decode('utf-8')
+            screenshot_base64 = base64.b64encode(screenshot_bytes).decode("utf-8")
 
             logger.info(f"Captured screenshot for port {port}")
             return screenshot_base64
@@ -113,14 +108,15 @@ class ScreenshotService:
         async with self._lock:
             if port not in self._pages:
                 context = await self._browser.new_context(
-                    viewport={'width': 1280, 'height': 720},
-                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0'
+                    viewport={"width": 1280, "height": 720},
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0",
                 )
                 self._pages[port] = await context.new_page()
 
                 # Enable console logging
-                self._pages[port].on('console', lambda msg:
-                    logger.debug(f"Browser console [{port}]: {msg.text}")
+                self._pages[port].on(
+                    "console",
+                    lambda msg: logger.debug(f"Browser console [{port}]: {msg.text}"),
                 )
 
             return self._pages[port]
@@ -152,7 +148,7 @@ class ScreenshotService:
         """
         try:
             page = await self._get_or_create_page(port)
-            await page.goto(url, wait_until='networkidle', timeout=30000)
+            await page.goto(url, wait_until="networkidle", timeout=30000)
             logger.info(f"Navigated port {port} to {url}")
             return True
         except Exception as e:
@@ -184,7 +180,7 @@ class ScreenshotService:
             Dictionary with service information
         """
         return {
-            'is_running': self._browser is not None,
-            'active_pages': list(self._pages.keys()),
-            'page_count': len(self._pages)
+            "is_running": self._browser is not None,
+            "active_pages": list(self._pages.keys()),
+            "page_count": len(self._pages),
         }

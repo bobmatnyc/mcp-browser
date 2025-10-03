@@ -2,4 +2,4 @@
 
 from .service_container import ServiceContainer, ServiceNotFoundError
 
-__all__ = ['ServiceContainer', 'ServiceNotFoundError']
+__all__ = ["ServiceContainer", "ServiceNotFoundError"]

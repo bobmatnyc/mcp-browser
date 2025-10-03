@@ -13,14 +13,14 @@ from .validation import (
 )
 
 __all__ = [
-    'console',
-    'show_version_info',
-    'check_installation_status',
-    'check_system_requirements',
-    'is_first_run',
-    'HOME_DIR',
-    'CONFIG_FILE',
-    'LOG_DIR',
-    'DATA_DIR',
-    'BrowserMCPServer',
+    "console",
+    "show_version_info",
+    "check_installation_status",
+    "check_system_requirements",
+    "is_first_run",
+    "HOME_DIR",
+    "CONFIG_FILE",
+    "LOG_DIR",
+    "DATA_DIR",
+    "BrowserMCPServer",
 ]

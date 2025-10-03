@@ -18,10 +18,15 @@ from .commands import dashboard, doctor, init, quickstart, start, status, tutori
 from .utils import BrowserMCPServer, console, is_first_run, show_version_info
 
 
-@click.group(invoke_without_command=True, context_settings=dict(help_option_names=['-h', '--help']))
-@click.option('--version', '-v', is_flag=True, help='Show version information')
-@click.option('--debug', is_flag=True, help='Enable debug logging')
-@click.option('--config', type=click.Path(exists=True), help='Path to configuration file')
+@click.group(
+    invoke_without_command=True,
+    context_settings=dict(help_option_names=["-h", "--help"]),
+)
+@click.option("--version", "-v", is_flag=True, help="Show version information")
+@click.option("--debug", is_flag=True, help="Enable debug logging")
+@click.option(
+    "--config", type=click.Path(exists=True), help="Path to configuration file"
+)
 @click.pass_context
 def cli(ctx, version, debug, config):
     """🌐 MCP Browser - Browser console log capture and control for Claude Code.
@@ -44,19 +49,19 @@ def cli(ctx, version, debug, config):
       mcp-browser COMMAND --help
     """
     ctx.ensure_object(dict)
-    ctx.obj['debug'] = debug
-    ctx.obj['config_file'] = config
+    ctx.obj["debug"] = debug
+    ctx.obj["config_file"] = config
 
     # Store config in context
     if config:
         try:
-            with open(config, 'r') as f:
-                ctx.obj['config'] = json.load(f)
+            with open(config, "r") as f:
+                ctx.obj["config"] = json.load(f)
         except Exception as e:
             console.print(f"[red]Error loading config: {e}[/red]")
             sys.exit(1)
     else:
-        ctx.obj['config'] = None
+        ctx.obj["config"] = None
 
     if version:
         show_version_info()
@@ -66,16 +71,18 @@ def cli(ctx, version, debug, config):
     if ctx.invoked_subcommand is None:
         # Check if first run
         if is_first_run():
-            console.print(Panel.fit(
-                "[bold yellow]👋 Welcome to MCP Browser![/bold yellow]\n\n"
-                "It looks like this is your first time running mcp-browser.\n\n"
-                "[bold]Get started with:[/bold]\n"
-                "  • [cyan]mcp-browser quickstart[/cyan] - Interactive setup wizard\n"
-                "  • [cyan]mcp-browser --help[/cyan] - Show all commands\n"
-                "  • [cyan]mcp-browser doctor[/cyan] - Check system requirements",
-                title="First Run Detected",
-                border_style="yellow"
-            ))
+            console.print(
+                Panel.fit(
+                    "[bold yellow]👋 Welcome to MCP Browser![/bold yellow]\n\n"
+                    "It looks like this is your first time running mcp-browser.\n\n"
+                    "[bold]Get started with:[/bold]\n"
+                    "  • [cyan]mcp-browser quickstart[/cyan] - Interactive setup wizard\n"
+                    "  • [cyan]mcp-browser --help[/cyan] - Show all commands\n"
+                    "  • [cyan]mcp-browser doctor[/cyan] - Check system requirements",
+                    title="First Run Detected",
+                    border_style="yellow",
+                )
+            )
         else:
             click.echo(ctx.get_help())
 
@@ -106,7 +113,7 @@ def mcp(ctx):
     invoked by Claude Code or other MCP clients.
     """
     # Run in MCP mode (no console output)
-    config = ctx.obj.get('config')
+    config = ctx.obj.get("config")
     server = BrowserMCPServer(config=config, mcp_mode=True)
 
     try:
@@ -114,12 +121,15 @@ def mcp(ctx):
     except Exception:
         # Errors logged to stderr to avoid corrupting stdio
         import traceback
+
         traceback.print_exc(file=sys.stderr)
         sys.exit(1)
 
 
 @cli.command()
-@click.option('--detailed', '-d', is_flag=True, help='Show detailed version information')
+@click.option(
+    "--detailed", "-d", is_flag=True, help="Show detailed version information"
+)
 def version(detailed):
     """📦 Show version information.
 
@@ -203,16 +213,18 @@ def reference():
   mcp-browser COMMAND --help
   mcp-browser tutorial
 """
-    console.print(Panel(
-        reference_text,
-        title="📚 Quick Reference",
-        border_style="blue",
-        padding=(1, 2)
-    ))
+    console.print(
+        Panel(
+            reference_text,
+            title="📚 Quick Reference",
+            border_style="blue",
+            padding=(1, 2),
+        )
+    )
 
 
 @cli.command()
-@click.argument('shell', type=click.Choice(['bash', 'zsh', 'fish']))
+@click.argument("shell", type=click.Choice(["bash", "zsh", "fish"]))
 def completion(shell):
     """🔧 Generate shell completion script.
 
@@ -282,19 +294,19 @@ complete -c mcp-browser -n "__fish_use_subcommand" -a version -d "Show version"
 complete -c mcp-browser -n "__fish_use_subcommand" -a completion -d "Generate completion"
 """
 
-    if shell == 'bash':
+    if shell == "bash":
         script_path = scripts_dir / "completion.bash"
         if script_path.exists():
             console.print(script_path.read_text())
         else:
             console.print(BASH_COMPLETION)
-    elif shell == 'zsh':
+    elif shell == "zsh":
         script_path = scripts_dir / "completion.zsh"
         if script_path.exists():
             console.print(script_path.read_text())
         else:
             console.print(ZSH_COMPLETION)
-    elif shell == 'fish':
+    elif shell == "fish":
         console.print(FISH_COMPLETION)
 
 
@@ -313,5 +325,5 @@ def main():
     cli()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -9,11 +9,11 @@ from .status import status
 from .tutorial import tutorial
 
 __all__ = [
-    'init',
-    'start',
-    'status',
-    'doctor',
-    'dashboard',
-    'tutorial',
-    'quickstart',
+    "init",
+    "start",
+    "status",
+    "doctor",
+    "dashboard",
+    "tutorial",
+    "quickstart",
 ]

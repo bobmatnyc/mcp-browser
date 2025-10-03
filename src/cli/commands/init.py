@@ -28,22 +28,29 @@ async def init_project_extension() -> None:
         # For pip/pipx installations - use package resources
         if sys.version_info >= (3, 9):
             import importlib.resources as resources
+
             # Check if extension exists as package data
-            package = resources.files('mcp_browser')
-            extension_dir = package / 'extension'
+            package = resources.files("mcp_browser")
+            extension_dir = package / "extension"
             if extension_dir.is_dir():
                 source_extension = Path(str(extension_dir))
         else:
             # Fallback for older Python versions
             import pkg_resources
+
             try:
-                extension_files = pkg_resources.resource_listdir('mcp_browser', 'extension')
+                extension_files = pkg_resources.resource_listdir(
+                    "mcp_browser", "extension"
+                )
                 if extension_files:
                     # Extract to temp location
                     import tempfile
-                    temp_dir = tempfile.mkdtemp(prefix='mcp_browser_ext_')
+
+                    temp_dir = tempfile.mkdtemp(prefix="mcp_browser_ext_")
                     for file in extension_files:
-                        content = pkg_resources.resource_string('mcp_browser', f'extension/{file}')
+                        content = pkg_resources.resource_string(
+                            "mcp_browser", f"extension/{file}"
+                        )
                         (Path(temp_dir) / file).write_bytes(content)
                     source_extension = Path(temp_dir)
             except Exception:
@@ -62,7 +69,10 @@ async def init_project_extension() -> None:
             source_extension = Path(__file__).parent.parent.parent.parent / "extension"
 
     if not source_extension or not source_extension.exists():
-        print("Error: Extension source not found. Tried multiple locations.", file=sys.stderr)
+        print(
+            "Error: Extension source not found. Tried multiple locations.",
+            file=sys.stderr,
+        )
         print("Please ensure the package was installed correctly.", file=sys.stderr)
         sys.exit(1)
 
@@ -70,7 +80,7 @@ async def init_project_extension() -> None:
     if extension_path.exists():
         print(f"Extension already exists at {extension_path}")
         response = input("Overwrite existing extension? (y/N): ")
-        if response.lower() != 'y':
+        if response.lower() != "y":
             print("Initialization cancelled.")
             return
         shutil.rmtree(extension_path)
@@ -130,11 +140,12 @@ async def init_project_extension_interactive() -> None:
     try:
         if sys.version_info >= (3, 9):
             import importlib.resources as resources
-            package = resources.files('mcp_browser')
-            extension_dir = package / 'extension'
+
+            package = resources.files("mcp_browser")
+            extension_dir = package / "extension"
             if extension_dir.is_dir():
                 source_extension = Path(str(extension_dir))
-    except:
+    except Exception:
         pass
 
     if not source_extension or not source_extension.exists():
@@ -159,7 +170,7 @@ async def init_project_extension_interactive() -> None:
     console.print("  [green]✓[/green] Extension copied")
 
     # Create other directories
-    for dir_name in ['data', 'logs']:
+    for dir_name in ["data", "logs"]:
         dir_path = project_path / ".mcp-browser" / dir_name
         dir_path.mkdir(parents=True, exist_ok=True)
         console.print(f"  [green]✓[/green] Created {dir_name} directory")
@@ -180,8 +191,16 @@ data/
 
 
 @click.command()
-@click.option('--project', '-p', is_flag=True, help='Initialize in current project directory')
-@click.option('--global', '-g', 'global_init', is_flag=True, help='Initialize globally in home directory')
+@click.option(
+    "--project", "-p", is_flag=True, help="Initialize in current project directory"
+)
+@click.option(
+    "--global",
+    "-g",
+    "global_init",
+    is_flag=True,
+    help="Initialize globally in home directory",
+)
 @click.pass_context
 def init(ctx, project, global_init):
     """📦 Initialize MCP Browser extension and configuration.
@@ -213,19 +232,19 @@ def init(ctx, project, global_init):
 
     if not project and not global_init:
         # Interactive mode
-        console.print(Panel.fit(
-            "[bold]Choose initialization mode:[/bold]\n\n"
-            "[cyan]Project[/cyan]: Creates .mcp-browser/ in current directory\n"
-            "  Best for: Development projects, version control\n\n"
-            "[cyan]Global[/cyan]: Uses ~/.mcp-browser/ directory\n"
-            "  Best for: System-wide installation, personal use",
-            title="Initialization Mode"
-        ))
+        console.print(
+            Panel.fit(
+                "[bold]Choose initialization mode:[/bold]\n\n"
+                "[cyan]Project[/cyan]: Creates .mcp-browser/ in current directory\n"
+                "  Best for: Development projects, version control\n\n"
+                "[cyan]Global[/cyan]: Uses ~/.mcp-browser/ directory\n"
+                "  Best for: System-wide installation, personal use",
+                title="Initialization Mode",
+            )
+        )
 
         choice = Prompt.ask(
-            "\nChoose mode",
-            choices=["project", "global", "cancel"],
-            default="project"
+            "\nChoose mode", choices=["project", "global", "cancel"], default="project"
         )
 
         if choice == "cancel":

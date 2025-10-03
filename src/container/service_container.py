@@ -5,11 +5,12 @@ import inspect
 from functools import wraps
 from typing import Any, Callable, Dict, TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class ServiceNotFoundError(Exception):
     """Raised when a service is not found in the container."""
+
     pass
 
 
@@ -25,12 +26,7 @@ class ServiceContainer:
         # Per-service creation locks to prevent race conditions during singleton creation
         self._creating: Dict[str, asyncio.Lock] = {}
 
-    def register(
-        self,
-        name: str,
-        factory: Callable,
-        singleton: bool = True
-    ) -> None:
+    def register(self, name: str, factory: Callable, singleton: bool = True) -> None:
         """Register a service factory.
 
         Args:
@@ -110,7 +106,7 @@ class ServiceContainer:
             params = {}
 
             for param_name, param in sig.parameters.items():
-                if param_name == 'self':
+                if param_name == "self":
                     continue
 
                 # Try to resolve parameter by name
@@ -179,6 +175,7 @@ class ServiceContainer:
         Returns:
             Decorated function
         """
+
         def decorator(func: Callable) -> Callable:
             @wraps(func)
             async def async_wrapper(*args, **kwargs):

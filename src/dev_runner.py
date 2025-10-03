@@ -15,16 +15,16 @@ from watchdog.observers import Observer
 from .cli.main import BrowserMCPServer
 
 # Create log directory if it doesn't exist
-os.makedirs('./tmp/logs', exist_ok=True)
+os.makedirs("./tmp/logs", exist_ok=True)
 
 # Configure development logging
 logging.basicConfig(
     level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler('./tmp/logs/dev-server.log', mode='a')
-    ]
+        logging.FileHandler("./tmp/logs/dev-server.log", mode="a"),
+    ],
 )
 logger = logging.getLogger(__name__)
 
@@ -38,15 +38,15 @@ class HotReloadHandler(FileSystemEventHandler):
         self.restart_callback = restart_callback
         self.last_reload = 0
         self.reload_delay = 1.0  # Minimum seconds between reloads
-        self.watched_extensions = {'.py', '.json', '.js'}
+        self.watched_extensions = {".py", ".json", ".js"}
         self.ignore_patterns = {
-            '__pycache__',
-            '.pyc',
-            '.git',
-            'node_modules',
-            'tmp',
-            'logs',
-            '.DS_Store'
+            "__pycache__",
+            ".pyc",
+            ".git",
+            "node_modules",
+            "tmp",
+            "logs",
+            ".DS_Store",
         }
 
     def should_reload(self, file_path: str) -> bool:
@@ -92,23 +92,23 @@ class DevelopmentServer:
         self.restart_event = asyncio.Event()
 
         # Create tmp directories
-        os.makedirs('./tmp/logs', exist_ok=True)
-        os.makedirs('./tmp', exist_ok=True)
+        os.makedirs("./tmp/logs", exist_ok=True)
+        os.makedirs("./tmp", exist_ok=True)
 
         # Load environment
         self._load_environment()
 
     def _load_environment(self):
         """Load development environment variables."""
-        env_file = Path('.env.development')
+        env_file = Path(".env.development")
         if env_file.exists():
             logger.info("Loading development environment...")
             with open(env_file) as f:
                 for line in f:
                     line = line.strip()
-                    if line and not line.startswith('#'):
-                        if '=' in line:
-                            key, value = line.split('=', 1)
+                    if line and not line.startswith("#"):
+                        if "=" in line:
+                            key, value = line.split("=", 1)
                             os.environ[key] = value
                             logger.debug(f"Set {key}={value}")
 
@@ -119,11 +119,8 @@ class DevelopmentServer:
 
     def setup_file_watcher(self):
         """Set up file system watcher for hot reload."""
-        project_root = Path('.')
-        watch_paths = [
-            project_root / 'src',
-            project_root / 'extension'
-        ]
+        project_root = Path(".")
+        watch_paths = [project_root / "src", project_root / "extension"]
 
         # Create observer
         self.observer = Observer()
@@ -201,7 +198,9 @@ class DevelopmentServer:
             logger.error("Failed to start initial server")
             return
 
-        logger.info("Development server ready! Making changes to files will trigger restart.")
+        logger.info(
+            "Development server ready! Making changes to files will trigger restart."
+        )
 
         # Main loop
         try:
@@ -245,7 +244,7 @@ async def main():
     await dev_server.run()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

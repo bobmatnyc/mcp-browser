@@ -4,7 +4,7 @@ import sys
 
 from rich.console import Console
 
-from ..._version import __version__, get_version_info
+from ..._version import get_version_info
 
 # Create console for rich output
 console = Console()
@@ -23,13 +23,15 @@ def show_version_info():
     print()
     print("Build Info:")
     print(f"  Date:         {info['build_date']}")
-    if info['git_commit']:
+    if info["git_commit"]:
         print(f"  Git Commit:   {info['git_commit']}")
-    if info['git_branch']:
+    if info["git_branch"]:
         print(f"  Git Branch:   {info['git_branch']}")
-    if info['git_dirty']:
+    if info["git_dirty"]:
         print("  Git Status:   Modified (uncommitted changes)")
-    print(f"  Environment:  {'Development' if info['is_development'] else 'Production'}")
+    print(
+        f"  Environment:  {'Development' if info['is_development'] else 'Production'}"
+    )
     print()
     print("Project Info:")
     print(f"  Title:        {info['title']}")

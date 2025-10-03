@@ -7,9 +7,9 @@ from .storage_service import StorageService
 from .websocket_service import WebSocketService
 
 __all__ = [
-    'StorageService',
-    'WebSocketService',
-    'BrowserService',
-    'MCPService',
-    'ScreenshotService'
+    "StorageService",
+    "WebSocketService",
+    "BrowserService",
+    "MCPService",
+    "ScreenshotService",
 ]

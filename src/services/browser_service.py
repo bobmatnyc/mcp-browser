@@ -40,17 +40,19 @@ class BrowserService:
         Args:
             connection_info: Connection information
         """
-        websocket = connection_info['websocket']
-        remote_address = connection_info['remote_address']
+        websocket = connection_info["websocket"]
+        remote_address = connection_info["remote_address"]
 
         # Extract port from remote address
-        port = remote_address[1] if isinstance(remote_address, tuple) else self._get_next_port()
+        port = (
+            remote_address[1]
+            if isinstance(remote_address, tuple)
+            else self._get_next_port()
+        )
 
         # Add connection to state
         await self.browser_state.add_connection(
-            port=port,
-            websocket=websocket,
-            user_agent=connection_info.get('user_agent')
+            port=port, websocket=websocket, user_agent=connection_info.get("user_agent")
         )
 
         # Initialize message buffer for this port
@@ -66,11 +68,15 @@ class BrowserService:
         logger.info(f"Browser connected on port {port} from {remote_address}")
 
         # Send acknowledgment
-        await websocket.send(json.dumps({
-            'type': 'connection_ack',
-            'port': port,
-            'timestamp': datetime.now().isoformat()
-        }))
+        await websocket.send(
+            json.dumps(
+                {
+                    "type": "connection_ack",
+                    "port": port,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
+        )
 
     async def handle_browser_disconnect(self, connection_info: Dict[str, Any]) -> None:
         """Handle browser disconnection event.
@@ -78,7 +84,7 @@ class BrowserService:
         Args:
             connection_info: Connection information
         """
-        remote_address = connection_info['remote_address']
+        remote_address = connection_info["remote_address"]
         port = remote_address[1] if isinstance(remote_address, tuple) else None
 
         if port:
@@ -103,8 +109,12 @@ class BrowserService:
         """
         try:
             # Extract port from connection info
-            remote_address = data.get('_remote_address')
-            port = remote_address[1] if isinstance(remote_address, tuple) else self._get_current_port()
+            remote_address = data.get("_remote_address")
+            port = (
+                remote_address[1]
+                if isinstance(remote_address, tuple)
+                else self._get_current_port()
+            )
 
             # Create console message
             message = ConsoleMessage.from_websocket_data(data, port)
@@ -116,13 +126,18 @@ class BrowserService:
             if message.url:
                 await self.browser_state.update_connection_url(port, message.url)
 
+            # Initialize buffer if not present
+            if port not in self._message_buffer:
+                self._message_buffer[port] = deque(maxlen=1000)
+
             # Add to buffer
-            if port in self._message_buffer:
-                self._message_buffer[port].append(message)
+            self._message_buffer[port].append(message)
 
             # Log high-priority messages immediately
-            if message.level.value in ['error', 'warn', 'warning']:
-                logger.info(f"[{message.level.value.upper()}] from port {port}: {message.message[:100]}")
+            if message.level.value in ["error", "warn", "warning"]:
+                logger.info(
+                    f"[{message.level.value.upper()}] from port {port}: {message.message[:100]}"
+                )
 
         except Exception as e:
             logger.error(f"Failed to handle console message: {e}")
@@ -133,12 +148,16 @@ class BrowserService:
         Args:
             data: Batch message data
         """
-        messages = data.get('messages', [])
-        remote_address = data.get('_remote_address')
-        port = remote_address[1] if isinstance(remote_address, tuple) else self._get_current_port()
+        messages = data.get("messages", [])
+        remote_address = data.get("_remote_address")
+        port = (
+            remote_address[1]
+            if isinstance(remote_address, tuple)
+            else self._get_current_port()
+        )
 
         for msg_data in messages:
-            msg_data['_remote_address'] = remote_address
+            msg_data["_remote_address"] = remote_address
             await self.handle_console_message(msg_data)
 
         logger.debug(f"Processed batch of {len(messages)} messages from port {port}")
@@ -150,16 +169,15 @@ class BrowserService:
             data: DOM response data
         """
         # Forward to DOM interaction service if available
-        if hasattr(self, 'dom_interaction_service'):
+        if hasattr(self, "dom_interaction_service"):
             await self.dom_interaction_service.handle_dom_response(data)
         else:
-            logger.warning("DOM response received but no DOM interaction service available")
+            logger.warning(
+                "DOM response received but no DOM interaction service available"
+            )
 
     async def send_dom_command(
-        self,
-        port: int,
-        command: Dict[str, Any],
-        tab_id: Optional[int] = None
+        self, port: int, command: Dict[str, Any], tab_id: Optional[int] = None
     ) -> bool:
         """Send a DOM command to the browser.
 
@@ -179,15 +197,20 @@ class BrowserService:
 
         try:
             import uuid
+
             request_id = str(uuid.uuid4())
 
-            await connection.websocket.send(json.dumps({
-                'type': 'dom_command',
-                'requestId': request_id,
-                'tabId': tab_id,
-                'command': command,
-                'timestamp': datetime.now().isoformat()
-            }))
+            await connection.websocket.send(
+                json.dumps(
+                    {
+                        "type": "dom_command",
+                        "requestId": request_id,
+                        "tabId": tab_id,
+                        "command": command,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
+            )
 
             logger.debug(f"Sent DOM command to port {port}: {command.get('type')}")
             return True
@@ -213,11 +236,15 @@ class BrowserService:
             return False
 
         try:
-            await connection.websocket.send(json.dumps({
-                'type': 'navigate',
-                'url': url,
-                'timestamp': datetime.now().isoformat()
-            }))
+            await connection.websocket.send(
+                json.dumps(
+                    {
+                        "type": "navigate",
+                        "url": url,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
+            )
 
             await self.browser_state.update_connection_url(port, url)
             logger.info(f"Sent navigation command to port {port}: {url}")
@@ -228,10 +255,7 @@ class BrowserService:
             return False
 
     async def query_logs(
-        self,
-        port: int,
-        last_n: int = 100,
-        level_filter: Optional[List[str]] = None
+        self, port: int, last_n: int = 100, level_filter: Optional[List[str]] = None
     ) -> List[ConsoleMessage]:
         """Query console logs for a port.
 
@@ -257,7 +281,7 @@ class BrowserService:
             stored_messages = await self.storage_service.query_messages(
                 port=port,
                 last_n=max(0, last_n - len(messages)),
-                level_filter=level_filter
+                level_filter=level_filter,
             )
             messages = stored_messages + messages
 
@@ -265,10 +289,7 @@ class BrowserService:
         return messages[-last_n:] if last_n else messages
 
     async def extract_content(
-        self,
-        port: int,
-        tab_id: Optional[int] = None,
-        timeout: float = 10.0
+        self, port: int, tab_id: Optional[int] = None, timeout: float = 10.0
     ) -> Dict[str, Any]:
         """Extract readable content from a browser tab using Readability.
 
@@ -284,30 +305,34 @@ class BrowserService:
 
         if not connection or not connection.websocket:
             logger.warning(f"No active browser connection on port {port}")
-            return {
-                'success': False,
-                'error': 'No active browser connection'
-            }
+            return {"success": False, "error": "No active browser connection"}
 
         try:
             import uuid
+
             request_id = str(uuid.uuid4())
 
             # Create a future to wait for response with creation time tracking
             response_future = asyncio.Future()
             self._pending_requests[request_id] = {
-                'future': response_future,
-                'created_at': datetime.now()
+                "future": response_future,
+                "created_at": datetime.now(),
             }
 
-            await connection.websocket.send(json.dumps({
-                'type': 'extract_content',
-                'requestId': request_id,
-                'tabId': tab_id,
-                'timestamp': datetime.now().isoformat()
-            }))
+            await connection.websocket.send(
+                json.dumps(
+                    {
+                        "type": "extract_content",
+                        "requestId": request_id,
+                        "tabId": tab_id,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
+            )
 
-            logger.info(f"Sent content extraction request to port {port}, tab {tab_id or 'active'}")
+            logger.info(
+                f"Sent content extraction request to port {port}, tab {tab_id or 'active'}"
+            )
 
             try:
                 # Wait for response with timeout
@@ -316,8 +341,8 @@ class BrowserService:
             except asyncio.TimeoutError:
                 logger.warning(f"Content extraction timed out after {timeout}s")
                 return {
-                    'success': False,
-                    'error': f'Content extraction timed out after {timeout} seconds'
+                    "success": False,
+                    "error": f"Content extraction timed out after {timeout} seconds",
                 }
             finally:
                 # Clean up pending request
@@ -325,10 +350,7 @@ class BrowserService:
 
         except Exception as e:
             logger.error(f"Failed to send content extraction command: {e}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     async def handle_content_extracted(self, data: Dict[str, Any]) -> None:
         """Handle content extraction response from browser.
@@ -336,16 +358,20 @@ class BrowserService:
         Args:
             data: Response data including extracted content
         """
-        request_id = data.get('requestId')
+        request_id = data.get("requestId")
         if request_id and request_id in self._pending_requests:
             request_data = self._pending_requests[request_id]
-            future = request_data['future']
+            future = request_data["future"]
             if not future.done():
-                response = data.get('response', {})
+                response = data.get("response", {})
                 future.set_result(response)
-                logger.info(f"Received content extraction response for request {request_id}")
+                logger.info(
+                    f"Received content extraction response for request {request_id}"
+                )
         else:
-            logger.warning(f"Received content extraction response for unknown request: {request_id}")
+            logger.warning(
+                f"Received content extraction response for unknown request: {request_id}"
+            )
 
     async def _cleanup_pending_requests(self) -> None:
         """Clean up orphaned or expired pending requests.
@@ -358,8 +384,8 @@ class BrowserService:
         to_remove = []
 
         for request_id, request_data in self._pending_requests.items():
-            future = request_data['future']
-            created_at = request_data['created_at']
+            future = request_data["future"]
+            created_at = request_data["created_at"]
             age = (now - created_at).total_seconds()
 
             # Remove if completed or expired
@@ -371,7 +397,9 @@ class BrowserService:
                 # Cancel the future if it's still pending
                 if not future.done():
                     future.cancel()
-                logger.warning(f"Cleaning up expired request {request_id} (age: {age:.1f}s)")
+                logger.warning(
+                    f"Cleaning up expired request {request_id} (age: {age:.1f}s)"
+                )
 
         # Remove stale requests
         for request_id in to_remove:
@@ -496,10 +524,8 @@ class BrowserService:
         stats = await self.browser_state.get_connection_stats()
 
         # Add buffer information
-        stats['buffers'] = {
-            port: len(buffer)
-            for port, buffer in self._message_buffer.items()
+        stats["buffers"] = {
+            port: len(buffer) for port, buffer in self._message_buffer.items()
         }
 
         return stats
-

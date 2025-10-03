@@ -14,7 +14,7 @@ from typing import Optional, Tuple
 __version__ = "2.0.5"
 
 # Version components for programmatic access
-VERSION_INFO = tuple(map(int, __version__.split('.')))
+VERSION_INFO = tuple(map(int, __version__.split(".")))
 MAJOR, MINOR, PATCH = VERSION_INFO
 
 # Project metadata
@@ -34,11 +34,11 @@ def get_git_commit() -> Optional[str]:
     """Get the current git commit hash."""
     try:
         result = subprocess.run(
-            ['git', 'rev-parse', '--short', 'HEAD'],
+            ["git", "rev-parse", "--short", "HEAD"],
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent,
-            timeout=1
+            timeout=1,
         )
         if result.returncode == 0:
             return result.stdout.strip()
@@ -51,11 +51,11 @@ def get_git_branch() -> Optional[str]:
     """Get the current git branch name."""
     try:
         result = subprocess.run(
-            ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent,
-            timeout=1
+            timeout=1,
         )
         if result.returncode == 0:
             return result.stdout.strip()
@@ -68,11 +68,11 @@ def get_git_dirty() -> bool:
     """Check if the git repository has uncommitted changes."""
     try:
         result = subprocess.run(
-            ['git', 'status', '--porcelain'],
+            ["git", "status", "--porcelain"],
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent,
-            timeout=1
+            timeout=1,
         )
         if result.returncode == 0:
             return bool(result.stdout.strip())
@@ -108,8 +108,8 @@ def get_version_string(include_build: bool = False) -> str:
 
         # Add branch if not main/master
         branch = get_git_branch()
-        if branch and branch not in ('main', 'master'):
-            metadata.append(branch.replace('/', '-'))
+        if branch and branch not in ("main", "master"):
+            metadata.append(branch.replace("/", "-"))
 
         if metadata:
             version = f"{version}+{'.'.join(metadata)}"
@@ -155,14 +155,14 @@ def parse_version(version_str: str) -> Tuple[int, int, int]:
         ValueError: If version string is invalid
     """
     # Remove build metadata if present
-    if '+' in version_str:
-        version_str = version_str.split('+')[0]
+    if "+" in version_str:
+        version_str = version_str.split("+")[0]
 
     # Remove pre-release info if present
-    if '-' in version_str:
-        version_str = version_str.split('-')[0]
+    if "-" in version_str:
+        version_str = version_str.split("-")[0]
 
-    parts = version_str.split('.')
+    parts = version_str.split(".")
     if len(parts) != 3:
         raise ValueError(f"Invalid version string: {version_str}")
 
@@ -172,7 +172,7 @@ def parse_version(version_str: str) -> Tuple[int, int, int]:
         raise ValueError(f"Invalid version string: {version_str}") from e
 
 
-def bump_version(component: str = 'patch') -> str:
+def bump_version(component: str = "patch") -> str:
     """Calculate the next version number.
 
     Args:
@@ -186,14 +186,16 @@ def bump_version(component: str = 'patch') -> str:
     """
     major, minor, patch = VERSION_INFO
 
-    if component == 'major':
+    if component == "major":
         return f"{major + 1}.0.0"
-    elif component == 'minor':
+    elif component == "minor":
         return f"{major}.{minor + 1}.0"
-    elif component == 'patch':
+    elif component == "patch":
         return f"{major}.{minor}.{patch + 1}"
     else:
-        raise ValueError(f"Invalid component: {component}. Must be 'major', 'minor', or 'patch'")
+        raise ValueError(
+            f"Invalid component: {component}. Must be 'major', 'minor', or 'patch'"
+        )
 
 
 # Convenience exports

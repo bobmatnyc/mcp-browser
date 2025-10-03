@@ -11,7 +11,14 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
 from rich.table import Table
 
-from ..utils import CONFIG_FILE, DATA_DIR, HOME_DIR, LOG_DIR, check_system_requirements, console
+from ..utils import (
+    CONFIG_FILE,
+    DATA_DIR,
+    HOME_DIR,
+    LOG_DIR,
+    check_system_requirements,
+    console,
+)
 from .init import init_project_extension_interactive
 
 
@@ -31,12 +38,14 @@ def quickstart(ctx):
 
     Perfect for getting started quickly without reading documentation!
     """
-    console.print(Panel.fit(
-        "[bold cyan]🚀 MCP Browser Quick Start Wizard[/bold cyan]\n\n"
-        "This wizard will help you set up MCP Browser in just a few steps.",
-        title="Welcome",
-        border_style="cyan"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold cyan]🚀 MCP Browser Quick Start Wizard[/bold cyan]\n\n"
+            "This wizard will help you set up MCP Browser in just a few steps.",
+            title="Welcome",
+            border_style="cyan",
+        )
+    )
 
     # Step 1: Check requirements
     console.print("\n[bold]Step 1: Checking system requirements...[/bold]")
@@ -63,7 +72,9 @@ def quickstart(ctx):
     console.print(table)
 
     if not all_ok:
-        if not Confirm.ask("\n[yellow]Some requirements are missing. Continue anyway?[/yellow]"):
+        if not Confirm.ask(
+            "\n[yellow]Some requirements are missing. Continue anyway?[/yellow]"
+        ):
             console.print("[red]Setup cancelled.[/red]")
             return
 
@@ -86,35 +97,36 @@ def quickstart(ctx):
     # Step 3: Initialize extension
     console.print("\n[bold]Step 3: Setting up Chrome extension...[/bold]")
 
-    use_local = Confirm.ask("\nInitialize extension in current directory? (recommended for projects)")
+    use_local = Confirm.ask(
+        "\nInitialize extension in current directory? (recommended for projects)"
+    )
 
     if use_local:
         asyncio.run(init_project_extension_interactive())
     else:
-        console.print("[dim]Skipping local extension setup. You can run 'mcp-browser init' later.[/dim]")
+        console.print(
+            "[dim]Skipping local extension setup. You can run 'mcp-browser init' later.[/dim]"
+        )
 
     # Step 4: Configure settings
     console.print("\n[bold]Step 4: Configuring settings...[/bold]")
 
     if not CONFIG_FILE.exists():
         default_config = {
-            'storage': {
-                'base_path': str(DATA_DIR),
-                'max_file_size_mb': 50,
-                'retention_days': 7
+            "storage": {
+                "base_path": str(DATA_DIR),
+                "max_file_size_mb": 50,
+                "retention_days": 7,
             },
-            'websocket': {
-                'port_range': [8875, 8895],
-                'host': 'localhost'
+            "websocket": {"port_range": [8875, 8895], "host": "localhost"},
+            "logging": {
+                "level": "INFO",
+                "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             },
-            'logging': {
-                'level': 'INFO',
-                'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-            }
         }
 
         CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(CONFIG_FILE, 'w') as f:
+        with open(CONFIG_FILE, "w") as f:
             json.dump(default_config, f, indent=2)
         console.print("  [green]✓[/green] Created default configuration")
     else:
@@ -125,19 +137,29 @@ def quickstart(ctx):
 
     try:
         import playwright
+
         if Confirm.ask("\nInstall Playwright browsers for screenshot support?"):
             with Progress(
                 SpinnerColumn(),
                 TextColumn("[progress.description]{task.description}"),
                 transient=True,
             ) as progress:
-                task = progress.add_task("Installing Playwright browsers...", total=None)
-                subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+                task = progress.add_task(
+                    "Installing Playwright browsers...", total=None
+                )
+                subprocess.run(
+                    [sys.executable, "-m", "playwright", "install", "chromium"],
+                    check=True,
+                )
             console.print("  [green]✓[/green] Playwright browsers installed")
     except ImportError:
-        console.print("  [yellow]⚠[/yellow] Playwright not installed (screenshots won't work)")
+        console.print(
+            "  [yellow]⚠[/yellow] Playwright not installed (screenshots won't work)"
+        )
     except Exception as e:
-        console.print(f"  [yellow]⚠[/yellow] Could not install Playwright browsers: {e}")
+        console.print(
+            f"  [yellow]⚠[/yellow] Could not install Playwright browsers: {e}"
+        )
 
     # Step 6: Start server
     console.print("\n[bold]Step 6: Starting the server...[/bold]")
@@ -151,7 +173,7 @@ def quickstart(ctx):
         from ...cli.main import BrowserMCPServer
 
         # Start the server
-        config = ctx.obj.get('config')
+        config = ctx.obj.get("config")
         server = BrowserMCPServer(config=config, mcp_mode=False)
 
         try:
@@ -162,6 +184,8 @@ def quickstart(ctx):
         console.print("\n[green]✨ Setup complete![/green]")
         console.print("\n[bold]Next steps:[/bold]")
         console.print("  1. Run [cyan]mcp-browser start[/cyan] to start the server")
-        console.print("  2. Open [link=http://localhost:8080]http://localhost:8080[/link] in your browser")
+        console.print(
+            "  2. Open [link=http://localhost:8080]http://localhost:8080[/link] in your browser"
+        )
         console.print("  3. Install the Chrome extension from the dashboard")
         console.print("  4. Configure Claude Code to use MCP Browser")

@@ -17,6 +17,7 @@ class TestServiceContainer:
 
     def test_register_service(self, container):
         """Test service registration."""
+
         def test_factory(c):
             return "test_service"
 
@@ -100,6 +101,7 @@ class TestServiceContainer:
     @pytest.mark.asyncio
     async def test_async_factory(self, container):
         """Test async factory function."""
+
         async def async_factory(c):
             await asyncio.sleep(0.01)  # Simulate async work
             return "async_result"

@@ -14,21 +14,21 @@ from .services import (
 
 __all__ = [
     # Services
-    'StorageService',
-    'WebSocketService',
-    'BrowserService',
-    'MCPService',
-    'ScreenshotService',
+    "StorageService",
+    "WebSocketService",
+    "BrowserService",
+    "MCPService",
+    "ScreenshotService",
     # Models
-    'ConsoleMessage',
-    'ConsoleLevel',
-    'BrowserState',
-    'BrowserConnection',
+    "ConsoleMessage",
+    "ConsoleLevel",
+    "BrowserState",
+    "BrowserConnection",
     # Container
-    'ServiceContainer',
+    "ServiceContainer",
     # Version
-    '__version__',
-    '__author__',
-    '__description__',
-    'version_string'
+    "__version__",
+    "__author__",
+    "__description__",
+    "version_string",
 ]

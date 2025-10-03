@@ -59,25 +59,22 @@ class BrowserMCPServer:
             Configuration dictionary
         """
         default_config = {
-            'storage': {
-                'base_path': str(DATA_DIR),
-                'max_file_size_mb': 50,
-                'retention_days': 7
+            "storage": {
+                "base_path": str(DATA_DIR),
+                "max_file_size_mb": 50,
+                "retention_days": 7,
             },
-            'websocket': {
-                'port_range': [8875, 8895],
-                'host': 'localhost'
+            "websocket": {"port_range": [8875, 8895], "host": "localhost"},
+            "logging": {
+                "level": "INFO",
+                "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             },
-            'logging': {
-                'level': 'INFO',
-                'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-            }
         }
 
         # Try to load from config file
         if CONFIG_FILE.exists():
             try:
-                with open(CONFIG_FILE, 'r') as f:
+                with open(CONFIG_FILE, "r") as f:
                     file_config = json.load(f)
                     default_config.update(file_config)
             except Exception as e:
@@ -91,11 +88,10 @@ class BrowserMCPServer:
 
     def _setup_logging(self) -> None:
         """Configure logging based on settings."""
-        log_config = self.config.get('logging', {})
-        level = getattr(logging, log_config.get('level', 'INFO'))
+        log_config = self.config.get("logging", {})
+        level = getattr(logging, log_config.get("level", "INFO"))
         format_str = log_config.get(
-            'format',
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            "format", "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         )
 
         # Ensure log directory exists
@@ -106,7 +102,7 @@ class BrowserMCPServer:
 
         if self.mcp_mode:
             # In MCP mode, only log to file and stderr, never stdout
-            handlers.append(logging.FileHandler(LOG_DIR / 'mcp-browser.log'))
+            handlers.append(logging.FileHandler(LOG_DIR / "mcp-browser.log"))
             # Create a stderr handler for critical errors only
             stderr_handler = logging.StreamHandler(sys.stderr)
             stderr_handler.setLevel(logging.ERROR)
@@ -114,43 +110,45 @@ class BrowserMCPServer:
         else:
             # Normal mode: log to both stdout and file
             handlers.append(logging.StreamHandler())
-            handlers.append(logging.FileHandler(LOG_DIR / 'mcp-browser.log'))
+            handlers.append(logging.FileHandler(LOG_DIR / "mcp-browser.log"))
 
         # Configure root logger
-        logging.basicConfig(
-            level=level,
-            format=format_str,
-            handlers=handlers
-        )
+        logging.basicConfig(level=level, format=format_str, handlers=handlers)
 
     def _setup_services(self) -> None:
         """Set up all services in the container with configuration."""
 
         # Get configuration sections
-        storage_config = self.config.get('storage', {})
+        storage_config = self.config.get("storage", {})
 
         # Register storage service with configuration
-        self.container.register('storage_service', lambda c: StorageService(
-            StorageConfig(
-                base_path=Path(storage_config.get('base_path', DATA_DIR)),
-                max_file_size_mb=storage_config.get('max_file_size_mb', 50),
-                retention_days=storage_config.get('retention_days', 7)
-            )
-        ))
+        self.container.register(
+            "storage_service",
+            lambda c: StorageService(
+                StorageConfig(
+                    base_path=Path(storage_config.get("base_path", DATA_DIR)),
+                    max_file_size_mb=storage_config.get("max_file_size_mb", 50),
+                    retention_days=storage_config.get("retention_days", 7),
+                )
+            ),
+        )
 
         # Register WebSocket service with configuration
-        websocket_config = self.config.get('websocket', {})
-        port_range = websocket_config.get('port_range', [8875, 8895])
-        self.container.register('websocket_service', lambda c: WebSocketService(
-            start_port=port_range[0],
-            end_port=port_range[-1],
-            host=websocket_config.get('host', 'localhost')
-        ))
+        websocket_config = self.config.get("websocket", {})
+        port_range = websocket_config.get("port_range", [8875, 8895])
+        self.container.register(
+            "websocket_service",
+            lambda c: WebSocketService(
+                start_port=port_range[0],
+                end_port=port_range[-1],
+                host=websocket_config.get("host", "localhost"),
+            ),
+        )
 
         # Register browser service and DOM interaction service together to avoid circular dependency
         # Both services are created in the same factory to handle bidirectional references properly
         async def create_browser_service(c):
-            storage = await c.get('storage_service')
+            storage = await c.get("storage_service")
             # Create browser service without DOM service initially
             browser = BrowserService(storage_service=storage)
             # Create DOM service with browser reference
@@ -158,39 +156,39 @@ class BrowserMCPServer:
             # Set bidirectional reference - browser now has DOM service
             browser.dom_interaction_service = dom_service
             # Register DOM service as singleton for other services to use
-            c.register_instance('dom_interaction_service', dom_service)
+            c.register_instance("dom_interaction_service", dom_service)
             return browser
 
-        self.container.register('browser_service', create_browser_service)
+        self.container.register("browser_service", create_browser_service)
 
         # Register screenshot service
-        self.container.register('screenshot_service', lambda c: ScreenshotService())
+        self.container.register("screenshot_service", lambda c: ScreenshotService())
 
         # Register MCP service with dependencies
         async def create_mcp_service(c):
-            browser = await c.get('browser_service')
-            screenshot = await c.get('screenshot_service')
-            dom_interaction = await c.get('dom_interaction_service')
+            browser = await c.get("browser_service")
+            screenshot = await c.get("screenshot_service")
+            dom_interaction = await c.get("dom_interaction_service")
             return MCPService(
                 browser_service=browser,
                 screenshot_service=screenshot,
-                dom_interaction_service=dom_interaction
+                dom_interaction_service=dom_interaction,
             )
 
-        self.container.register('mcp_service', create_mcp_service)
+        self.container.register("mcp_service", create_mcp_service)
 
         # Register dashboard service with dependencies
         async def create_dashboard_service(c):
-            websocket = await c.get('websocket_service')
-            browser = await c.get('browser_service')
-            storage = await c.get('storage_service')
+            websocket = await c.get("websocket_service")
+            browser = await c.get("browser_service")
+            storage = await c.get("storage_service")
             return DashboardService(
                 websocket_service=websocket,
                 browser_service=browser,
-                storage_service=storage
+                storage_service=storage,
             )
 
-        self.container.register('dashboard_service', create_dashboard_service)
+        self.container.register("dashboard_service", create_dashboard_service)
 
     async def start(self) -> None:
         """Start all services."""
@@ -199,25 +197,33 @@ class BrowserMCPServer:
         self.start_time = datetime.now()
 
         # Get services
-        storage = await self.container.get('storage_service')
-        websocket = await self.container.get('websocket_service')
-        browser = await self.container.get('browser_service')
-        screenshot = await self.container.get('screenshot_service')
-        dom_interaction = await self.container.get('dom_interaction_service')
+        storage = await self.container.get("storage_service")
+        websocket = await self.container.get("websocket_service")
+        browser = await self.container.get("browser_service")
+        screenshot = await self.container.get("screenshot_service")
+        dom_interaction = await self.container.get("dom_interaction_service")
         # Note: MCP service initialized via container but not used in start phase
 
         # Start storage rotation task
         await storage.start_rotation_task()
 
         # Set up WebSocket handlers
-        websocket.register_connection_handler('connect', browser.handle_browser_connect)
-        websocket.register_connection_handler('disconnect', browser.handle_browser_disconnect)
-        websocket.register_message_handler('console', browser.handle_console_message)
-        websocket.register_message_handler('batch', browser.handle_batch_messages)
-        websocket.register_message_handler('dom_response', browser.handle_dom_response)
-        websocket.register_message_handler('tabs_info', dom_interaction.handle_dom_response)
-        websocket.register_message_handler('tab_activated', dom_interaction.handle_dom_response)
-        websocket.register_message_handler('content_extracted', browser.handle_content_extracted)
+        websocket.register_connection_handler("connect", browser.handle_browser_connect)
+        websocket.register_connection_handler(
+            "disconnect", browser.handle_browser_disconnect
+        )
+        websocket.register_message_handler("console", browser.handle_console_message)
+        websocket.register_message_handler("batch", browser.handle_batch_messages)
+        websocket.register_message_handler("dom_response", browser.handle_dom_response)
+        websocket.register_message_handler(
+            "tabs_info", dom_interaction.handle_dom_response
+        )
+        websocket.register_message_handler(
+            "tab_activated", dom_interaction.handle_dom_response
+        )
+        websocket.register_message_handler(
+            "content_extracted", browser.handle_content_extracted
+        )
 
         # Start WebSocket server
         self.websocket_port = await websocket.start()
@@ -249,19 +255,19 @@ class BrowserMCPServer:
 
         # Get services
         try:
-            storage = await self.container.get('storage_service')
+            storage = await self.container.get("storage_service")
             await storage.stop_rotation_task()
         except Exception as e:
             logger.error(f"Error stopping storage service: {e}")
 
         try:
-            websocket = await self.container.get('websocket_service')
+            websocket = await self.container.get("websocket_service")
             await websocket.stop()
         except Exception as e:
             logger.error(f"Error stopping WebSocket service: {e}")
 
         try:
-            screenshot = await self.container.get('screenshot_service')
+            screenshot = await self.container.get("screenshot_service")
             await screenshot.stop()
         except Exception as e:
             logger.error(f"Error stopping screenshot service: {e}")
@@ -276,10 +282,10 @@ class BrowserMCPServer:
         if self.mcp_mode:
             return
 
-        websocket = await self.container.get('websocket_service')
-        browser = await self.container.get('browser_service')
-        storage = await self.container.get('storage_service')
-        screenshot = await self.container.get('screenshot_service')
+        websocket = await self.container.get("websocket_service")
+        browser = await self.container.get("browser_service")
+        storage = await self.container.get("storage_service")
+        screenshot = await self.container.get("screenshot_service")
 
         print("\n" + "═" * 60)
         print(f"  MCP Browser Server Status (v{__version__})")
@@ -305,8 +311,10 @@ class BrowserMCPServer:
         browser_stats = await browser.get_browser_stats()
         print(f"  Total Browsers: {browser_stats['total_connections']}")
         print(f"  Total Messages: {browser_stats['total_messages']:,}")
-        if browser_stats['total_messages'] > 0:
-            print(f"  Message Rate: ~{browser_stats['total_messages'] // max(1, browser_stats.get('uptime_seconds', 1))}/sec")
+        if browser_stats["total_messages"] > 0:
+            print(
+                f"  Message Rate: ~{browser_stats['total_messages'] // max(1, browser_stats.get('uptime_seconds', 1))}/sec"
+            )
 
         # Storage stats
         print("\n💾 Storage Service:")
@@ -319,9 +327,9 @@ class BrowserMCPServer:
         # Screenshot service
         print("\n📸 Screenshot Service:")
         screenshot_info = screenshot.get_service_info()
-        status = '✅ Running' if screenshot_info['is_running'] else '⭕ Stopped'
+        status = "✅ Running" if screenshot_info["is_running"] else "⭕ Stopped"
         print(f"  Status: {status}")
-        if screenshot_info.get('browser_type'):
+        if screenshot_info.get("browser_type"):
             print(f"  Browser: {screenshot_info['browser_type']}")
 
         # MCP Integration
@@ -352,12 +360,12 @@ class BrowserMCPServer:
         # Register minimal services needed for MCP
 
         # Create simple service instances without full initialization
-        storage_config = self.config.get('storage', {})
+        storage_config = self.config.get("storage", {})
         storage = StorageService(
             StorageConfig(
-                base_path=Path(storage_config.get('base_path', DATA_DIR)),
-                max_file_size_mb=storage_config.get('max_file_size_mb', 50),
-                retention_days=storage_config.get('retention_days', 7)
+                base_path=Path(storage_config.get("base_path", DATA_DIR)),
+                max_file_size_mb=storage_config.get("max_file_size_mb", 50),
+                retention_days=storage_config.get("retention_days", 7),
             )
         )
 
@@ -375,7 +383,7 @@ class BrowserMCPServer:
         mcp = MCPService(
             browser_service=browser,
             screenshot_service=screenshot,
-            dom_interaction_service=dom_interaction
+            dom_interaction_service=dom_interaction,
         )
 
         # Note: We don't start WebSocket server in MCP mode
@@ -387,6 +395,7 @@ class BrowserMCPServer:
         except Exception:
             # Log to stderr to avoid corrupting stdio
             import traceback
+
             traceback.print_exc(file=sys.stderr)
 
     async def run_server_with_dashboard(self) -> None:
@@ -395,7 +404,7 @@ class BrowserMCPServer:
 
         # Start dashboard service
         try:
-            dashboard = await self.container.get('dashboard_service')
+            dashboard = await self.container.get("dashboard_service")
             await dashboard.start(port=8080)
             if not self.mcp_mode:
                 logger.info("Dashboard available at http://localhost:8080")
@@ -410,7 +419,7 @@ class BrowserMCPServer:
             pass
         finally:
             try:
-                dashboard = await self.container.get('dashboard_service')
+                dashboard = await self.container.get("dashboard_service")
                 await dashboard.stop()
             except Exception:
                 pass
