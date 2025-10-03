@@ -2,6 +2,12 @@
 
 All notable changes to MCP Browser will be documented in this file.
 
+## [2.0.7] - 2025-10-03
+
+### Fixed
+- Import sorting and code style improvements
+- Auto-fixed isort violations in 7 files
+
 ## [2.0.6] - 2025-10-03
 
 ### Added
