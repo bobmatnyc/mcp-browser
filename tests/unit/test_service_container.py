@@ -4,7 +4,8 @@ import asyncio
 
 import pytest
 
-from src.container.service_container import ServiceContainer, ServiceNotFoundError
+from src.container.service_container import (ServiceContainer,
+                                             ServiceNotFoundError)
 
 
 class TestServiceContainer:

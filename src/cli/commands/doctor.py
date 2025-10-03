@@ -8,13 +8,8 @@ import sys
 import click
 from rich.panel import Panel
 
-from ..utils import (
-    CONFIG_FILE,
-    DATA_DIR,
-    check_installation_status,
-    check_system_requirements,
-    console,
-)
+from ..utils import (CONFIG_FILE, DATA_DIR, check_installation_status,
+                     check_system_requirements, console)
 from .init import init_project_extension
 
 

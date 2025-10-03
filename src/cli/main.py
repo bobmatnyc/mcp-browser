@@ -14,17 +14,8 @@ from rich.panel import Panel
 
 # Import version information from single source of truth
 from .._version import __version__
-from .commands import (
-    dashboard,
-    doctor,
-    extension,
-    init,
-    install,
-    quickstart,
-    start,
-    status,
-    tutorial,
-)
+from .commands import (dashboard, doctor, extension, init, install, quickstart,
+                       start, status, tutorial)
 from .utils import BrowserMCPServer, console, is_first_run, show_version_info
 
 

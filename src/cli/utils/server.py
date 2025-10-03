@@ -11,13 +11,8 @@ from typing import Any, Dict, Optional
 
 from ..._version import __version__
 from ...container import ServiceContainer
-from ...services import (
-    BrowserService,
-    MCPService,
-    ScreenshotService,
-    StorageService,
-    WebSocketService,
-)
+from ...services import (BrowserService, MCPService, ScreenshotService,
+                         StorageService, WebSocketService)
 from ...services.dashboard_service import DashboardService
 from ...services.dom_interaction_service import DOMInteractionService
 from ...services.storage_service import StorageConfig
