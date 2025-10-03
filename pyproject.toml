@@ -54,7 +54,15 @@ Issues = "https://github.com/browserpymcp/mcp-browser/issues"
 
 [tool.setuptools]
 package-dir = {"mcp_browser" = "src"}
-packages = ["mcp_browser", "mcp_browser.cli", "mcp_browser.container", "mcp_browser.models", "mcp_browser.services"]
+packages = [
+    "mcp_browser",
+    "mcp_browser.cli",
+    "mcp_browser.cli.commands",
+    "mcp_browser.cli.utils",
+    "mcp_browser.container",
+    "mcp_browser.models",
+    "mcp_browser.services"
+]
 
 [tool.setuptools.package-data]
 mcp_browser = [

@@ -2,6 +2,33 @@
 
 All notable changes to MCP Browser will be documented in this file.
 
+## [2.0.5] - 2024-10-03
+
+### Changed
+- Renamed package from BrowserPyMCP to mcp-browser
+- Restructured CLI into modular command system (main.py: 1,835 → 317 lines)
+- Improved service container with per-service creation locks
+- Enhanced async patterns in storage service (replaced blocking I/O)
+
+### Added
+- CLI commands package with dedicated modules for each command
+- CLI utilities package for shared functionality
+- Periodic cleanup for pending browser requests (prevents memory leak)
+- Interactive quickstart wizard
+- System diagnostics (doctor command)
+- Tutorial command for guided learning
+
+### Fixed
+- Race condition in service container singleton creation
+- Memory leak in BrowserService pending requests
+- Blocking file I/O in StorageService.get_storage_stats()
+- Circular dependency between BrowserService and DOMInteractionService
+
+### Performance
+- Better concurrency for service initialization
+- Non-blocking async file operations
+- Automatic cleanup of orphaned requests (every 30s)
+
 ## [1.0.3] - 2024-09-24
 
 ### Fixed

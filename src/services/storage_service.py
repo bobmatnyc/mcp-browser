@@ -270,6 +270,20 @@ class StorageService:
             except Exception as e:
                 logger.error(f"Error in rotation loop: {e}")
 
+    async def _enumerate_async(self, async_iterable):
+        """Async helper to enumerate an async iterable.
+
+        Args:
+            async_iterable: Async iterable to enumerate
+
+        Yields:
+            Tuple of (index, item)
+        """
+        i = 0
+        async for item in async_iterable:
+            yield i, item
+            i += 1
+
     async def get_storage_stats(self) -> Dict[str, Any]:
         """Get storage statistics.
 
@@ -302,9 +316,15 @@ class StorageService:
                 })
                 port_stats['size_mb'] += size_mb
 
-                # Count messages
-                with open(file_path, 'r') as f:
-                    port_stats['message_count'] += sum(1 for _ in f)
+                # Count messages asynchronously with periodic yielding
+                line_count = 0
+                async with aiofiles.open(file_path, 'r') as f:
+                    async for i, _ in self._enumerate_async(f):
+                        line_count += 1
+                        # Yield control every 1000 lines to prevent blocking
+                        if i % 1000 == 0:
+                            await asyncio.sleep(0)
+                port_stats['message_count'] += line_count
 
             stats['ports'].append(port_stats)
             stats['total_size_mb'] += port_stats['size_mb']

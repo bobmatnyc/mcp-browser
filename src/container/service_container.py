@@ -22,6 +22,8 @@ class ServiceContainer:
         self._singletons: Dict[str, Any] = {}
         self._singleton_flags: Dict[str, bool] = {}
         self._lock = asyncio.Lock()
+        # Per-service creation locks to prevent race conditions during singleton creation
+        self._creating: Dict[str, asyncio.Lock] = {}
 
     def register(
         self,
@@ -70,12 +72,19 @@ class ServiceContainer:
 
         # Check if we should create a singleton
         if self._singleton_flags.get(name, False):
+            # Ensure per-service lock exists (thread-safe creation of lock itself)
             async with self._lock:
-                # Double-check after acquiring lock
+                if name not in self._creating:
+                    self._creating[name] = asyncio.Lock()
+                service_lock = self._creating[name]
+
+            # Use per-service lock for double-check pattern
+            async with service_lock:
+                # Double-check after acquiring lock - another coroutine may have created it
                 if name in self._singletons:
                     return self._singletons[name]
 
-                # Create singleton instance
+                # Create singleton instance - only one coroutine per service reaches here
                 instance = await self._create_instance(name)
                 self._singletons[name] = instance
                 return instance

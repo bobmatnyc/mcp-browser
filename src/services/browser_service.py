@@ -15,18 +15,24 @@ logger = logging.getLogger(__name__)
 class BrowserService:
     """Service for handling browser connections and messages."""
 
-    def __init__(self, storage_service=None):
+    def __init__(self, storage_service=None, dom_interaction_service=None):
         """Initialize browser service.
 
         Args:
             storage_service: Optional storage service for persistence
+            dom_interaction_service: Optional DOM interaction service for element manipulation
         """
         self.storage_service = storage_service
+        self.dom_interaction_service = dom_interaction_service
         self.browser_state = BrowserState()
         self._message_buffer: Dict[int, deque] = {}
         self._buffer_tasks: Dict[int, asyncio.Task] = {}
         self._buffer_interval = 2.5  # seconds
-        self._pending_requests: Dict[str, asyncio.Future] = {}  # For async request/response
+        # For async request/response with creation time tracking
+        self._pending_requests: Dict[str, Dict[str, Any]] = {}
+        self._cleanup_task: Optional[asyncio.Task] = None
+        self._cleanup_interval = 30.0  # seconds - cleanup check interval
+        self._request_timeout = 120.0  # seconds - max age for pending requests
 
     async def handle_browser_connect(self, connection_info: Dict[str, Any]) -> None:
         """Handle browser connection event.
@@ -287,9 +293,12 @@ class BrowserService:
             import uuid
             request_id = str(uuid.uuid4())
 
-            # Create a future to wait for response
+            # Create a future to wait for response with creation time tracking
             response_future = asyncio.Future()
-            self._pending_requests[request_id] = response_future
+            self._pending_requests[request_id] = {
+                'future': response_future,
+                'created_at': datetime.now()
+            }
 
             await connection.websocket.send(json.dumps({
                 'type': 'extract_content',
@@ -329,13 +338,92 @@ class BrowserService:
         """
         request_id = data.get('requestId')
         if request_id and request_id in self._pending_requests:
-            future = self._pending_requests[request_id]
+            request_data = self._pending_requests[request_id]
+            future = request_data['future']
             if not future.done():
                 response = data.get('response', {})
                 future.set_result(response)
                 logger.info(f"Received content extraction response for request {request_id}")
         else:
             logger.warning(f"Received content extraction response for unknown request: {request_id}")
+
+    async def _cleanup_pending_requests(self) -> None:
+        """Clean up orphaned or expired pending requests.
+
+        Removes:
+        - Requests older than _request_timeout (2 minutes)
+        - Completed futures that weren't cleaned up
+        """
+        now = datetime.now()
+        to_remove = []
+
+        for request_id, request_data in self._pending_requests.items():
+            future = request_data['future']
+            created_at = request_data['created_at']
+            age = (now - created_at).total_seconds()
+
+            # Remove if completed or expired
+            if future.done():
+                to_remove.append(request_id)
+                logger.debug(f"Cleaning up completed request {request_id}")
+            elif age > self._request_timeout:
+                to_remove.append(request_id)
+                # Cancel the future if it's still pending
+                if not future.done():
+                    future.cancel()
+                logger.warning(f"Cleaning up expired request {request_id} (age: {age:.1f}s)")
+
+        # Remove stale requests
+        for request_id in to_remove:
+            self._pending_requests.pop(request_id, None)
+
+        if to_remove:
+            logger.info(f"Cleaned up {len(to_remove)} stale pending requests")
+
+    async def _cleanup_pending_requests_loop(self) -> None:
+        """Periodically clean up orphaned pending requests."""
+        while True:
+            try:
+                await asyncio.sleep(self._cleanup_interval)
+                await self._cleanup_pending_requests()
+            except asyncio.CancelledError:
+                # Final cleanup before cancellation
+                await self._cleanup_pending_requests()
+                break
+            except Exception as e:
+                logger.error(f"Error in pending requests cleanup task: {e}")
+
+    async def start_cleanup_task(self) -> None:
+        """Start the background cleanup task for pending requests."""
+        if self._cleanup_task and not self._cleanup_task.done():
+            return
+
+        self._cleanup_task = asyncio.create_task(self._cleanup_pending_requests_loop())
+        logger.info("Started pending requests cleanup task")
+
+    async def cleanup(self) -> None:
+        """Clean up all resources and background tasks."""
+        # Cancel cleanup task
+        if self._cleanup_task and not self._cleanup_task.done():
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+
+        # Cancel all buffer tasks
+        for port, task in list(self._buffer_tasks.items()):
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+        # Final cleanup of pending requests
+        await self._cleanup_pending_requests()
+
+        logger.info("BrowserService cleanup completed")
 
     async def _flush_buffer(self, port: int) -> None:
         """Flush message buffer for a port.
@@ -415,10 +503,3 @@ class BrowserService:
 
         return stats
 
-    def set_dom_interaction_service(self, dom_service) -> None:
-        """Set the DOM interaction service.
-
-        Args:
-            dom_service: DOM interaction service instance
-        """
-        self.dom_interaction_service = dom_service
