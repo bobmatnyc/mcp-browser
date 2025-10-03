@@ -40,7 +40,7 @@ repos:
         files: ^(src/|tests/|\.md$|\.yml$|\.yaml$)
       - id: check-yaml
       - id: check-json
-        exclude: ^extension/
+        exclude: ^src/extension/
       - id: check-added-large-files
         args: ["--maxkb=1000"]
       - id: check-merge-conflict

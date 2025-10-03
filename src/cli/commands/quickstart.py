@@ -148,9 +148,7 @@ def quickstart(ctx):
                 TextColumn("[progress.description]{task.description}"),
                 transient=True,
             ) as progress:
-                progress.add_task(
-                    "Installing Playwright browsers...", total=None
-                )
+                progress.add_task("Installing Playwright browsers...", total=None)
                 subprocess.run(
                     [sys.executable, "-m", "playwright", "install", "chromium"],
                     check=True,

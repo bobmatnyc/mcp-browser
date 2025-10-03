@@ -100,7 +100,7 @@ fi
 echo -e "${GREEN}  ✅ Project package available${NC}"
 
 # Check extension files
-if [ ! -f "$PROJECT_ROOT/extension/manifest.json" ]; then
+if [ ! -f "$PROJECT_ROOT/src/extension/manifest.json" ]; then
     echo -e "${RED}❌ Extension manifest.json not found${NC}"
     exit 1
 fi

@@ -18,7 +18,7 @@ class ExtensionBuilder:
 
     def __init__(self):
         self.project_root = Path(__file__).parent.parent
-        self.extension_dir = self.project_root / "extension"
+        self.extension_dir = self.project_root / "src" / "extension"
         self.dist_dir = self.project_root / "dist"
         self.manifest_path = self.extension_dir / "manifest.json"
         self.pyproject_path = self.project_root / "pyproject.toml"
@@ -249,7 +249,7 @@ class ExtensionBuilder:
         """Check if extension directory has uncommitted changes."""
         try:
             result = subprocess.run(
-                ['git', 'status', '--porcelain', 'extension/'],
+                ['git', 'status', '--porcelain', 'src/extension/'],
                 capture_output=True,
                 text=True,
                 cwd=self.project_root
@@ -400,7 +400,7 @@ def main():
 
             # Check for uncommitted changes as a warning
             if builder.has_uncommitted_changes():
-                print("⚠️  Warning: Uncommitted changes detected in extension/")
+                print("⚠️  Warning: Uncommitted changes detected in src/extension/")
                 print("   Consider committing changes after the release")
 
             # Calculate new version
@@ -469,7 +469,7 @@ def main():
             # Check for changes
             print(f"\n🔍 Change Detection:")
             if builder.has_uncommitted_changes():
-                print("  • Git status: Uncommitted changes in extension/")
+                print("  • Git status: Uncommitted changes in src/extension/")
             else:
                 print("  • Git status: Clean")
 

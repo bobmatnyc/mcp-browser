@@ -62,10 +62,10 @@ async def init_project_extension() -> None:
     if not source_extension or not source_extension.exists():
         # Try relative to current file (development mode)
         package_path = Path(__file__).parent.parent.parent
-        source_extension = package_path.parent / "extension"
+        source_extension = package_path / "extension"
 
         if not source_extension.exists():
-            # Try from project root
+            # Try from project root (old location for compatibility)
             source_extension = Path(__file__).parent.parent.parent.parent / "extension"
 
     if not source_extension or not source_extension.exists():
@@ -150,7 +150,7 @@ async def init_project_extension_interactive() -> None:
 
     if not source_extension or not source_extension.exists():
         package_path = Path(__file__).parent.parent.parent
-        source_extension = package_path.parent / "extension"
+        source_extension = package_path / "extension"
         if not source_extension.exists():
             source_extension = Path(__file__).parent.parent.parent.parent / "extension"
 

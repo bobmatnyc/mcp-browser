@@ -149,7 +149,7 @@ Thumbs.db
 ehthumbs.db
 
 # Chrome extension icons (generated)
-extension/icon-*.png
+src/extension/icon-*.png
 
 # Storage directory (local testing)
 ~/.browserPYMCP/

@@ -5,8 +5,27 @@
 (function() {
   'use strict';
 
-  // Extension detection markers are added at the end of the file
-  // to ensure all methods are properly initialized
+  // Mark that the extension is installed (for detection)
+  // Note: This won't be accessible from page context due to isolation
+  window.__MCP_BROWSER_EXTENSION__ = {
+    version: '1.0.0',
+    installed: true,
+    timestamp: new Date().toISOString()
+  };
+
+  // Add DOM marker for detection (accessible from page)
+  const marker = document.createElement('div');
+  marker.setAttribute('data-mcp-browser-extension', 'installed');
+  marker.setAttribute('data-extension-version', '1.0.0');
+  marker.style.display = 'none';
+  if (document.documentElement) {
+    document.documentElement.appendChild(marker);
+  }
+
+  // Also add a class to document element
+  if (document.documentElement) {
+    document.documentElement.classList.add('mcp-browser-extension-installed');
+  }
 
   // Message buffer
   const messageBuffer = [];
@@ -442,11 +461,128 @@
             sendResponse({ success: true });
             break;
 
+          case 'extractContent':
+            try {
+              // Check if Readability is available
+              if (typeof Readability === 'undefined') {
+                sendResponse({
+                  success: false,
+                  error: 'Readability library not loaded'
+                });
+                break;
+              }
+
+              // Clone the document to avoid modifying the actual page
+              const documentClone = document.cloneNode(true);
+
+              // Create a Readability object
+              const reader = new Readability(documentClone, {
+                // Options for better content extraction
+                debug: false,
+                maxElemsToParse: 0, // 0 means no limit
+                nbTopCandidates: 5,
+                charThreshold: 500,
+                classesToPreserve: ['highlight', 'important', 'code']
+              });
+
+              // Parse the document
+              const article = reader.parse();
+
+              if (article) {
+                // Extract additional metadata
+                const metadata = {
+                  url: window.location.href,
+                  domain: window.location.hostname,
+                  pathname: window.location.pathname,
+                  timestamp: new Date().toISOString(),
+
+                  // Try to get additional metadata from meta tags
+                  author: article.byline ||
+                    document.querySelector('meta[name="author"]')?.content ||
+                    document.querySelector('meta[property="article:author"]')?.content ||
+                    null,
+
+                  publishDate:
+                    document.querySelector('meta[property="article:published_time"]')?.content ||
+                    document.querySelector('meta[name="publish_date"]')?.content ||
+                    document.querySelector('time[datetime]')?.getAttribute('datetime') ||
+                    null,
+
+                  description:
+                    document.querySelector('meta[name="description"]')?.content ||
+                    document.querySelector('meta[property="og:description"]')?.content ||
+                    null,
+
+                  image:
+                    document.querySelector('meta[property="og:image"]')?.content ||
+                    document.querySelector('meta[name="twitter:image"]')?.content ||
+                    null,
+
+                  keywords:
+                    document.querySelector('meta[name="keywords"]')?.content?.split(',').map(k => k.trim()) ||
+                    [],
+
+                  language: article.lang ||
+                    document.documentElement.lang ||
+                    document.querySelector('meta[property="og:locale"]')?.content ||
+                    null
+                };
+
+                sendResponse({
+                  success: true,
+                  content: {
+                    title: article.title || document.title,
+                    textContent: article.textContent, // Clean text
+                    excerpt: article.excerpt,
+                    byline: article.byline,
+                    length: article.length, // Estimated reading time in minutes
+                    htmlContent: article.content, // HTML content
+                    siteName: article.siteName,
+                    metadata: metadata,
+                    wordCount: article.textContent ? article.textContent.split(/\s+/).length : 0
+                  }
+                });
+              } else {
+                // Fallback for pages that Readability can't parse
+                // Extract basic text content
+                const textContent = document.body ? document.body.innerText : '';
+                const title = document.title;
+
+                sendResponse({
+                  success: true,
+                  content: {
+                    title: title,
+                    textContent: textContent,
+                    excerpt: textContent.substring(0, 200) + '...',
+                    byline: null,
+                    length: Math.ceil(textContent.split(/\s+/).length / 200), // Rough estimate
+                    htmlContent: null,
+                    siteName: window.location.hostname,
+                    metadata: {
+                      url: window.location.href,
+                      domain: window.location.hostname,
+                      pathname: window.location.pathname,
+                      timestamp: new Date().toISOString()
+                    },
+                    wordCount: textContent.split(/\s+/).length,
+                    fallback: true // Indicate this is fallback extraction
+                  }
+                });
+              }
+            } catch (error) {
+              console.error('[mcp-browser] Content extraction error:', error);
+              sendResponse({
+                success: false,
+                error: error.message || 'Failed to extract content'
+              });
+            }
+            break;
+
           default:
             sendResponse({ success: false, error: 'Unknown command type' });
         }
       } catch (error) {
-        console.error('[BrowserPyMCP] Command error:', error);
+        console.error('[mcp-browser] Command error:', error);
         sendResponse({
           success: false,
           error: error.message || 'Command execution failed'
@@ -459,68 +595,36 @@
   })
 
   // Initial console message to confirm injection
-  console.log('[BrowserPyMCP] Console capture initialized');
+  console.log('[mcp-browser] Console capture initialized');
 
-  // Extension detection helpers - Enhanced with multiple methods
+  // Extension detection helpers
   (function setupDetection() {
-    // Method 1: Inject script to set window variable (bypasses content script isolation)
-    const script = document.createElement('script');
-    script.textContent = `
-      window.__MCP_BROWSER_EXTENSION__ = {
-        installed: true,
-        version: '1.0.0',
-        timestamp: ${Date.now()}
-      };
-    `;
-    (document.head || document.documentElement).appendChild(script);
-    script.remove();
-
-    // Method 2: DOM markers (immediately on document start)
+    // Inject detection marker
     const marker = document.createElement('div');
-    marker.setAttribute('data-mcp-browser-extension', 'installed');
-    marker.setAttribute('data-extension-version', '1.0.0');
+    marker.setAttribute('data-mcp-browser-extension', 'true');
+    marker.dataset.version = chrome.runtime.getManifest ? chrome.runtime.getManifest().version : '1.0.0';
     marker.style.display = 'none';
     marker.id = 'mcp-browser-extension-marker';
-    if (document.documentElement) {
-      document.documentElement.appendChild(marker);
-    } else {
-      // If documentElement not ready, wait for it
-      const observer = new MutationObserver(() => {
-        if (document.documentElement) {
-          document.documentElement.appendChild(marker);
-          observer.disconnect();
-        }
-      });
-      observer.observe(document, { childList: true, subtree: true });
-    }
+    document.documentElement.appendChild(marker);
 
-    // Method 3: Add class to HTML element
-    if (document.documentElement) {
-      document.documentElement.classList.add('mcp-browser-extension-installed');
-      document.documentElement.classList.add('mcp-browser-extension-active');
-    } else {
-      // Wait for documentElement
-      const classObserver = new MutationObserver(() => {
-        if (document.documentElement) {
-          document.documentElement.classList.add('mcp-browser-extension-installed');
-          document.documentElement.classList.add('mcp-browser-extension-active');
-          classObserver.disconnect();
-        }
-      });
-      classObserver.observe(document, { childList: true, subtree: true });
-    }
+    // Add class to HTML element
+    document.documentElement.classList.add('mcp-browser-extension-active');
 
-    // Method 4: PostMessage communication (most reliable)
+    // Expose global flag
+    window.__MCP_BROWSER_EXTENSION__ = {
+      installed: true,
+      version: chrome.runtime.getManifest ? chrome.runtime.getManifest().version : '1.0.0',
+      timestamp: Date.now()
+    };
+
+    // Listen for detection pings
     window.addEventListener('message', function(event) {
-      // Only respond to messages from the same origin
-      if (event.source !== window) return;
-
       if (event.data && event.data.type === 'MCP_BROWSER_PING') {
         // Respond with pong
         window.postMessage({
           type: 'MCP_BROWSER_PONG',
           status: 'connected',
-          version: '1.0.0',
+          version: chrome.runtime.getManifest ? chrome.runtime.getManifest().version : '1.0.0',
           id: chrome.runtime.id,
           info: 'MCP Browser Extension Active'
         }, '*');
@@ -536,32 +640,25 @@
       }
     });
 
-    // Method 5: Custom events (works across isolation boundary)
+    // Dispatch ready event
+    const readyEvent = new CustomEvent('mcp-browser-extension-ready', {
+      detail: {
+        version: chrome.runtime.getManifest ? chrome.runtime.getManifest().version : '1.0.0',
+        id: chrome.runtime.id
+      }
+    });
+    document.dispatchEvent(readyEvent);
+
+    // Listen for test pings via custom events
     document.addEventListener('mcp-browser-test-ping', function(event) {
       const responseEvent = new CustomEvent('mcp-browser-test-pong', {
         detail: {
-          timestamp: event.detail ? event.detail.timestamp : Date.now(),
-          version: '1.0.0',
-          extensionId: chrome.runtime.id
+          timestamp: event.detail.timestamp,
+          version: chrome.runtime.getManifest ? chrome.runtime.getManifest().version : '1.0.0'
         }
       });
       document.dispatchEvent(responseEvent);
     });
-
-    // Method 6: Dispatch ready event immediately
-    setTimeout(() => {
-      const readyEvent = new CustomEvent('mcp-browser-extension-ready', {
-        detail: {
-          version: '1.0.0',
-          id: chrome.runtime.id,
-          timestamp: Date.now()
-        }
-      });
-      document.dispatchEvent(readyEvent);
-    }, 0);
-
-    // Log for debugging
-    console.log('[BrowserPyMCP] Extension detection markers installed');
   })();
 
 })();

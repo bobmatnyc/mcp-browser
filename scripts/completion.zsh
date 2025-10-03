@@ -15,6 +15,8 @@ _mcp_browser() {
         'doctor:Diagnose and fix common MCP Browser issues'
         'dashboard:Run the monitoring dashboard'
         'tutorial:Interactive tutorial for using MCP Browser'
+        'install:Install Chrome extension from Chrome Web Store'
+        'extension:Manage Chrome extension installation'
         'mcp:Run in MCP stdio mode for Claude Code integration'
         'version:Show version information'
     )
@@ -68,6 +70,17 @@ _mcp_browser() {
                 status)
                     _arguments \
                         '--format[Output format]:format:(table json simple)' \
+                        '--help[Show help]'
+                    ;;
+                install)
+                    _arguments \
+                        '--target[Installation target directory]:directory:_directories' \
+                        '--force[Force installation even if already installed]' \
+                        '--help[Show help]'
+                    ;;
+                extension)
+                    _arguments \
+                        '1:subcommand:(install update path)' \
                         '--help[Show help]'
                     ;;
                 version)

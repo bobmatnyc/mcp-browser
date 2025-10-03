@@ -96,7 +96,7 @@ make lint-fix
 
 ### Extension Development
 - Uses vanilla JavaScript (no frameworks)
-- Manifest V3 structure in `extension/` directory
+- Manifest V3 structure in `src/extension/` directory
 - Real-time connection status with visual indicators
 
 ### Future Architecture

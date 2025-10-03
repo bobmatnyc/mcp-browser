@@ -2,6 +2,23 @@
 
 All notable changes to MCP Browser will be documented in this file.
 
+## [2.0.6] - 2025-10-03
+
+### Added
+- New `install` CLI command for automated Claude Code/Desktop configuration
+- New `extension` CLI command for managing Chrome extension files
+- Extension directory moved to `src/extension/` for proper packaging
+
+### Changed
+- Extension files now properly included in pip/pipx installations
+- Updated build scripts to reference new extension location
+- Shell completion scripts updated with new commands
+
+### Fixed
+- Extension source detection in `init` command (packaging issue)
+- Path detection for both development and production installations
+- Extension manifest version synced with package version
+
 ## [2.0.5] - 2024-10-03
 
 ### Changed

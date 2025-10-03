@@ -27,11 +27,10 @@ RUN playwright install chromium && \
     playwright install-deps chromium
 
 # Create necessary directories
-RUN mkdir -p /app/logs /app/tmp /app/src /app/extension /app/tests
+RUN mkdir -p /app/logs /app/tmp /app/src /app/tests
 
 # Copy source code (this layer changes frequently)
 COPY src/ ./src/
-COPY extension/ ./extension/
 COPY tests/ ./tests/
 
 # Install the package in development mode
