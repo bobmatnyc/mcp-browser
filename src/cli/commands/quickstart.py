@@ -54,7 +54,7 @@ def quickstart(ctx):
         TextColumn("[progress.description]{task.description}"),
         transient=True,
     ) as progress:
-        task = progress.add_task("Checking...", total=None)
+        progress.add_task("Checking...", total=None)
         checks = asyncio.run(check_system_requirements())
 
     table = Table(title="System Requirements", show_header=True)
@@ -136,7 +136,11 @@ def quickstart(ctx):
     console.print("\n[bold]Step 5: Setting up Playwright (for screenshots)...[/bold]")
 
     try:
-        import playwright
+        import importlib.util
+
+        playwright_spec = importlib.util.find_spec("playwright")
+        if playwright_spec is None:
+            raise ImportError("playwright not found")
 
         if Confirm.ask("\nInstall Playwright browsers for screenshot support?"):
             with Progress(
@@ -144,7 +148,7 @@ def quickstart(ctx):
                 TextColumn("[progress.description]{task.description}"),
                 transient=True,
             ) as progress:
-                task = progress.add_task(
+                progress.add_task(
                     "Installing Playwright browsers...", total=None
                 )
                 subprocess.run(

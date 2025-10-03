@@ -253,7 +253,7 @@ def completion(shell):
     scripts_dir = Path(__file__).parent.parent.parent / "scripts"
 
     # Inline completion scripts
-    BASH_COMPLETION = """
+    bash_completion = """
 _mcp_browser_completions() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
     local commands="quickstart init start status doctor dashboard tutorial mcp version completion --help --version"
@@ -262,7 +262,7 @@ _mcp_browser_completions() {
 complete -F _mcp_browser_completions mcp-browser
 """
 
-    ZSH_COMPLETION = """
+    zsh_completion = """
 #compdef mcp-browser
 _mcp_browser() {
     local commands=(
@@ -281,7 +281,7 @@ _mcp_browser() {
 }
 """
 
-    FISH_COMPLETION = """
+    fish_completion = """
 complete -c mcp-browser -n "__fish_use_subcommand" -a quickstart -d "Interactive setup wizard"
 complete -c mcp-browser -n "__fish_use_subcommand" -a init -d "Initialize extension"
 complete -c mcp-browser -n "__fish_use_subcommand" -a start -d "Start server"
@@ -299,15 +299,15 @@ complete -c mcp-browser -n "__fish_use_subcommand" -a completion -d "Generate co
         if script_path.exists():
             console.print(script_path.read_text())
         else:
-            console.print(BASH_COMPLETION)
+            console.print(bash_completion)
     elif shell == "zsh":
         script_path = scripts_dir / "completion.zsh"
         if script_path.exists():
             console.print(script_path.read_text())
         else:
-            console.print(ZSH_COMPLETION)
+            console.print(zsh_completion)
     elif shell == "fish":
-        console.print(FISH_COMPLETION)
+        console.print(fish_completion)
 
 
 # Register command modules
