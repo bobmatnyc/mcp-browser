@@ -372,7 +372,7 @@ class BrowserMCPServer:
 
         # Create DOM interaction service with simple initialization
         dom_interaction = DOMInteractionService(browser_service=browser)
-        browser.set_dom_interaction_service(dom_interaction)
+        browser.dom_interaction_service = dom_interaction
 
         # Create MCP service with dependencies
         mcp = MCPService(
