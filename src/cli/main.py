@@ -14,8 +14,8 @@ from rich.panel import Panel
 
 # Import version information from single source of truth
 from .._version import __version__
-from .commands import (dashboard, doctor, extension, init, install, quickstart,
-                       start, status, tutorial)
+from .commands import (browser, dashboard, doctor, extension, init, install,
+                       quickstart, start, status, tutorial)
 from .utils import BrowserMCPServer, console, is_first_run, show_version_info
 
 
@@ -172,6 +172,7 @@ def reference():
   [cyan]tutorial[/cyan]    - Interactive tutorial
   [cyan]install[/cyan]     - Install MCP config for Claude
   [cyan]extension[/cyan]   - Manage Chrome extension
+  [cyan]browser[/cyan]     - Browser interaction and testing
 
 [bold]Quick Start:[/bold]
   1. pip install mcp-browser
@@ -192,6 +193,13 @@ def reference():
   • Start server: mcp-browser start
   • Open: http://localhost:8080
   • Click "Install Extension"
+
+[bold]Browser Testing Commands:[/bold]
+  mcp-browser browser navigate <url>
+  mcp-browser browser logs [--limit N]
+  mcp-browser browser fill <selector> <value>
+  mcp-browser browser click <selector>
+  mcp-browser browser test [--demo]
 
 [bold]Claude Desktop Config:[/bold]
   {
@@ -259,7 +267,7 @@ def completion(shell):
     bash_completion = """
 _mcp_browser_completions() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
-    local commands="quickstart init start status doctor dashboard tutorial install extension mcp version completion --help --version"
+    local commands="quickstart init start status doctor dashboard tutorial install extension browser mcp version completion --help --version"
     COMPREPLY=( $(compgen -W "${commands}" -- ${cur}) )
 }
 complete -F _mcp_browser_completions mcp-browser
@@ -278,6 +286,7 @@ _mcp_browser() {
         'tutorial:Interactive tutorial'
         'install:Install MCP config for Claude'
         'extension:Manage Chrome extension'
+        'browser:Browser interaction and testing'
         'mcp:MCP stdio mode'
         'version:Show version'
         'completion:Generate completion'
@@ -296,6 +305,7 @@ complete -c mcp-browser -n "__fish_use_subcommand" -a dashboard -d "Run dashboar
 complete -c mcp-browser -n "__fish_use_subcommand" -a tutorial -d "Interactive tutorial"
 complete -c mcp-browser -n "__fish_use_subcommand" -a install -d "Install MCP config for Claude"
 complete -c mcp-browser -n "__fish_use_subcommand" -a extension -d "Manage Chrome extension"
+complete -c mcp-browser -n "__fish_use_subcommand" -a browser -d "Browser interaction and testing"
 complete -c mcp-browser -n "__fish_use_subcommand" -a mcp -d "MCP stdio mode"
 complete -c mcp-browser -n "__fish_use_subcommand" -a version -d "Show version"
 complete -c mcp-browser -n "__fish_use_subcommand" -a completion -d "Generate completion"
@@ -327,6 +337,7 @@ cli.add_command(dashboard)
 cli.add_command(tutorial)
 cli.add_command(install)
 cli.add_command(extension)
+cli.add_command(browser)
 
 
 def main():

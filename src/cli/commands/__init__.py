@@ -1,5 +1,6 @@
 """CLI command modules."""
 
+from .browser import browser
 from .dashboard import dashboard
 from .doctor import doctor
 from .extension import extension
@@ -20,4 +21,5 @@ __all__ = [
     "quickstart",
     "install",
     "extension",
+    "browser",
 ]

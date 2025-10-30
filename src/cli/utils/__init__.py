@@ -1,5 +1,6 @@
 """CLI utility modules."""
 
+from .browser_client import BrowserClient, find_active_port
 from .display import console, show_version_info
 from .server import BrowserMCPServer
 from .validation import (CONFIG_FILE, DATA_DIR, HOME_DIR, LOG_DIR,
@@ -17,4 +18,6 @@ __all__ = [
     "LOG_DIR",
     "DATA_DIR",
     "BrowserMCPServer",
+    "BrowserClient",
+    "find_active_port",
 ]
