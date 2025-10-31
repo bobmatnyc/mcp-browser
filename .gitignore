@@ -167,6 +167,7 @@ data/console_*.jsonl
 logs/
 *.pid
 .mcp.json
+mcp-browser-extension/  # Deployed extension (source is src/extension/)
 
 # Added by Claude MPM /mpm-init
 $RECYCLE.BIN/

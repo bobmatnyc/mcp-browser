@@ -1,6 +1,6 @@
 {
   "index_version": "0.12.0",
-  "indexed_at": "2025-10-30T19:01:15.318240+00:00",
+  "indexed_at": "2025-10-30T19:02:55.150149+00:00",
   "file_mtimes": {
     "/Users/masa/Projects/managed/mcp-browser/.claude/agents/agent-manager.md": 1757890355.8014393,
     "/Users/masa/Projects/managed/mcp-browser/.claude/agents/agentic-coder-optimizer.md": 1757890355.8017218,
@@ -270,6 +270,10 @@
     "/Users/masa/Projects/mcp-browser/scripts/demo.sh": 1758487457.0,
     "/Users/masa/Projects/mcp-browser/scripts/setup-claude-code.sh": 1757967732.0,
     "/Users/masa/Projects/mcp-browser/scripts/test_mcp_server.sh": 1758659861.0,
-    "/Users/masa/Projects/mcp-browser/scripts/test_installation.sh": 1757967926.0
+    "/Users/masa/Projects/mcp-browser/scripts/test_installation.sh": 1757967926.0,
+    "/Users/masa/Projects/mcp-browser/CHANGELOG.md": 1761850973.949153,
+    "/Users/masa/Projects/mcp-browser/src/__init__.py": 1761850973.9487915,
+    "/Users/masa/Projects/mcp-browser/src/_version.py": 1761850973.9482794,
+    "/Users/masa/Projects/mcp-browser/setup.py": 1761850973.9490345
   }
 }

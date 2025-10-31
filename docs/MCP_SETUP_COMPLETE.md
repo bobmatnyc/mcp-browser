@@ -68,9 +68,9 @@ You can test the MCP tools right now in Claude Code by asking me to:
 
 The Chrome extension should show:
 - **Name**: MCP Browser
-- **Status**: Connected
+- **Status**: Connected (🟢)
 - **Port**: 8876
-- **Console Capture**: Active on all tabs
+- **Console Capture**: Active tab only (filters inactive tabs)
 
 ## Setup Verification
 

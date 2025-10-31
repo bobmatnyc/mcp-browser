@@ -242,7 +242,12 @@ def update_mcp_config(config_path: Path, force: bool = False) -> bool:
     help="Installation target (default: claude-code)",
 )
 @click.option("--force", is_flag=True, help="Overwrite existing configuration")
-def install(target: str, force: bool):
+@click.option(
+    "--extension/--no-extension",
+    default=True,
+    help="Also install Chrome extension in project (default: True)",
+)
+def install(target: str, force: bool, extension: bool):
     """⚙️ Install MCP Browser configuration for Claude Code/Desktop.
 
     \b
@@ -280,11 +285,27 @@ def install(target: str, force: bool):
         Panel.fit(
             "[bold]Installing MCP Browser Configuration[/bold]\n\n"
             f"Target: [cyan]{target}[/cyan]\n"
-            f"Force overwrite: [cyan]{force}[/cyan]",
+            f"Force overwrite: [cyan]{force}[/cyan]\n"
+            f"Install extension: [cyan]{extension}[/cyan]",
             title="Installation",
             border_style="blue",
         )
     )
+
+    # Install extension if requested
+    if extension:
+        console.print("\n[bold]Installing Chrome Extension...[/bold]")
+        try:
+            import asyncio
+
+            from .init import init_project_extension_interactive
+
+            asyncio.run(init_project_extension_interactive())
+        except Exception as e:
+            console.print(f"[yellow]⚠ Extension installation failed: {e}[/yellow]")
+            console.print(
+                "[dim]You can install it later with: mcp-browser init --project[/dim]"
+            )
 
     success_count = 0
     total_count = 0
@@ -318,6 +339,17 @@ def install(target: str, force: bool):
     # Summary
     console.print()
     if success_count == total_count:
+        extension_msg = ""
+        if extension:
+            extension_msg = (
+                "3. Load Chrome extension:\n"
+                "   - Open chrome://extensions\n"
+                "   - Enable Developer mode\n"
+                "   - Load unpacked → Select mcp-browser-extension/\n\n"
+            )
+        else:
+            extension_msg = "3. Install Chrome extension:\n   [cyan]mcp-browser init --project[/cyan]\n\n"
+
         console.print(
             Panel.fit(
                 "[bold green]✓ Installation Complete![/bold green]\n\n"
@@ -325,8 +357,8 @@ def install(target: str, force: bool):
                 "1. Restart Claude Code or Claude Desktop\n"
                 "2. Start the MCP Browser server:\n"
                 "   [cyan]mcp-browser start[/cyan]\n"
-                "3. Install the Chrome extension from the dashboard\n\n"
-                "[dim]The mcp-browser MCP server should now be available[/dim]",
+                + extension_msg
+                + "[dim]The mcp-browser MCP server should now be available[/dim]",
                 title="Success",
                 border_style="green",
             )

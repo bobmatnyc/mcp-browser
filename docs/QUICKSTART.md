@@ -231,10 +231,10 @@ After running `mcp-browser quickstart`, you'll have:
 11. **browser_evaluate_js** - Execute JavaScript in browser
 
 ### 🎨 Chrome Extension Features
-- ✅ Real-time console log capture from all tabs
-- ✅ Visual connection status indicator
+- ✅ Real-time console log capture from active tab only
+- ✅ Visual connection status indicator (🔴 error, 🟡 listening, 🟢 connected)
 - ✅ Automatic reconnection on failures
-- ✅ Multi-tab support with buffering
+- ✅ Active tab filtering (prevents duplicate messages)
 - ✅ WebSocket communication (ports 8875-8895)
 
 ### 🔧 Professional CLI

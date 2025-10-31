@@ -58,9 +58,9 @@ async def create_browser_service(container):
 - **browser_screenshot**: Playwright capture with optional URL navigation
 
 ### Chrome Extension Architecture
-- **Content script**: Captures console messages from all tabs
-- **Background script**: Manages WebSocket connections with buffering
-- **Popup**: Shows connection status and active ports
+- **Content script**: Captures console messages from all tabs (background script filters to active only)
+- **Background script**: Manages WebSocket connections, active tab filtering, and message buffering
+- **Popup**: Shows connection status with three-color indicator (🔴🟡🟢) and active ports
 
 ## 🟢 STANDARD: Development Workflows
 
@@ -95,9 +95,11 @@ make lint-fix
 ## ⚪ OPTIONAL: Project Enhancements
 
 ### Extension Development
+- **Source of truth**: `src/extension/` (edit here only)
+- **Deployed to**: `mcp-browser-extension/` (via `mcp-browser init --project`)
 - Uses vanilla JavaScript (no frameworks)
-- Manifest V3 structure in `src/extension/` directory
-- Real-time connection status with visual indicators
+- Manifest V3 structure with three-color status indicators (🔴🟡🟢)
+- Active tab filtering prevents duplicate console messages
 
 ### Future Architecture
 - Multi-browser support (Firefox, Safari)
@@ -109,6 +111,12 @@ make lint-fix
 src/
 ├── cli/main.py                    # Entry point, service orchestration
 ├── container/service_container.py # DI container implementation
+├── extension/                     # Chrome extension source (EDIT HERE)
+│   ├── manifest.json              # Extension manifest
+│   ├── background-enhanced.js     # Service worker with active tab filtering
+│   ├── content.js                 # Console capture script
+│   ├── popup.html                 # Extension popup UI
+│   └── popup-enhanced.html        # Multi-server popup UI
 ├── services/                      # Service layer (SOA)
 │   ├── browser_service.py         # Console handling, navigation
 │   ├── websocket_service.py       # Connection management
@@ -118,6 +126,11 @@ src/
 └── models/                        # Data models
     ├── console_message.py         # Console log structure
     └── browser_state.py           # Connection state tracking
+
+mcp-browser-extension/             # Deployed extension (auto-generated)
+├── manifest.json                  # DO NOT EDIT - deployed from src/extension/
+├── background-enhanced.js         # DO NOT EDIT - deployed from src/extension/
+└── README.md                      # Installation instructions
 ```
 
 ## Memory Notes

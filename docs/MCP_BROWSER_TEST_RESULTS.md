@@ -158,9 +158,9 @@ async def create_browser_service(container):
 
 #### Chrome Extension Integration
 - **Installation**: ✅ Manifest V3 extension installed successfully
-- **Console Capture**: ✅ Active on all tabs with real-time transmission
-- **Connection Status**: ✅ Visual indicators showing "Connected" on port 8876
-- **Tab Management**: ✅ Handles tab lifecycle automatically
+- **Console Capture**: ✅ Active tab only with real-time transmission (filters inactive tabs)
+- **Connection Status**: ✅ Visual indicators with three-color system (🔴🟡🟢)
+- **Tab Management**: ✅ Active tab detection with automatic filtering
 
 #### MCP Protocol Integration
 - **JSON-RPC**: ✅ Proper stdio communication with Claude Code CLI

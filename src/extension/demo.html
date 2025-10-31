@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Browser - Extension Test Page</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            font-size: 1.2em;
+            opacity: 0.9;
+            margin-bottom: 40px;
+        }
+
+        .demo-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        .demo-section h2 {
+            margin-top: 0;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+            padding-bottom: 10px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 20px;
+            border-radius: 8px;
+            transition: transform 0.3s ease, background 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        .feature-card h3 {
+            margin-top: 0;
+            font-size: 1.3em;
+        }
+
+        button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: white;
+            color: #667eea;
+            transform: scale(1.05);
+        }
+
+        input, select {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 14px;
+            margin: 5px;
+            width: 200px;
+        }
+
+        input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        #console-output {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+
+        .log-entry {
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .log-info { color: #4fc3f7; }
+        .log-warn { color: #ffb74d; }
+        .log-error { color: #ef5350; }
+
+        .connection-status {
+            text-align: center;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        .status-connected {
+            background-color: #4CAF50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.6);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .note {
+            background: rgba(255, 255, 255, 0.1);
+            border-left: 4px solid #4CAF50;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🌐 MCP Browser Extension Test</h1>
+    <p class="subtitle">Interactive test page for extension features</p>
+
+    <div class="connection-status">
+        <span class="status-indicator status-connected"></span>
+        Active Tab - Console Messages Being Captured
+    </div>
+
+    <div class="note">
+        <strong>📌 How to use this page:</strong>
+        <ol>
+            <li>Make sure the MCP Browser extension is loaded</li>
+            <li>Check the extension badge - should show 🟢 (green) with port number</li>
+            <li>Click buttons below to generate console messages</li>
+            <li>Use Claude Code to query logs: <code>browser_query_logs(port=8875, last_n=10)</code></li>
+        </ol>
+    </div>
+
+    <div class="demo-section">
+        <h2>📝 Console Logging Tests</h2>
+        <p>Test console message capture with different severity levels</p>
+        <div>
+            <button onclick="testConsole('log')">console.log()</button>
+            <button onclick="testConsole('info')">console.info()</button>
+            <button onclick="testConsole('warn')">console.warn()</button>
+            <button onclick="testConsole('error')">console.error()</button>
+            <button onclick="testObject()">Log Object</button>
+            <button onclick="testArray()">Log Array</button>
+            <button onclick="testMultiple()">Log Multiple Args</button>
+        </div>
+        <div id="console-output"></div>
+    </div>
+
+    <div class="demo-section">
+        <h2>🎯 DOM Interaction Tests</h2>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3>Click Test</h3>
+                <button id="clickTarget" onclick="handleClick()">Click Me!</button>
+                <p id="clickCount">Clicks: 0</p>
+                <p><small>Selector: <code>#clickTarget</code></small></p>
+            </div>
+
+            <div class="feature-card">
+                <h3>Form Input</h3>
+                <input type="text" id="testInput" placeholder="Type something...">
+                <p id="inputValue">Value: </p>
+                <p><small>Selector: <code>#testInput</code></small></p>
+            </div>
+
+            <div class="feature-card">
+                <h3>Dropdown Selection</h3>
+                <select id="testSelect" onchange="handleSelect()">
+                    <option value="">Select an option</option>
+                    <option value="option1">Option 1</option>
+                    <option value="option2">Option 2</option>
+                    <option value="option3">Option 3</option>
+                </select>
+                <p id="selectValue">Selected: </p>
+                <p><small>Selector: <code>#testSelect</code></small></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>⚡ Extension Testing Commands</h2>
+        <p>Use these commands in Claude Code to interact with this page:</p>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3>Query Logs</h3>
+                <pre><code>browser_query_logs(
+  port=8875,
+  last_n=10
+)</code></pre>
+                <p>Returns the last 10 console messages from this tab</p>
+            </div>
+
+            <div class="feature-card">
+                <h3>Filter by Level</h3>
+                <pre><code>browser_query_logs(
+  port=8875,
+  level_filter=["error"],
+  last_n=5
+)</code></pre>
+                <p>Returns only error messages</p>
+            </div>
+
+            <div class="feature-card">
+                <h3>Take Screenshot</h3>
+                <pre><code>browser_screenshot(
+  port=8875
+)</code></pre>
+                <p>Captures a screenshot of this page</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>🔬 Active Tab Filtering Test</h2>
+        <p>The extension only captures console messages from the <strong>active tab</strong>.</p>
+
+        <button onclick="startBackgroundLogging()">Start Background Logging</button>
+        <button onclick="stopBackgroundLogging()">Stop Background Logging</button>
+
+        <div class="note">
+            <strong>Test Steps:</strong>
+            <ol>
+                <li>Click "Start Background Logging" - messages logged every 2 seconds</li>
+                <li>Switch to another tab - extension should ignore these messages</li>
+                <li>Switch back to this tab - messages should resume being captured</li>
+                <li>Query logs to verify only active-tab messages were captured</li>
+            </ol>
+        </div>
+
+        <p id="backgroundStatus">Background logging: Stopped</p>
+    </div>
+
+    <div class="demo-section">
+        <h2>📊 Extension Status Check</h2>
+        <ul>
+            <li>✅ Extension loaded in Chrome</li>
+            <li>✅ Badge should show 🟢 (green) when connected</li>
+            <li>✅ Port number displayed in badge (e.g., "8875")</li>
+            <li>✅ Only this tab (active) sends console messages</li>
+            <li>✅ Background tabs are filtered out</li>
+        </ul>
+    </div>
+
+    <script>
+        let clickCount = 0;
+        let backgroundInterval = null;
+        let backgroundCounter = 0;
+
+        function testConsole(level) {
+            const messages = {
+                log: 'This is a regular log message',
+                info: 'This is an info message',
+                warn: 'This is a warning message',
+                error: 'This is an error message'
+            };
+
+            console[level](messages[level]);
+            addToOutput(level, messages[level]);
+        }
+
+        function testObject() {
+            const obj = {
+                name: 'Test Object',
+                timestamp: new Date().toISOString(),
+                data: { nested: true, value: 42 },
+                array: [1, 2, 3]
+            };
+            console.log('Complex object:', obj);
+            addToOutput('log', 'Complex object: ' + JSON.stringify(obj, null, 2));
+        }
+
+        function testArray() {
+            const arr = ['apple', 'banana', 'cherry', { count: 3 }];
+            console.log('Array with mixed types:', arr);
+            addToOutput('log', 'Array: ' + JSON.stringify(arr));
+        }
+
+        function testMultiple() {
+            console.log('Multiple', 'arguments', 'in', 'one', 'call', { extra: 'data' });
+            addToOutput('log', 'Multiple arguments logged');
+        }
+
+        function handleClick() {
+            clickCount++;
+            document.getElementById('clickCount').textContent = `Clicks: ${clickCount}`;
+            console.log(`Button clicked! Total clicks: ${clickCount}`);
+        }
+
+        document.getElementById('testInput')?.addEventListener('input', (e) => {
+            document.getElementById('inputValue').textContent = `Value: ${e.target.value}`;
+            console.log(`Input changed: "${e.target.value}"`);
+        });
+
+        function handleSelect() {
+            const value = document.getElementById('testSelect').value;
+            document.getElementById('selectValue').textContent = `Selected: ${value}`;
+            console.log(`Dropdown selection: ${value}`);
+        }
+
+        function addToOutput(level, message) {
+            const output = document.getElementById('console-output');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${level}`;
+            entry.textContent = `[${level.toUpperCase()}] ${new Date().toLocaleTimeString()} - ${message}`;
+            output.appendChild(entry);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function startBackgroundLogging() {
+            if (backgroundInterval) return;
+
+            backgroundCounter = 0;
+            backgroundInterval = setInterval(() => {
+                backgroundCounter++;
+                console.log(`[BACKGROUND] Message #${backgroundCounter} - ${new Date().toISOString()}`);
+            }, 2000);
+
+            document.getElementById('backgroundStatus').textContent = 'Background logging: Running (every 2s)';
+            console.info('Background logging started - switch tabs to test filtering');
+        }
+
+        function stopBackgroundLogging() {
+            if (backgroundInterval) {
+                clearInterval(backgroundInterval);
+                backgroundInterval = null;
+                document.getElementById('backgroundStatus').textContent = 'Background logging: Stopped';
+                console.info(`Background logging stopped after ${backgroundCounter} messages`);
+            }
+        }
+
+        // Initial console messages
+        console.log('🌐 MCP Browser Extension Test Page loaded successfully!');
+        console.info('Extension is capturing console messages from this active tab only');
+        console.log(`Page loaded at: ${new Date().toISOString()}`);
+    </script>
+</body>
+</html>

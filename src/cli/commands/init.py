@@ -14,7 +14,7 @@ from ..utils import DATA_DIR, HOME_DIR, LOG_DIR, console
 async def init_project_extension() -> None:
     """Initialize project-specific extension folder."""
     project_path = Path.cwd()
-    extension_path = project_path / ".mcp-browser" / "extension"
+    extension_path = project_path / "mcp-browser-extension"
 
     print(f"Initializing MCP Browser extension in {project_path}")
 
@@ -88,7 +88,82 @@ async def init_project_extension() -> None:
     shutil.copytree(source_extension, extension_path)
     print(f"✓ Extension copied to {extension_path}")
 
-    # Create data directory
+    # Create README in extension directory
+    readme_path = extension_path / "README.md"
+    readme_content = """# MCP Browser Chrome Extension
+
+This directory contains the Chrome extension for MCP Browser.
+
+## Installation
+
+1. Open Chrome and navigate to `chrome://extensions`
+2. Enable "Developer mode" (toggle in top right)
+3. Click "Load unpacked"
+4. Select this directory (`mcp-browser-extension/`)
+
+## Status Colors
+
+The extension badge shows connection status:
+
+- 🔴 **RED** - Error or not functional
+- 🟡 **YELLOW** - Listening but not connected
+- 🟢 **GREEN** - Connected to server (shows port number)
+
+## Testing the Extension
+
+Open the included **demo.html** test page to verify extension functionality:
+
+```
+file:///path/to/mcp-browser-extension/demo.html
+```
+
+Or from Chrome:
+```
+chrome-extension://<your-extension-id>/demo.html
+```
+
+The demo page includes:
+- Console logging tests (log, info, warn, error, objects, arrays)
+- DOM interaction examples (buttons, inputs, dropdowns)
+- Active tab filtering verification
+- Command examples for Claude Code integration
+
+### Example Commands
+
+Once the demo page is open and generating console messages:
+
+```python
+# Query recent console logs
+browser_query_logs(port=8875, last_n=10)
+
+# Filter by level
+browser_query_logs(port=8875, level_filter=["error"], last_n=5)
+
+# Take screenshot
+browser_screenshot(port=8875)
+```
+
+## Version
+
+See `manifest.json` for current version.
+
+## Server Connection
+
+The extension automatically scans ports 8875-8895 for MCP Browser servers.
+When connected, the badge will show the port number (e.g., "8875").
+
+## Features
+
+- ✅ **Active tab filtering** - Only the active tab sends console messages
+- ✅ **Multi-server discovery** - Automatically finds servers on ports 8875-8895
+- ✅ **Three-color status** - Visual connection state indicator
+- ✅ **Message batching** - Efficient WebSocket communication
+- ✅ **Auto-reconnection** - Handles connection failures gracefully
+"""
+    readme_path.write_text(readme_content)
+    print(f"✓ Created {readme_path}")
+
+    # Create data directory in .mcp-browser (for logs and data)
     data_path = project_path / ".mcp-browser" / "data"
     data_path.mkdir(parents=True, exist_ok=True)
     print(f"✓ Created data directory at {data_path}")
@@ -116,24 +191,29 @@ data/
     print("✅ MCP Browser initialization complete!")
     print("=" * 50)
     print("\nProject structure created:")
-    print(f"  📁 {project_path / '.mcp-browser'}/")
-    print("     📁 extension/     - Chrome extension files")
-    print("     📁 data/          - Console log storage")
-    print("     📁 logs/          - Server logs")
-    print("     📄 .gitignore     - Git ignore rules")
+    print(f"  📁 {extension_path}/")
+    print("     📄 manifest.json       - Extension manifest")
+    print("     📄 background-enhanced.js - Background service worker")
+    print("     📄 content.js          - Content script")
+    print("     📄 README.md           - Installation instructions")
+    print(f"\n  📁 {project_path / '.mcp-browser'}/")
+    print("     📁 data/               - Console log storage")
+    print("     📁 logs/               - Server logs")
+    print("     📄 .gitignore          - Git ignore rules")
 
     print("\nNext steps:")
     print("1. Start the server: mcp-browser start")
-    print("2. Open dashboard: http://localhost:8080")
-    print("3. Install the Chrome extension from the dashboard")
+    print(f"2. Load extension from: {extension_path}")
+    print("   - Chrome → Extensions → Load unpacked → Select directory")
+    print("3. Extension should connect automatically")
 
 
 async def init_project_extension_interactive() -> None:
     """Interactive version of init_project_extension with better UX."""
     project_path = Path.cwd()
-    extension_path = project_path / ".mcp-browser" / "extension"
+    extension_path = project_path / "mcp-browser-extension"
 
-    console.print(f"\n  Initializing extension in: [cyan]{project_path}[/cyan]")
+    console.print(f"\n  Initializing extension in: [cyan]{extension_path}[/cyan]")
 
     # Find source extension
     source_extension = None
@@ -167,13 +247,88 @@ async def init_project_extension_interactive() -> None:
             return
 
     shutil.copytree(source_extension, extension_path)
-    console.print("  [green]✓[/green] Extension copied")
+    console.print("  [green]✓[/green] Extension copied to [cyan]mcp-browser-extension/[/cyan]")
 
-    # Create other directories
+    # Create README in extension directory
+    readme_path = extension_path / "README.md"
+    readme_content = """# MCP Browser Chrome Extension
+
+This directory contains the Chrome extension for MCP Browser.
+
+## Installation
+
+1. Open Chrome and navigate to `chrome://extensions`
+2. Enable "Developer mode" (toggle in top right)
+3. Click "Load unpacked"
+4. Select this directory (`mcp-browser-extension/`)
+
+## Status Colors
+
+The extension badge shows connection status:
+
+- 🔴 **RED** - Error or not functional
+- 🟡 **YELLOW** - Listening but not connected
+- 🟢 **GREEN** - Connected to server (shows port number)
+
+## Testing the Extension
+
+Open the included **demo.html** test page to verify extension functionality:
+
+```
+file:///path/to/mcp-browser-extension/demo.html
+```
+
+Or from Chrome:
+```
+chrome-extension://<your-extension-id>/demo.html
+```
+
+The demo page includes:
+- Console logging tests (log, info, warn, error, objects, arrays)
+- DOM interaction examples (buttons, inputs, dropdowns)
+- Active tab filtering verification
+- Command examples for Claude Code integration
+
+### Example Commands
+
+Once the demo page is open and generating console messages:
+
+```python
+# Query recent console logs
+browser_query_logs(port=8875, last_n=10)
+
+# Filter by level
+browser_query_logs(port=8875, level_filter=["error"], last_n=5)
+
+# Take screenshot
+browser_screenshot(port=8875)
+```
+
+## Version
+
+See `manifest.json` for current version.
+
+## Server Connection
+
+The extension automatically scans ports 8875-8895 for MCP Browser servers.
+When connected, the badge will show the port number (e.g., "8875").
+
+## Features
+
+- ✅ **Active tab filtering** - Only the active tab sends console messages
+- ✅ **Multi-server discovery** - Automatically finds servers on ports 8875-8895
+- ✅ **Three-color status** - Visual connection state indicator
+- ✅ **Message batching** - Efficient WebSocket communication
+- ✅ **Auto-reconnection** - Handles connection failures gracefully
+"""
+    readme_path.write_text(readme_content)
+    console.print("  [green]✓[/green] Created README.md in extension directory")
+
+    # Create other directories in .mcp-browser
     for dir_name in ["data", "logs"]:
         dir_path = project_path / ".mcp-browser" / dir_name
         dir_path.mkdir(parents=True, exist_ok=True)
-        console.print(f"  [green]✓[/green] Created {dir_name} directory")
+        console.print(f"  [green]✓[/green] Created {dir_name} directory in .mcp-browser/")
 
     # Create .gitignore
     gitignore_path = project_path / ".mcp-browser" / ".gitignore"

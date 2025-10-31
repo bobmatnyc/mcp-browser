@@ -10,11 +10,19 @@
 const PORT_RANGE = { start: 8875, end: 8895 };
 const SCAN_INTERVAL = 30000; // Scan for servers every 30 seconds
 
+// Status colors
+const STATUS_COLORS = {
+  RED: '#DC3545',    // Not functional / Error
+  YELLOW: '#FFC107', // Listening but not connected
+  GREEN: '#4CAF50'   // Connected to server
+};
+
 // State management
 let activeServers = new Map(); // port -> server info
 let currentConnection = null;
 let messageQueue = [];
 let scanTimer = null;
+let extensionState = 'starting'; // 'starting', 'scanning', 'idle', 'connected', 'error'
 
 // Connection status
 const connectionStatus = {
@@ -29,11 +37,41 @@ const connectionStatus = {
 };
 
 /**
+ * Update extension badge to reflect current status
+ * States:
+ * - RED: Not functional or error state
+ * - YELLOW: Scanning/ready but not connected
+ * - GREEN: Connected to server
+ */
+function updateBadgeStatus() {
+  if (extensionState === 'error' || (!connectionStatus.connected && connectionStatus.lastError)) {
+    // RED: Error state or not functional
+    chrome.action.setBadgeBackgroundColor({ color: STATUS_COLORS.RED });
+    chrome.action.setBadgeText({ text: '!' });
+  } else if (connectionStatus.connected && currentConnection) {
+    // GREEN: Connected to server
+    chrome.action.setBadgeBackgroundColor({ color: STATUS_COLORS.GREEN });
+    chrome.action.setBadgeText({ text: String(connectionStatus.port) });
+  } else if (connectionStatus.availableServers.length > 0) {
+    // YELLOW: Servers available but not connected
+    chrome.action.setBadgeBackgroundColor({ color: STATUS_COLORS.YELLOW });
+    chrome.action.setBadgeText({ text: String(connectionStatus.availableServers.length) });
+  } else {
+    // YELLOW: Listening/scanning for servers
+    chrome.action.setBadgeBackgroundColor({ color: STATUS_COLORS.YELLOW });
+    chrome.action.setBadgeText({ text: '...' });
+  }
+}
+
+/**
  * Scan all ports for running MCP Browser servers
  * @returns {Promise<Array>} Array of available servers
  */
 async function scanForServers() {
   console.log(`[MCP Browser] Scanning ports ${PORT_RANGE.start}-${PORT_RANGE.end} for servers...`);
+  extensionState = 'scanning';
+  updateBadgeStatus();
+
   const servers = [];
 
   for (let port = PORT_RANGE.start; port <= PORT_RANGE.end; port++) {
@@ -45,6 +83,9 @@ async function scanForServers() {
   }
 
   connectionStatus.availableServers = servers;
+  extensionState = servers.length > 0 ? 'idle' : 'idle';
+  updateBadgeStatus();
+
   console.log(`[MCP Browser] Found ${servers.length} active server(s):`, servers);
   return servers;
 }
@@ -57,61 +98,76 @@ async function scanForServers() {
 async function probePort(port) {
   return new Promise((resolve) => {
     let ws = null; // Declare ws in the proper scope
+    let serverInfoRequested = false;
 
     const timeout = setTimeout(() => {
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.close();
       }
       resolve(null);
-    }, 1000);
+    }, 2000); // Increased timeout to handle two-message protocol
 
     try {
       ws = new WebSocket(`ws://localhost:${port}`);
 
       ws.onopen = () => {
-        // Send server info request
-        ws.send(JSON.stringify({ type: 'server_info' }));
-
-        // Wait for response
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data.type === 'server_info_response') {
-              clearTimeout(timeout);
-              ws.close();
-              // Only accept servers with valid project information
-              if (data.project_name && data.project_name !== 'Unknown') {
-                resolve({
-                  port: port,
-                  projectName: data.project_name,
-                  projectPath: data.project_path || '',
-                  version: data.version || '1.0.0',
-                  connected: false
-                });
-              } else {
-                // Not a valid MCP Browser server
-                ws.close();
-                resolve(null);
-              }
-            }
-          } catch (e) {
-            // Not a valid response
-          }
-        };
-
-        // No fallback - only accept servers that respond with proper server_info
-        // This ensures we only show actual MCP Browser servers
+        console.log(`[MCP Browser] WebSocket opened for port ${port}`);
+        // Don't send server_info immediately - wait for connection_ack first
+        // The server sends connection_ack automatically on connect
       };
 
-      ws.onerror = () => {
+      // Handle incoming messages
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+
+          // Handle connection_ack - server sends this first
+          if (data.type === 'connection_ack') {
+            // Now request server info
+            if (!serverInfoRequested) {
+              serverInfoRequested = true;
+              ws.send(JSON.stringify({ type: 'server_info' }));
+            }
+            return;
+          }
+
+          // Handle server_info_response - this is what we're waiting for
+          if (data.type === 'server_info_response') {
+            clearTimeout(timeout);
+            ws.close();
+            // Only accept servers with valid project information
+            if (data.project_name && data.project_name !== 'Unknown') {
+              resolve({
+                port: port,
+                projectName: data.project_name,
+                projectPath: data.project_path || '',
+                version: data.version || '1.0.0',
+                connected: false
+              });
+            } else {
+              // Not a valid MCP Browser server
+              ws.close();
+              resolve(null);
+            }
+          }
+        } catch (e) {
+          // Not a valid response - ignore and wait for more messages
+          console.warn(`[MCP Browser] Failed to parse message from port ${port}:`, e);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.warn(`[MCP Browser] WebSocket error for port ${port}:`, error);
         clearTimeout(timeout);
         resolve(null);
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
+        console.log(`[MCP Browser] WebSocket closed for port ${port}, code: ${event.code}`);
         clearTimeout(timeout);
       };
     } catch (error) {
+      console.error(`[MCP Browser] Failed to create WebSocket for port ${port}:`, error);
       clearTimeout(timeout);
       resolve(null);
     }
@@ -160,9 +216,9 @@ async function connectToServer(port, serverInfo = null) {
           connectionStatus.projectPath = serverInfo.projectPath;
         }
 
-        // Update extension badge
-        chrome.action.setBadgeText({ text: String(port) });
-        chrome.action.setBadgeBackgroundColor({ color: '#4CAF50' });
+        // Update state and badge - GREEN
+        extensionState = 'connected';
+        updateBadgeStatus();
 
         console.log(`[MCP Browser] Connected to port ${port} (${connectionStatus.projectName})`);
 
@@ -175,6 +231,8 @@ async function connectToServer(port, serverInfo = null) {
       ws.onerror = (error) => {
         clearTimeout(timeout);
         connectionStatus.lastError = `Connection error on port ${port}`;
+        extensionState = 'error';
+        updateBadgeStatus();
         console.error(`[MCP Browser] Connection error:`, error);
         resolve(false);
       };
@@ -209,6 +267,8 @@ function setupWebSocketHandlers(ws) {
   ws.onerror = (error) => {
     console.error('[MCP Browser] WebSocket error:', error);
     connectionStatus.lastError = 'WebSocket error';
+    extensionState = 'error';
+    updateBadgeStatus();
   };
 
   ws.onclose = () => {
@@ -218,9 +278,9 @@ function setupWebSocketHandlers(ws) {
     connectionStatus.port = null;
     connectionStatus.projectName = null;
 
-    // Update extension badge
-    chrome.action.setBadgeText({ text: '!' });
-    chrome.action.setBadgeBackgroundColor({ color: '#F44336' });
+    // Update state - back to YELLOW (listening but not connected)
+    extensionState = connectionStatus.availableServers.length > 0 ? 'idle' : 'idle';
+    updateBadgeStatus();
 
     // Try to reconnect after a delay
     setTimeout(() => {
@@ -233,23 +293,35 @@ function setupWebSocketHandlers(ws) {
  * Auto-connect to the best available server
  */
 async function autoConnect() {
-  const servers = await scanForServers();
+  try {
+    console.log('[MCP Browser] Auto-connect starting...');
+    const servers = await scanForServers();
 
-  if (servers.length === 0) {
-    console.log('[MCP Browser] No servers found');
-    connectionStatus.lastError = 'No MCP Browser servers found';
-    return;
-  }
+    if (servers.length === 0) {
+      console.log('[MCP Browser] No servers found');
+      connectionStatus.lastError = 'No MCP Browser servers found';
+      extensionState = 'idle';
+      updateBadgeStatus();
+      return;
+    }
 
-  // If only one server, connect to it
-  if (servers.length === 1) {
+    // If only one server, connect to it
+    if (servers.length === 1) {
+      console.log(`[MCP Browser] Connecting to single server on port ${servers[0].port}`);
+      await connectToServer(servers[0].port, servers[0]);
+      return;
+    }
+
+    // If multiple servers, prefer the first one (could be enhanced with preferences)
+    // In the future, we could remember the last connected project
+    console.log(`[MCP Browser] Found ${servers.length} servers, connecting to first one`);
     await connectToServer(servers[0].port, servers[0]);
-    return;
+  } catch (error) {
+    console.error('[MCP Browser] Auto-connect failed:', error);
+    extensionState = 'error';
+    connectionStatus.lastError = error.message || 'Auto-connect failed';
+    updateBadgeStatus();
   }
-
-  // If multiple servers, prefer the first one (could be enhanced with preferences)
-  // In the future, we could remember the last connected project
-  await connectToServer(servers[0].port, servers[0]);
 }
 
 /**
@@ -306,19 +378,30 @@ function flushMessageQueue() {
 // Handle messages from popup and content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'console_messages') {
-    // Batch console messages
-    const batchMessage = {
-      type: 'batch',
-      messages: request.messages,
-      url: request.url,
-      timestamp: request.timestamp,
-      tabId: sender.tab?.id,
-      frameId: sender.frameId
-    };
+    // Only process messages from the active tab
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const activeTab = tabs[0];
 
-    if (!sendToServer(batchMessage)) {
-      console.log('[MCP Browser] WebSocket not connected, message queued');
-    }
+      // Check if this message is from the active tab
+      if (sender.tab && activeTab && sender.tab.id === activeTab.id) {
+        // Batch console messages
+        const batchMessage = {
+          type: 'batch',
+          messages: request.messages,
+          url: request.url,
+          timestamp: request.timestamp,
+          tabId: sender.tab.id,
+          frameId: sender.frameId
+        };
+
+        if (!sendToServer(batchMessage)) {
+          console.log('[MCP Browser] WebSocket not connected, message queued');
+        }
+      } else {
+        // Silently ignore messages from inactive tabs
+        console.log(`[MCP Browser] Ignoring console messages from inactive tab ${sender.tab?.id}`);
+      }
+    });
 
     sendResponse({ received: true });
   } else if (request.type === 'get_status') {
@@ -350,9 +433,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 chrome.runtime.onInstalled.addListener(() => {
   console.log('[MCP Browser] Extension installed');
 
-  // Set initial badge
-  chrome.action.setBadgeText({ text: '?' });
-  chrome.action.setBadgeBackgroundColor({ color: '#9E9E9E' });
+  // Set initial badge - YELLOW (starting state)
+  extensionState = 'starting';
+  updateBadgeStatus();
 
   // Inject content script into all existing tabs
   chrome.tabs.query({}, (tabs) => {
@@ -387,4 +470,17 @@ chrome.runtime.onStartup.addListener(() => {
 });
 
 // Initialize on load
-autoConnect();
+try {
+  extensionState = 'starting';
+  updateBadgeStatus();
+
+  // Delay initial scan slightly to ensure extension is fully loaded
+  setTimeout(() => {
+    console.log('[MCP Browser] Starting initial auto-connect...');
+    autoConnect();
+  }, 100);
+} catch (error) {
+  console.error('[MCP Browser] Initialization error:', error);
+  extensionState = 'error';
+  updateBadgeStatus();
+}
