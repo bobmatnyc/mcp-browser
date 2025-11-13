@@ -11,8 +11,14 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
 from rich.table import Table
 
-from ..utils import (CONFIG_FILE, DATA_DIR, HOME_DIR, LOG_DIR,
-                     check_system_requirements, console)
+from ..utils import (
+    CONFIG_FILE,
+    DATA_DIR,
+    HOME_DIR,
+    LOG_DIR,
+    check_system_requirements,
+    console,
+)
 from .init import init_project_extension_interactive
 
 

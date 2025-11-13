@@ -3,10 +3,14 @@
 # Import version from single source of truth
 from ._version import __author__, __description__, __version__, version_string
 from .container import ServiceContainer
-from .models import (BrowserConnection, BrowserState, ConsoleLevel,
-                     ConsoleMessage)
-from .services import (BrowserService, MCPService, ScreenshotService,
-                       StorageService, WebSocketService)
+from .models import BrowserConnection, BrowserState, ConsoleLevel, ConsoleMessage
+from .services import (
+    BrowserService,
+    MCPService,
+    ScreenshotService,
+    StorageService,
+    WebSocketService,
+)
 
 __all__ = [
     # Services

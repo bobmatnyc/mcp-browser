@@ -247,7 +247,9 @@ async def init_project_extension_interactive() -> None:
             return
 
     shutil.copytree(source_extension, extension_path)
-    console.print("  [green]✓[/green] Extension copied to [cyan]mcp-browser-extension/[/cyan]")
+    console.print(
+        "  [green]✓[/green] Extension copied to [cyan]mcp-browser-extension/[/cyan]"
+    )
 
     # Create README in extension directory
     readme_path = extension_path / "README.md"
@@ -328,7 +330,9 @@ When connected, the badge will show the port number (e.g., "8875").
     for dir_name in ["data", "logs"]:
         dir_path = project_path / ".mcp-browser" / dir_name
         dir_path.mkdir(parents=True, exist_ok=True)
-        console.print(f"  [green]✓[/green] Created {dir_name} directory in .mcp-browser/")
+        console.print(
+            f"  [green]✓[/green] Created {dir_name} directory in .mcp-browser/"
+        )
 
     # Create .gitignore
     gitignore_path = project_path / ".mcp-browser" / ".gitignore"

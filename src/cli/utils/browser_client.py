@@ -3,11 +3,10 @@
 import asyncio
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import websockets
 from rich.console import Console
-from rich.panel import Panel
 
 console = Console()
 logger = logging.getLogger(__name__)
@@ -43,8 +42,8 @@ class BrowserClient:
         except Exception as e:
             console.print(f"[red]✗ Failed to connect to server: {e}[/red]")
             console.print(
-                f"\n[yellow]Make sure the server is running:[/yellow]\n"
-                f"  mcp-browser start\n"
+                "\n[yellow]Make sure the server is running:[/yellow]\n"
+                "  mcp-browser start\n"
             )
             return False
 
@@ -79,9 +78,7 @@ class BrowserClient:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    async def query_logs(
-        self, limit: int = 50, level: str = "all"
-    ) -> Dict[str, Any]:
+    async def query_logs(self, limit: int = 50, level: str = "all") -> Dict[str, Any]:
         """Query console logs from browser.
 
         Args:
@@ -236,7 +233,9 @@ class BrowserClient:
             return {"success": False, "status": "not_running", "error": str(e)}
 
 
-async def find_active_port(start_port: int = 8875, end_port: int = 8895) -> Optional[int]:
+async def find_active_port(
+    start_port: int = 8875, end_port: int = 8895
+) -> Optional[int]:
     """Find the active WebSocket server port.
 
     Args:

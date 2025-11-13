@@ -2,14 +2,12 @@
 
 import asyncio
 import sys
-from pathlib import Path
 from typing import Optional
 
 import click
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import Confirm, Prompt
-from rich.syntax import Syntax
+from rich.prompt import Prompt
 from rich.table import Table
 
 from ..utils.browser_client import BrowserClient, find_active_port
@@ -44,8 +42,15 @@ def browser():
 
 @browser.command()
 @click.argument("url")
-@click.option("--wait", default=0, type=float, help="Wait time after navigation (seconds)")
-@click.option("--port", default=None, type=int, help="WebSocket port (auto-detect if not specified)")
+@click.option(
+    "--wait", default=0, type=float, help="Wait time after navigation (seconds)"
+)
+@click.option(
+    "--port",
+    default=None,
+    type=int,
+    help="WebSocket port (auto-detect if not specified)",
+)
 def navigate(url: str, wait: float, port: int):
     """Navigate browser to a URL.
 
@@ -118,7 +123,12 @@ async def _navigate_command(url: str, wait: float, port: Optional[int]):
     default="all",
     help="Filter by log level",
 )
-@click.option("--port", default=None, type=int, help="WebSocket port (auto-detect if not specified)")
+@click.option(
+    "--port",
+    default=None,
+    type=int,
+    help="WebSocket port (auto-detect if not specified)",
+)
 @click.option("--json", "json_output", is_flag=True, help="Output as JSON")
 def logs(limit: int, level: str, port: int, json_output: bool):
     """Query captured console logs.
@@ -138,7 +148,9 @@ async def _logs_command(limit: int, level: str, port: Optional[int], json_output
     if port is None:
         port = await find_active_port()
         if port is None:
-            console.print("[red]✗ No active server found. Start with: mcp-browser start[/red]")
+            console.print(
+                "[red]✗ No active server found. Start with: mcp-browser start[/red]"
+            )
             sys.exit(1)
 
     # For now, show a message about using MCP tools
@@ -174,7 +186,12 @@ async def _logs_command(limit: int, level: str, port: Optional[int], json_output
 @browser.command()
 @click.argument("selector")
 @click.argument("value")
-@click.option("--port", default=None, type=int, help="WebSocket port (auto-detect if not specified)")
+@click.option(
+    "--port",
+    default=None,
+    type=int,
+    help="WebSocket port (auto-detect if not specified)",
+)
 def fill(selector: str, value: str, port: int):
     """Fill a form field.
 
@@ -194,7 +211,9 @@ async def _fill_command(selector: str, value: str, port: Optional[int]):
         console.print("[cyan]🔍 Searching for active server...[/cyan]")
         port = await find_active_port()
         if port is None:
-            console.print("[red]✗ No active server found. Start with: mcp-browser start[/red]")
+            console.print(
+                "[red]✗ No active server found. Start with: mcp-browser start[/red]"
+            )
             sys.exit(1)
         console.print(f"[green]✓ Found server on port {port}[/green]\n")
 
@@ -232,7 +251,12 @@ async def _fill_command(selector: str, value: str, port: Optional[int]):
 
 @browser.command(name="click")
 @click.argument("selector")
-@click.option("--port", default=None, type=int, help="WebSocket port (auto-detect if not specified)")
+@click.option(
+    "--port",
+    default=None,
+    type=int,
+    help="WebSocket port (auto-detect if not specified)",
+)
 def click_element(selector: str, port: int):
     """Click an element.
 
@@ -252,7 +276,9 @@ async def _click_command(selector: str, port: Optional[int]):
         console.print("[cyan]🔍 Searching for active server...[/cyan]")
         port = await find_active_port()
         if port is None:
-            console.print("[red]✗ No active server found. Start with: mcp-browser start[/red]")
+            console.print(
+                "[red]✗ No active server found. Start with: mcp-browser start[/red]"
+            )
             sys.exit(1)
         console.print(f"[green]✓ Found server on port {port}[/green]\n")
 
@@ -288,7 +314,12 @@ async def _click_command(selector: str, port: Optional[int]):
 
 @browser.command()
 @click.argument("selector")
-@click.option("--port", default=None, type=int, help="WebSocket port (auto-detect if not specified)")
+@click.option(
+    "--port",
+    default=None,
+    type=int,
+    help="WebSocket port (auto-detect if not specified)",
+)
 def extract(selector: str, port: int):
     """Extract content from an element.
 
@@ -308,7 +339,9 @@ async def _extract_command(selector: str, port: Optional[int]):
         console.print("[cyan]🔍 Searching for active server...[/cyan]")
         port = await find_active_port()
         if port is None:
-            console.print("[red]✗ No active server found. Start with: mcp-browser start[/red]")
+            console.print(
+                "[red]✗ No active server found. Start with: mcp-browser start[/red]"
+            )
             sys.exit(1)
         console.print(f"[green]✓ Found server on port {port}[/green]\n")
 
@@ -345,7 +378,12 @@ async def _extract_command(selector: str, port: Optional[int]):
 
 @browser.command()
 @click.option("--output", default="screenshot.png", help="Output filename")
-@click.option("--port", default=None, type=int, help="WebSocket port (auto-detect if not specified)")
+@click.option(
+    "--port",
+    default=None,
+    type=int,
+    help="WebSocket port (auto-detect if not specified)",
+)
 def screenshot(output: str, port: int):
     """Take a screenshot of the current browser tab.
 
@@ -364,7 +402,9 @@ async def _screenshot_command(output: str, port: Optional[int]):
     if port is None:
         port = await find_active_port()
         if port is None:
-            console.print("[red]✗ No active server found. Start with: mcp-browser start[/red]")
+            console.print(
+                "[red]✗ No active server found. Start with: mcp-browser start[/red]"
+            )
             sys.exit(1)
 
     console.print(
@@ -383,7 +423,12 @@ async def _screenshot_command(output: str, port: Optional[int]):
 
 @browser.command()
 @click.option("--demo", is_flag=True, help="Run automated demo scenario")
-@click.option("--port", default=None, type=int, help="WebSocket port (auto-detect if not specified)")
+@click.option(
+    "--port",
+    default=None,
+    type=int,
+    help="WebSocket port (auto-detect if not specified)",
+)
 def test(demo: bool, port: int):
     """Run interactive browser test session.
 
@@ -520,7 +565,9 @@ async def _run_interactive_test(port: int):
         while True:
             try:
                 # Get command from user
-                command = Prompt.ask("\n[bold cyan]browser>[/bold cyan]", default="help")
+                command = Prompt.ask(
+                    "\n[bold cyan]browser>[/bold cyan]", default="help"
+                )
 
                 if not command or command.strip() == "":
                     continue
@@ -583,7 +630,9 @@ async def _run_interactive_test(port: int):
                     value = " ".join(parts[2:])
                     result = await client.fill_field(selector, value)
                     if result["success"]:
-                        console.print(f"[green]✓ Filled {selector} with '{value}'[/green]")
+                        console.print(
+                            f"[green]✓ Filled {selector} with '{value}'[/green]"
+                        )
                     else:
                         console.print(f"[red]✗ Failed: {result.get('error')}[/red]")
 
@@ -594,7 +643,9 @@ async def _run_interactive_test(port: int):
                     selector = parts[1]
                     result = await client.extract_content(selector)
                     if result["success"]:
-                        console.print(f"[green]✓ Extracted content from {selector}[/green]")
+                        console.print(
+                            f"[green]✓ Extracted content from {selector}[/green]"
+                        )
                     else:
                         console.print(f"[red]✗ Failed: {result.get('error')}[/red]")
 
