@@ -167,6 +167,12 @@ mcp-browser stop           # Stop the server
 mcp-browser restart        # Restart (stop + start)
 mcp-browser status         # Check status (ports, PIDs, logs)
 
+# Installation management
+mcp-browser install        # Install/configure MCP integration
+mcp-browser uninstall      # Remove from Claude Code
+mcp-browser uninstall --target claude-desktop  # Remove from Claude Desktop
+mcp-browser uninstall --target both           # Remove from both
+
 # Monitoring and logs
 mcp-browser logs           # Last 50 lines
 mcp-browser logs 100       # Last 100 lines
@@ -180,6 +186,37 @@ mcp-browser test-mcp       # Test all MCP tools
 mcp-browser version        # Show version info
 mcp-browser config         # Show configuration
 mcp-browser clean          # Clean old logs and data
+```
+
+### Uninstalling MCP Browser
+
+To remove MCP Browser from your Claude configuration:
+
+```bash
+# Remove from Claude Code (default)
+mcp-browser uninstall
+
+# Remove from Claude Desktop only
+mcp-browser uninstall --target claude-desktop
+
+# Remove from both Claude Code and Claude Desktop
+mcp-browser uninstall --target both
+```
+
+The uninstall command will:
+- Remove the mcp-browser entry from the MCP configuration file
+- Preserve all other MCP server configurations
+- Handle missing or invalid configuration files gracefully
+- Provide clear feedback about what was removed
+
+**Note:** This only removes the MCP configuration. To completely uninstall the package:
+
+```bash
+# If installed with pip
+pip uninstall mcp-browser
+
+# If installed with pipx
+pipx uninstall mcp-browser
 ```
 
 ### 🛠️ MCP Tools Available in Claude Code
