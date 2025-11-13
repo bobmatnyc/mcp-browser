@@ -12,7 +12,7 @@ _mcp_browser_completions() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Base commands
-    base_commands="quickstart init start status doctor dashboard tutorial install extension mcp version --help --version --debug"
+    base_commands="quickstart init start status doctor dashboard tutorial install uninstall extension mcp version --help --version --debug"
 
     # Command-specific options
     case "${prev}" in
@@ -48,6 +48,11 @@ _mcp_browser_completions() {
         install)
             local install_opts="--target --force --help"
             COMPREPLY=( $(compgen -W "${install_opts}" -- ${cur}) )
+            return 0
+            ;;
+        uninstall)
+            local uninstall_opts="--target --help"
+            COMPREPLY=( $(compgen -W "${uninstall_opts}" -- ${cur}) )
             return 0
             ;;
         extension)

@@ -15,7 +15,8 @@ _mcp_browser() {
         'doctor:Diagnose and fix common MCP Browser issues'
         'dashboard:Run the monitoring dashboard'
         'tutorial:Interactive tutorial for using MCP Browser'
-        'install:Install Chrome extension from Chrome Web Store'
+        'install:Install MCP config for Claude Code/Desktop'
+        'uninstall:Remove MCP config from Claude Code/Desktop'
         'extension:Manage Chrome extension installation'
         'mcp:Run in MCP stdio mode for Claude Code integration'
         'version:Show version information'
@@ -74,8 +75,13 @@ _mcp_browser() {
                     ;;
                 install)
                     _arguments \
-                        '--target[Installation target directory]:directory:_directories' \
+                        '--target[Installation target]:target:(claude-code claude-desktop both)' \
                         '--force[Force installation even if already installed]' \
+                        '--help[Show help]'
+                    ;;
+                uninstall)
+                    _arguments \
+                        '--target[Uninstall target]:target:(claude-code claude-desktop both)' \
                         '--help[Show help]'
                     ;;
                 extension)

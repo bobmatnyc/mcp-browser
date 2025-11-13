@@ -5,7 +5,7 @@ from .dashboard import dashboard
 from .doctor import doctor
 from .extension import extension
 from .init import init
-from .install import install
+from .install import install, uninstall
 from .quickstart import quickstart
 from .start import start
 from .status import status
@@ -20,6 +20,7 @@ __all__ = [
     "tutorial",
     "quickstart",
     "install",
+    "uninstall",
     "extension",
     "browser",
 ]

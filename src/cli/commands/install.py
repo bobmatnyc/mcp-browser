@@ -234,6 +234,44 @@ def update_mcp_config(config_path: Path, force: bool = False) -> bool:
     return False
 
 
+def remove_from_mcp_config(config_path: Path) -> bool:
+    """Remove mcp-browser from MCP configuration.
+
+    Args:
+        config_path: Path to configuration file
+
+    Returns:
+        True if removed successfully, False if not found or error
+    """
+    # Check if config exists
+    if not config_path.exists():
+        console.print(f"[yellow]Configuration file not found: {config_path}[/yellow]")
+        return False
+
+    # Load configuration
+    config = load_or_create_config(config_path)
+
+    # Check if mcpServers section exists
+    if "mcpServers" not in config:
+        console.print("[yellow]No mcpServers configuration found[/yellow]")
+        return False
+
+    # Check if mcp-browser is configured
+    if "mcp-browser" not in config["mcpServers"]:
+        console.print("[yellow]mcp-browser is not configured[/yellow]")
+        return False
+
+    # Remove mcp-browser entry
+    del config["mcpServers"]["mcp-browser"]
+
+    # Save updated configuration
+    if save_config(config_path, config):
+        console.print(f"[green]✓[/green] Removed mcp-browser from {config_path}")
+        return True
+
+    return False
+
+
 @click.command()
 @click.option(
     "--target",
@@ -384,3 +422,116 @@ def install(target: str, force: bool, extension: bool):
             )
         )
         sys.exit(1)
+
+
+@click.command()
+@click.option(
+    "--target",
+    type=click.Choice(["claude-code", "claude-desktop", "both"], case_sensitive=False),
+    default="claude-code",
+    help="Target to uninstall from (default: claude-code)",
+)
+def uninstall(target: str):
+    """🗑️ Remove MCP Browser configuration from Claude Code/Desktop.
+
+    \b
+    Removes the mcp-browser configuration from Claude Code or Claude Desktop
+    MCP server settings. This does not uninstall the package itself.
+
+    \b
+    Examples:
+      mcp-browser uninstall                         # Remove from Claude Code
+      mcp-browser uninstall --target claude-desktop # Remove from Claude Desktop
+      mcp-browser uninstall --target both           # Remove from both
+
+    \b
+    Configuration locations:
+      Claude Code:    ~/.claude/settings.local.json
+      Claude Desktop: OS-specific location
+        • macOS:   ~/Library/Application Support/Claude/
+        • Linux:   ~/.config/Claude/
+        • Windows: %APPDATA%/Claude/
+
+    \b
+    After uninstallation:
+      1. Restart Claude Code or Claude Desktop
+      2. The 'mcp-browser' MCP server will no longer be available
+      3. To uninstall the package itself, use: pip uninstall mcp-browser
+    """
+    console.print(
+        Panel.fit(
+            "[bold]Removing MCP Browser Configuration[/bold]\n\n"
+            f"Target: [cyan]{target}[/cyan]",
+            title="Uninstallation",
+            border_style="blue",
+        )
+    )
+
+    removed_count = 0
+    not_found_count = 0
+    total_count = 0
+
+    # Uninstall from Claude Code
+    if target in ["claude-code", "both"]:
+        total_count += 1
+        console.print("\n[bold]Removing from Claude Code...[/bold]")
+        config_path = get_claude_code_config_path()
+
+        if remove_from_mcp_config(config_path):
+            removed_count += 1
+        else:
+            not_found_count += 1
+
+    # Uninstall from Claude Desktop
+    if target in ["claude-desktop", "both"]:
+        total_count += 1
+        console.print("\n[bold]Removing from Claude Desktop...[/bold]")
+        config_path = get_claude_desktop_config_path()
+
+        if config_path is None:
+            console.print(
+                f"[red]✗[/red] Claude Desktop config path not found for {sys.platform}"
+            )
+            not_found_count += 1
+        elif remove_from_mcp_config(config_path):
+            removed_count += 1
+        else:
+            not_found_count += 1
+
+    # Summary
+    console.print()
+    if removed_count == total_count:
+        console.print(
+            Panel.fit(
+                "[bold green]✓ Uninstallation Complete![/bold green]\n\n"
+                f"Removed mcp-browser from {removed_count} configuration(s)\n\n"
+                "[bold]Next steps:[/bold]\n"
+                "1. Restart Claude Code or Claude Desktop\n"
+                "2. The mcp-browser MCP server will no longer be available\n\n"
+                "[dim]To uninstall the package:[/dim]\n"
+                "  [cyan]pip uninstall mcp-browser[/cyan]",
+                title="Success",
+                border_style="green",
+            )
+        )
+    elif removed_count > 0:
+        console.print(
+            Panel.fit(
+                f"[bold yellow]⚠ Partial Removal[/bold yellow]\n\n"
+                f"Removed from {removed_count} of {total_count} targets\n"
+                f"Not found in {not_found_count} target(s)\n\n"
+                "Check messages above for details",
+                title="Warning",
+                border_style="yellow",
+            )
+        )
+    else:
+        console.print(
+            Panel.fit(
+                "[bold yellow]⚠ Nothing to Remove[/bold yellow]\n\n"
+                "mcp-browser was not found in any of the specified configurations\n\n"
+                "[dim]To install, use:[/dim] [cyan]mcp-browser install[/cyan]",
+                title="Not Found",
+                border_style="yellow",
+            )
+        )

@@ -15,7 +15,7 @@ from rich.panel import Panel
 # Import version information from single source of truth
 from .._version import __version__
 from .commands import (browser, dashboard, doctor, extension, init, install,
-                       quickstart, start, status, tutorial)
+                       quickstart, start, status, tutorial, uninstall)
 from .utils import BrowserMCPServer, console, is_first_run, show_version_info
 
 
@@ -171,6 +171,7 @@ def reference():
   [cyan]dashboard[/cyan]   - Run dashboard only
   [cyan]tutorial[/cyan]    - Interactive tutorial
   [cyan]install[/cyan]     - Install MCP config for Claude
+  [cyan]uninstall[/cyan]   - Remove MCP config from Claude
   [cyan]extension[/cyan]   - Manage Chrome extension
   [cyan]browser[/cyan]     - Browser interaction and testing
 
@@ -267,7 +268,7 @@ def completion(shell):
     bash_completion = """
 _mcp_browser_completions() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
-    local commands="quickstart init start status doctor dashboard tutorial install extension browser mcp version completion --help --version"
+    local commands="quickstart init start status doctor dashboard tutorial install uninstall extension browser mcp version completion --help --version"
     COMPREPLY=( $(compgen -W "${commands}" -- ${cur}) )
 }
 complete -F _mcp_browser_completions mcp-browser
@@ -285,6 +286,7 @@ _mcp_browser() {
         'dashboard:Run dashboard'
         'tutorial:Interactive tutorial'
         'install:Install MCP config for Claude'
+        'uninstall:Remove MCP config from Claude'
         'extension:Manage Chrome extension'
         'browser:Browser interaction and testing'
         'mcp:MCP stdio mode'
@@ -304,6 +306,7 @@ complete -c mcp-browser -n "__fish_use_subcommand" -a doctor -d "Diagnose issues
 complete -c mcp-browser -n "__fish_use_subcommand" -a dashboard -d "Run dashboard"
 complete -c mcp-browser -n "__fish_use_subcommand" -a tutorial -d "Interactive tutorial"
 complete -c mcp-browser -n "__fish_use_subcommand" -a install -d "Install MCP config for Claude"
+complete -c mcp-browser -n "__fish_use_subcommand" -a uninstall -d "Remove MCP config from Claude"
 complete -c mcp-browser -n "__fish_use_subcommand" -a extension -d "Manage Chrome extension"
 complete -c mcp-browser -n "__fish_use_subcommand" -a browser -d "Browser interaction and testing"
 complete -c mcp-browser -n "__fish_use_subcommand" -a mcp -d "MCP stdio mode"
@@ -336,6 +339,7 @@ cli.add_command(doctor)
 cli.add_command(dashboard)
 cli.add_command(tutorial)
 cli.add_command(install)
+cli.add_command(uninstall)
 cli.add_command(extension)
 cli.add_command(browser)
 
