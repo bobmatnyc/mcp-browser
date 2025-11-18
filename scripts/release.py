@@ -191,16 +191,23 @@ def run_quality_gate(skip_tests: bool = False) -> bool:
     ]
 
     if not skip_tests:
+        # Use virtualenv pytest if available, otherwise system pytest
+        venv_pytest = PROJECT_ROOT / '.venv' / 'bin' / 'pytest'
+        pytest_cmd = str(venv_pytest) if venv_pytest.exists() else 'pytest'
+
         # Check if pytest-cov is available
         cov_available = subprocess.run(
+            [pytest_cmd, '--version'],
+            capture_output=True
+        ).returncode == 0 and subprocess.run(
             ['python3', '-c', 'import pytest_cov'],
             capture_output=True
         ).returncode == 0
 
         if cov_available:
-            checks.append((['pytest', 'tests/', '-v', '--cov=src'], 'Tests', False))
+            checks.append(([pytest_cmd, 'tests/', '-v', '--cov=src'], 'Tests', False))
         else:
-            checks.append((['pytest', 'tests/', '-v'], 'Tests', False))
+            checks.append(([pytest_cmd, 'tests/', '-v'], 'Tests', False))
 
     checks.append((['python3', '-m', 'build'], 'Build', False))
 
