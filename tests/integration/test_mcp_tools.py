@@ -5,6 +5,7 @@ import json
 import subprocess
 import sys
 
+
 def test_mcp_server():
     """Test MCP server initialization and tool listing."""
 

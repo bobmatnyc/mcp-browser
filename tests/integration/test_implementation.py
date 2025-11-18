@@ -2,23 +2,24 @@
 """Test script to verify the implementation works."""
 
 import asyncio
-import sys
 import json
+import sys
 from pathlib import Path
 
 # Add src to path for testing
 sys.path.insert(0, str(Path(__file__).parent))
 
+from datetime import datetime
+
 from src.container import ServiceContainer
+from src.models import ConsoleLevel, ConsoleMessage
 from src.services import (
-    StorageService,
-    WebSocketService,
     BrowserService,
     MCPService,
-    ScreenshotService
+    ScreenshotService,
+    StorageService,
+    WebSocketService,
 )
-from src.models import ConsoleMessage, ConsoleLevel
-from datetime import datetime
 
 
 async def test_services():
@@ -119,7 +120,7 @@ async def test_services():
 
     # Get all services to verify dependency injection works
     storage = await full_container.get('storage_service')
-    websocket = await full_container.get('websocket_service')
+    _ = await full_container.get('websocket_service')  # Verify registration
     browser = await full_container.get('browser_service')
     screenshot = await full_container.get('screenshot_service')
     mcp = await full_container.get('mcp_service')
@@ -154,7 +155,7 @@ async def test_services():
             print(f"  {path.name}: {lines} lines")
             total_lines += lines
             if lines > 500:
-                print(f"    ⚠️  Warning: File exceeds 500 line limit!")
+                print("    ⚠️  Warning: File exceeds 500 line limit!")
 
     print(f"\nTotal Python lines: {total_lines}")
 

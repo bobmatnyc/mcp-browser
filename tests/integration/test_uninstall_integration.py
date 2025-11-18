@@ -1,10 +1,10 @@
 """Integration tests for the uninstall command (no mocking)."""
 
 import json
-import tempfile
-import shutil
 from pathlib import Path
+
 from click.testing import CliRunner
+
 from src.cli.main import cli
 
 
@@ -66,7 +66,7 @@ def test_cli_registration():
     runner = CliRunner()
     result = runner.invoke(cli, ['--help'])
 
-    print(f"\n📤 CLI help output (snippet):\n")
+    print("\n📤 CLI help output (snippet):\n")
     lines = result.output.split('\n')
     for line in lines:
         if 'uninstall' in line.lower():
@@ -92,7 +92,7 @@ def test_completion_scripts():
     bash_script = scripts_dir / "completion.bash"
     if bash_script.exists():
         bash_content = bash_script.read_text()
-        print(f"\n📝 Checking bash completion...")
+        print("\n📝 Checking bash completion...")
         if "uninstall" in bash_content:
             print("✓ bash completion includes 'uninstall'")
         else:
@@ -104,7 +104,7 @@ def test_completion_scripts():
     zsh_script = scripts_dir / "completion.zsh"
     if zsh_script.exists():
         zsh_content = zsh_script.read_text()
-        print(f"\n📝 Checking zsh completion...")
+        print("\n📝 Checking zsh completion...")
         if "uninstall" in zsh_content:
             print("✓ zsh completion includes 'uninstall'")
         else:
@@ -116,21 +116,21 @@ def test_completion_scripts():
     runner = CliRunner()
     result = runner.invoke(cli, ['completion', 'bash'])
 
-    print(f"\n📝 Checking inline bash completion...")
+    print("\n📝 Checking inline bash completion...")
     if "uninstall" in result.output:
         print("✓ inline bash completion includes 'uninstall'")
     else:
         print("✗ inline bash completion MISSING 'uninstall'")
 
     result = runner.invoke(cli, ['completion', 'zsh'])
-    print(f"\n📝 Checking inline zsh completion...")
+    print("\n📝 Checking inline zsh completion...")
     if "uninstall" in result.output:
         print("✓ inline zsh completion includes 'uninstall'")
     else:
         print("✗ inline zsh completion MISSING 'uninstall'")
 
     result = runner.invoke(cli, ['completion', 'fish'])
-    print(f"\n📝 Checking inline fish completion...")
+    print("\n📝 Checking inline fish completion...")
     if "uninstall" in result.output:
         print("✓ inline fish completion includes 'uninstall'")
     else:
@@ -171,7 +171,7 @@ def test_reference_command():
     runner = CliRunner()
     result = runner.invoke(cli, ['reference'])
 
-    print(f"\n📝 Checking reference guide...")
+    print("\n📝 Checking reference guide...")
 
     if "uninstall" in result.output.lower():
         print("✓ reference guide includes 'uninstall'")

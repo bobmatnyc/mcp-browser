@@ -3,10 +3,11 @@
 import json
 import tempfile
 from pathlib import Path
+
 from src.cli.commands.install import (
     load_or_create_config,
+    remove_from_mcp_config,
     save_config,
-    remove_from_mcp_config
 )
 
 

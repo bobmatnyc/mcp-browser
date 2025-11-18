@@ -3,8 +3,9 @@
 
 import asyncio
 import json
-import websockets
 import time
+
+import websockets
 
 
 async def test_websocket_connection(port=8875):
@@ -64,7 +65,7 @@ async def scan_ports():
             await websocket.close()
             active_ports.append(port)
             print(f"Port {port}: ✅ Active")
-        except:
+        except (asyncio.TimeoutError, OSError, Exception):
             print(f"Port {port}: ⭕ Not listening")
 
     return active_ports

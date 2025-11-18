@@ -13,10 +13,9 @@ not just "initialized" as per the MCP specification.
 """
 
 import json
-import subprocess
 import select
+import subprocess
 import sys
-import time
 
 
 def send_request(proc, req_dict, timeout=2.0):
@@ -97,10 +96,10 @@ def test_mcp_server():
                 print(f"      - {tool['name']}: {tool['description']}")
         elif response and "error" in response:
             print(f"   ✗ Error: {response['error']['message']}")
-            print(f"      This usually means the initialized notification was incorrect")
+            print("      This usually means the initialized notification was incorrect")
             return False
         else:
-            print(f"   ✗ No response received")
+            print("   ✗ No response received")
             return False
 
         # 4. Test a tool call

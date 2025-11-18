@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Test script to verify MCP Browser setup."""
 
-import sys
 import importlib.util
+import sys
 from pathlib import Path
+
 
 def test_imports():
     """Test if all required modules can be imported."""
@@ -21,7 +22,6 @@ def test_imports():
     print("Testing module imports...")
     for module_name in modules:
         try:
-            module_path = module_name.replace('.', '/')
             spec = importlib.util.find_spec(module_name)
             if spec:
                 print(f"✓ {module_name}")
