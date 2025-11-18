@@ -69,6 +69,12 @@ class BrowserMCPServer:
                 "level": "INFO",
                 "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             },
+            "browser_control": {
+                "mode": "auto",  # "auto", "extension", "applescript"
+                "applescript_browser": "Safari",  # "Safari", "Google Chrome"
+                "fallback_enabled": True,
+                "prompt_for_permissions": True,  # Show permission instructions
+            },
         }
 
         # Try to load from config file
@@ -117,6 +123,7 @@ class BrowserMCPServer:
 
     def _setup_services(self) -> None:
         """Set up all services in the container with configuration."""
+        import sys
 
         # Get configuration sections
         storage_config = self.config.get("storage", {})
@@ -169,10 +176,12 @@ class BrowserMCPServer:
             browser = await c.get("browser_service")
             screenshot = await c.get("screenshot_service")
             dom_interaction = await c.get("dom_interaction_service")
+            browser_controller = await c.get("browser_controller")
             return MCPService(
                 browser_service=browser,
                 screenshot_service=screenshot,
                 dom_interaction_service=dom_interaction,
+                browser_controller=browser_controller,
             )
 
         self.container.register("mcp_service", create_mcp_service)
@@ -189,6 +198,36 @@ class BrowserMCPServer:
             )
 
         self.container.register("dashboard_service", create_dashboard_service)
+
+        # Register AppleScript service (macOS only)
+        if sys.platform == "darwin":
+            from ...services.applescript_service import AppleScriptService
+
+            self.container.register(
+                "applescript_service",
+                lambda c: AppleScriptService(),
+            )
+        else:
+            # Register a stub for non-macOS platforms
+            self.container.register_instance("applescript_service", None)
+
+        # Register BrowserController with dependencies
+        async def create_browser_controller(c):
+            websocket = await c.get("websocket_service")
+            browser = await c.get("browser_service")
+            applescript = await c.get("applescript_service")
+
+            # Import here to avoid circular dependency
+            from ...services.browser_controller import BrowserController
+
+            return BrowserController(
+                websocket_service=websocket,
+                browser_service=browser,
+                applescript_service=applescript,
+                config=self.config,
+            )
+
+        self.container.register("browser_controller", create_browser_controller)
 
     async def start(self) -> None:
         """Start all services."""
@@ -379,11 +418,33 @@ class BrowserMCPServer:
         dom_interaction = DOMInteractionService(browser_service=browser)
         browser.dom_interaction_service = dom_interaction
 
+        # Create AppleScript service (macOS only)
+        applescript = None
+        if sys.platform == "darwin":
+            from ...services.applescript_service import AppleScriptService
+
+            applescript = AppleScriptService()
+
+        # Create BrowserController for fallback support
+        browser_controller = None
+        if applescript:
+            from ...services.browser_controller import BrowserController
+
+            # Note: WebSocketService not available in MCP stdio mode
+            # BrowserController will use AppleScript fallback when port is None
+            browser_controller = BrowserController(
+                websocket_service=None,  # Not available in stdio mode
+                browser_service=browser,
+                applescript_service=applescript,
+                config=self.config,
+            )
+
         # Create MCP service with dependencies
         mcp = MCPService(
             browser_service=browser,
             screenshot_service=screenshot,
             dom_interaction_service=dom_interaction,
+            browser_controller=browser_controller,
         )
 
         # Note: We don't start WebSocket server in MCP mode

@@ -17,6 +17,7 @@ class MCPService:
         browser_service=None,
         screenshot_service=None,
         dom_interaction_service=None,
+        browser_controller=None,
     ):
         """Initialize MCP service.
 
@@ -24,10 +25,12 @@ class MCPService:
             browser_service: Browser service for navigation and logs
             screenshot_service: Screenshot service for captures
             dom_interaction_service: DOM interaction service for element manipulation
+            browser_controller: Optional BrowserController for AppleScript fallback
         """
         self.browser_service = browser_service
         self.screenshot_service = screenshot_service
         self.dom_interaction_service = dom_interaction_service
+        self.browser_controller = browser_controller
         # Initialize server with version info
         self.server = Server(
             name="mcp-browser",
@@ -345,7 +348,7 @@ class MCPService:
                 return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
     async def _handle_navigate(self, arguments: Dict[str, Any]) -> List[TextContent]:
-        """Handle browser navigation.
+        """Handle browser navigation with automatic AppleScript fallback.
 
         Args:
             arguments: Tool arguments
@@ -356,6 +359,35 @@ class MCPService:
         port = arguments.get("port")
         url = arguments.get("url")
 
+        # Try BrowserController first for automatic fallback support
+        if self.browser_controller:
+            result = await self.browser_controller.navigate(url=url, port=port)
+
+            if result["success"]:
+                method = result.get("method", "extension")
+                if method == "applescript":
+                    return [
+                        TextContent(
+                            type="text",
+                            text=f"Successfully navigated to {url} using AppleScript fallback.\n\n"
+                            f"Note: Console log capture requires the browser extension.\n"
+                            f"Install extension: mcp-browser quickstart",
+                        )
+                    ]
+                else:
+                    return [
+                        TextContent(
+                            type="text",
+                            text=f"Successfully navigated browser on port {port} to {url}",
+                        )
+                    ]
+            else:
+                error_msg = result.get("error", "Unknown error")
+                return [
+                    TextContent(type="text", text=f"Failed to navigate: {error_msg}")
+                ]
+
+        # Fallback to direct browser_service (legacy path)
         if not self.browser_service:
             return [TextContent(type="text", text="Browser service not available")]
 

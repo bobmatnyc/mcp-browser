@@ -182,9 +182,9 @@ class DashboardService:
                     status["logs"]["total"] = self.browser_service.get_message_count()
                 # Get buffer size if available
                 if hasattr(self.browser_service, "get_buffer_size"):
-                    status["logs"][
-                        "bufferSize"
-                    ] = self.browser_service.get_buffer_size()
+                    status["logs"]["bufferSize"] = (
+                        self.browser_service.get_buffer_size()
+                    )
             except Exception as e:
                 logger.error(f"Failed to get log stats: {e}")
 
