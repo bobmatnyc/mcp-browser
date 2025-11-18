@@ -25,11 +25,11 @@ async def test_websocket_connection(port=8875):
                     {
                         "level": "log",
                         "message": "Test message from Python client",
-                        "timestamp": time.time() * 1000
+                        "timestamp": time.time() * 1000,
                     }
                 ],
                 "url": "http://test.example.com",
-                "timestamp": time.time() * 1000
+                "timestamp": time.time() * 1000,
             }
 
             await websocket.send(json.dumps(test_message))
@@ -59,8 +59,7 @@ async def scan_ports():
         try:
             # Quick connection test
             websocket = await asyncio.wait_for(
-                websockets.connect(f"ws://localhost:{port}"),
-                timeout=0.5
+                websockets.connect(f"ws://localhost:{port}"), timeout=0.5
             )
             await websocket.close()
             active_ports.append(port)

@@ -30,8 +30,8 @@ async def test_services():
     # Test 1: Service Container
     print("\n1. Testing Service Container...")
     container = ServiceContainer()
-    container.register('test_service', lambda c: {"name": "test"})
-    test_service = await container.get('test_service')
+    container.register("test_service", lambda c: {"name": "test"})
+    test_service = await container.get("test_service")
     assert test_service["name"] == "test"
     print("✓ Service Container works")
 
@@ -45,7 +45,7 @@ async def test_services():
         level=ConsoleLevel.INFO,
         message="Test message",
         port=8875,
-        url="http://example.com"
+        url="http://example.com",
     )
 
     # Test JSONL conversion
@@ -84,8 +84,7 @@ async def test_services():
     # Test 6: MCP Service
     print("\n6. Testing MCP Service...")
     mcp_service = MCPService(
-        browser_service=browser_service,
-        screenshot_service=screenshot_service
+        browser_service=browser_service, screenshot_service=screenshot_service
     )
 
     # Check tool registration
@@ -98,32 +97,29 @@ async def test_services():
     full_container = ServiceContainer()
 
     # Register all services
-    full_container.register('storage_service', lambda c: StorageService())
-    full_container.register('websocket_service', lambda c: WebSocketService())
+    full_container.register("storage_service", lambda c: StorageService())
+    full_container.register("websocket_service", lambda c: WebSocketService())
 
     async def create_browser_service(c):
-        storage = await c.get('storage_service')
+        storage = await c.get("storage_service")
         return BrowserService(storage_service=storage)
 
-    full_container.register('browser_service', create_browser_service)
-    full_container.register('screenshot_service', lambda c: ScreenshotService())
+    full_container.register("browser_service", create_browser_service)
+    full_container.register("screenshot_service", lambda c: ScreenshotService())
 
     async def create_mcp_service(c):
-        browser = await c.get('browser_service')
-        screenshot = await c.get('screenshot_service')
-        return MCPService(
-            browser_service=browser,
-            screenshot_service=screenshot
-        )
+        browser = await c.get("browser_service")
+        screenshot = await c.get("screenshot_service")
+        return MCPService(browser_service=browser, screenshot_service=screenshot)
 
-    full_container.register('mcp_service', create_mcp_service)
+    full_container.register("mcp_service", create_mcp_service)
 
     # Get all services to verify dependency injection works
-    storage = await full_container.get('storage_service')
-    _ = await full_container.get('websocket_service')  # Verify registration
-    browser = await full_container.get('browser_service')
-    screenshot = await full_container.get('screenshot_service')
-    mcp = await full_container.get('mcp_service')
+    storage = await full_container.get("storage_service")
+    _ = await full_container.get("websocket_service")  # Verify registration
+    browser = await full_container.get("browser_service")
+    screenshot = await full_container.get("screenshot_service")
+    mcp = await full_container.get("mcp_service")
 
     # Verify dependencies are properly injected
     assert browser.storage_service is storage
@@ -144,7 +140,7 @@ async def test_services():
         "src/services/screenshot_service.py",
         "src/services/mcp_service.py",
         "src/container/service_container.py",
-        "src/cli/main.py"
+        "src/cli/main.py",
     ]
 
     total_lines = 0
@@ -166,7 +162,7 @@ async def test_services():
         "extension/background.js",
         "extension/content.js",
         "extension/popup.html",
-        "extension/popup.js"
+        "extension/popup.js",
     ]
 
     for file_path in extension_files:
@@ -183,5 +179,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n❌ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

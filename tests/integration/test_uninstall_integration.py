@@ -8,7 +8,12 @@ from click.testing import CliRunner
 from src.cli.main import cli
 
 
-def create_test_config(path: Path, has_mcpservers: bool = True, has_mcp_browser: bool = True, other_servers: bool = False):
+def create_test_config(
+    path: Path,
+    has_mcpservers: bool = True,
+    has_mcp_browser: bool = True,
+    other_servers: bool = False,
+):
     """Create a test configuration file."""
     config = {}
 
@@ -18,13 +23,13 @@ def create_test_config(path: Path, has_mcpservers: bool = True, has_mcp_browser:
         if has_mcp_browser:
             config["mcpServers"]["mcp-browser"] = {
                 "command": "mcp-browser",
-                "args": ["mcp"]
+                "args": ["mcp"],
             }
 
         if other_servers:
             config["mcpServers"]["other-server"] = {
                 "command": "other-command",
-                "args": ["arg1"]
+                "args": ["arg1"],
             }
 
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -36,12 +41,12 @@ def create_test_config(path: Path, has_mcpservers: bool = True, has_mcp_browser:
 
 def test_help_output():
     """Test 1: Verify help output is correct."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 1: Verify uninstall --help output")
-    print("="*70)
+    print("=" * 70)
 
     runner = CliRunner()
-    result = runner.invoke(cli, ['uninstall', '--help'])
+    result = runner.invoke(cli, ["uninstall", "--help"])
 
     print(f"\n📤 Help output:\n{result.output}")
 
@@ -59,17 +64,17 @@ def test_help_output():
 
 def test_cli_registration():
     """Test 2: Verify command is registered in main CLI."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 2: Verify command registration in CLI")
-    print("="*70)
+    print("=" * 70)
 
     runner = CliRunner()
-    result = runner.invoke(cli, ['--help'])
+    result = runner.invoke(cli, ["--help"])
 
     print("\n📤 CLI help output (snippet):\n")
-    lines = result.output.split('\n')
+    lines = result.output.split("\n")
     for line in lines:
-        if 'uninstall' in line.lower():
+        if "uninstall" in line.lower():
             print(line)
 
     # Assertions
@@ -82,9 +87,9 @@ def test_cli_registration():
 
 def test_completion_scripts():
     """Test 3: Verify completion scripts include uninstall."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 3: Verify completion scripts updated")
-    print("="*70)
+    print("=" * 70)
 
     scripts_dir = Path(__file__).parent / "scripts"
 
@@ -114,7 +119,7 @@ def test_completion_scripts():
 
     # Test inline completion in main.py
     runner = CliRunner()
-    result = runner.invoke(cli, ['completion', 'bash'])
+    result = runner.invoke(cli, ["completion", "bash"])
 
     print("\n📝 Checking inline bash completion...")
     if "uninstall" in result.output:
@@ -122,14 +127,14 @@ def test_completion_scripts():
     else:
         print("✗ inline bash completion MISSING 'uninstall'")
 
-    result = runner.invoke(cli, ['completion', 'zsh'])
+    result = runner.invoke(cli, ["completion", "zsh"])
     print("\n📝 Checking inline zsh completion...")
     if "uninstall" in result.output:
         print("✓ inline zsh completion includes 'uninstall'")
     else:
         print("✗ inline zsh completion MISSING 'uninstall'")
 
-    result = runner.invoke(cli, ['completion', 'fish'])
+    result = runner.invoke(cli, ["completion", "fish"])
     print("\n📝 Checking inline fish completion...")
     if "uninstall" in result.output:
         print("✓ inline fish completion includes 'uninstall'")
@@ -142,21 +147,25 @@ def test_completion_scripts():
 
 def test_uninstall_actual_behavior():
     """Test 4: Test actual command behavior (without system paths)."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 4: Test uninstall behavior (dry run)")
-    print("="*70)
+    print("=" * 70)
 
     # Since we can't mock easily, test with non-existent paths
     # This tests error handling
     runner = CliRunner()
-    result = runner.invoke(cli, ['uninstall', '--target', 'claude-code'])
+    result = runner.invoke(cli, ["uninstall", "--target", "claude-code"])
 
     print(f"\n📤 Command output:\n{result.output}")
     print(f"Exit code: {result.exit_code}")
 
     # Should handle gracefully
     assert result.exit_code == 0, "❌ Should exit gracefully"
-    assert "not found" in result.output.lower() or "not configured" in result.output.lower() or "complete" in result.output.lower(), "❌ Should provide feedback"
+    assert (
+        "not found" in result.output.lower()
+        or "not configured" in result.output.lower()
+        or "complete" in result.output.lower()
+    ), "❌ Should provide feedback"
 
     print("\n✅ TEST 4 PASSED: Command executes without crashing")
     return True
@@ -164,21 +173,21 @@ def test_uninstall_actual_behavior():
 
 def test_reference_command():
     """Test 5: Verify uninstall appears in reference."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 5: Verify uninstall in reference guide")
-    print("="*70)
+    print("=" * 70)
 
     runner = CliRunner()
-    result = runner.invoke(cli, ['reference'])
+    result = runner.invoke(cli, ["reference"])
 
     print("\n📝 Checking reference guide...")
 
     if "uninstall" in result.output.lower():
         print("✓ reference guide includes 'uninstall'")
         # Find and print the relevant line
-        lines = result.output.split('\n')
+        lines = result.output.split("\n")
         for line in lines:
-            if 'uninstall' in line.lower():
+            if "uninstall" in line.lower():
                 print(f"  {line.strip()}")
     else:
         print("✗ reference guide MISSING 'uninstall'")
@@ -189,9 +198,9 @@ def test_reference_command():
 
 def run_all_tests():
     """Run all integration tests."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("🧪 UNINSTALL COMMAND INTEGRATION TEST SUITE")
-    print("="*70)
+    print("=" * 70)
 
     tests = [
         test_help_output,
@@ -212,20 +221,22 @@ def run_all_tests():
             print(f"\n❌ TEST FAILED: {test.__name__}")
             print(f"Error: {e}")
             import traceback
+
             traceback.print_exc()
             failed += 1
 
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("📊 TEST SUMMARY")
-    print("="*70)
+    print("=" * 70)
     print(f"✅ Passed: {passed}/{len(tests)}")
     print(f"❌ Failed: {failed}/{len(tests)}")
-    print("="*70)
+    print("=" * 70)
 
     return failed == 0
 
 
 if __name__ == "__main__":
     import sys
+
     success = run_all_tests()
     sys.exit(0 if success else 1)

@@ -17,24 +17,19 @@ def test_mcp_server():
         "params": {
             "protocolVersion": "2025-06-18",
             "capabilities": {},
-            "clientInfo": {"name": "test", "version": "1.0"}
-        }
+            "clientInfo": {"name": "test", "version": "1.0"},
+        },
     }
 
     # CORRECT initialized notification - must use "notifications/initialized"
     initialized_notification = {
         "jsonrpc": "2.0",
         "method": "notifications/initialized",
-        "params": {}
+        "params": {},
     }
 
     # Test tool listing
-    tools_request = {
-        "jsonrpc": "2.0",
-        "id": 2,
-        "method": "tools/list",
-        "params": {}
-    }
+    tools_request = {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}
 
     try:
         # Start the MCP server
@@ -43,15 +38,16 @@ def test_mcp_server():
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=True,
         )
 
         # Send initialization request
-        proc.stdin.write(json.dumps(init_request) + '\n')
+        proc.stdin.write(json.dumps(init_request) + "\n")
         proc.stdin.flush()
 
         # Use timeout to read responses
         import time
+
         time.sleep(0.5)  # Give server time to start
 
         # Read initialization response
@@ -60,16 +56,20 @@ def test_mcp_server():
             print("✅ Initialization response received")
             init_data = json.loads(init_response)
             if "result" in init_data:
-                print(f"  Server: {init_data['result'].get('serverInfo', {}).get('name', 'Unknown')}")
-                print(f"  Version: {init_data['result'].get('serverInfo', {}).get('version', 'Unknown')}")
+                print(
+                    f"  Server: {init_data['result'].get('serverInfo', {}).get('name', 'Unknown')}"
+                )
+                print(
+                    f"  Version: {init_data['result'].get('serverInfo', {}).get('version', 'Unknown')}"
+                )
 
         # Send initialized notification to complete handshake
-        proc.stdin.write(json.dumps(initialized_notification) + '\n')
+        proc.stdin.write(json.dumps(initialized_notification) + "\n")
         proc.stdin.flush()
         time.sleep(0.5)  # No response expected for notification
 
         # Send tools list request
-        proc.stdin.write(json.dumps(tools_request) + '\n')
+        proc.stdin.write(json.dumps(tools_request) + "\n")
         proc.stdin.flush()
 
         # Read tools response with timeout
@@ -96,6 +96,7 @@ def test_mcp_server():
     except Exception as e:
         print(f"❌ Error testing MCP server: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     test_mcp_server()

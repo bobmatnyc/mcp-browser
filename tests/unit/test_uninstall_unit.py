@@ -13,9 +13,9 @@ from src.cli.commands.install import (
 
 def test_load_existing_config():
     """Test 1: Load an existing valid config."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 1: Load existing valid config")
-    print("="*70)
+    print("=" * 70)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = Path(tmpdir) / "test_config.json"
@@ -39,9 +39,9 @@ def test_load_existing_config():
 
 def test_load_nonexistent_config():
     """Test 2: Load a config that doesn't exist."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 2: Load non-existent config")
-    print("="*70)
+    print("=" * 70)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = Path(tmpdir) / "nonexistent.json"
@@ -59,9 +59,9 @@ def test_load_nonexistent_config():
 
 def test_load_invalid_json():
     """Test 3: Load a config with invalid JSON."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 3: Load config with invalid JSON")
-    print("="*70)
+    print("=" * 70)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = Path(tmpdir) / "invalid.json"
@@ -83,9 +83,9 @@ def test_load_invalid_json():
 
 def test_save_config():
     """Test 4: Save a config file."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 4: Save config file")
-    print("="*70)
+    print("=" * 70)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = Path(tmpdir) / "subdir" / "config.json"
@@ -115,9 +115,9 @@ def test_save_config():
 
 def test_remove_from_existing_config():
     """Test 5: Remove mcp-browser from existing config with other servers."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 5: Remove from config with other servers")
-    print("="*70)
+    print("=" * 70)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = Path(tmpdir) / "config.json"
@@ -126,7 +126,7 @@ def test_remove_from_existing_config():
         test_config = {
             "mcpServers": {
                 "mcp-browser": {"command": "mcp-browser", "args": ["mcp"]},
-                "other-server": {"command": "other", "args": ["arg"]}
+                "other-server": {"command": "other", "args": ["arg"]},
             }
         }
 
@@ -147,7 +147,9 @@ def test_remove_from_existing_config():
         print(f"\n📝 After removal:\n{json.dumps(updated, indent=2)}")
 
         assert success, "❌ Removal should succeed"
-        assert "mcp-browser" not in updated["mcpServers"], "❌ mcp-browser should be removed"
+        assert "mcp-browser" not in updated["mcpServers"], (
+            "❌ mcp-browser should be removed"
+        )
         assert "other-server" in updated["mcpServers"], "❌ other-server should remain"
 
         print("\n✅ TEST 5 PASSED: Removed mcp-browser, preserved other servers")
@@ -156,18 +158,16 @@ def test_remove_from_existing_config():
 
 def test_remove_when_not_configured():
     """Test 6: Remove when mcp-browser is not configured."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 6: Remove when not configured")
-    print("="*70)
+    print("=" * 70)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = Path(tmpdir) / "config.json"
 
         # Create config WITHOUT mcp-browser
         test_config = {
-            "mcpServers": {
-                "other-server": {"command": "other", "args": ["arg"]}
-            }
+            "mcpServers": {"other-server": {"command": "other", "args": ["arg"]}}
         }
 
         with open(config_path, "w") as f:
@@ -188,9 +188,9 @@ def test_remove_when_not_configured():
 
 def test_remove_nonexistent_file():
     """Test 7: Remove when config file doesn't exist."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 7: Remove when config file doesn't exist")
-    print("="*70)
+    print("=" * 70)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = Path(tmpdir) / "nonexistent.json"
@@ -210,9 +210,9 @@ def test_remove_nonexistent_file():
 
 def test_remove_no_mcpservers_section():
     """Test 8: Remove when config has no mcpServers section."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 8: Remove when no mcpServers section")
-    print("="*70)
+    print("=" * 70)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = Path(tmpdir) / "config.json"
@@ -238,9 +238,9 @@ def test_remove_no_mcpservers_section():
 
 def test_remove_empty_mcpservers():
     """Test 9: Remove from empty mcpServers section."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 9: Remove from empty mcpServers section")
-    print("="*70)
+    print("=" * 70)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = Path(tmpdir) / "config.json"
@@ -266,18 +266,16 @@ def test_remove_empty_mcpservers():
 
 def test_remove_only_mcp_browser():
     """Test 10: Remove when mcp-browser is the only server."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 10: Remove when mcp-browser is only server")
-    print("="*70)
+    print("=" * 70)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = Path(tmpdir) / "config.json"
 
         # Create config with ONLY mcp-browser
         test_config = {
-            "mcpServers": {
-                "mcp-browser": {"command": "mcp-browser", "args": ["mcp"]}
-            }
+            "mcpServers": {"mcp-browser": {"command": "mcp-browser", "args": ["mcp"]}}
         }
 
         with open(config_path, "w") as f:
@@ -297,7 +295,9 @@ def test_remove_only_mcp_browser():
         print(f"\n📝 After removal:\n{json.dumps(updated, indent=2)}")
 
         assert success, "❌ Removal should succeed"
-        assert "mcp-browser" not in updated["mcpServers"], "❌ mcp-browser should be removed"
+        assert "mcp-browser" not in updated["mcpServers"], (
+            "❌ mcp-browser should be removed"
+        )
         assert updated["mcpServers"] == {}, "❌ mcpServers should be empty"
         assert "mcpServers" in updated, "❌ mcpServers section should still exist"
 
@@ -307,9 +307,9 @@ def test_remove_only_mcp_browser():
 
 def run_all_tests():
     """Run all unit tests."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("🧪 UNINSTALL HELPER FUNCTIONS UNIT TEST SUITE")
-    print("="*70)
+    print("=" * 70)
 
     tests = [
         test_load_existing_config,
@@ -335,20 +335,22 @@ def run_all_tests():
             print(f"\n❌ TEST FAILED: {test.__name__}")
             print(f"Error: {e}")
             import traceback
+
             traceback.print_exc()
             failed += 1
 
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("📊 TEST SUMMARY")
-    print("="*70)
+    print("=" * 70)
     print(f"✅ Passed: {passed}/{len(tests)}")
     print(f"❌ Failed: {failed}/{len(tests)}")
-    print("="*70)
+    print("=" * 70)
 
     return failed == 0
 
 
 if __name__ == "__main__":
     import sys
+
     success = run_all_tests()
     sys.exit(0 if success else 1)

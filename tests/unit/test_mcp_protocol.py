@@ -20,7 +20,7 @@ import sys
 
 def send_request(proc, req_dict, timeout=2.0):
     """Send a request and return the response."""
-    proc.stdin.write(json.dumps(req_dict) + '\n')
+    proc.stdin.write(json.dumps(req_dict) + "\n")
     proc.stdin.flush()
 
     # Wait for response (notifications don't return a response)
@@ -44,27 +44,32 @@ def test_mcp_server():
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        bufsize=1
+        bufsize=1,
     )
 
     try:
         # 1. Initialize handshake
         print("\n1. Sending initialize request...")
-        response = send_request(proc, {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2025-06-18",
-                "capabilities": {},
-                "clientInfo": {"name": "test-client", "version": "1.0.0"}
-            }
-        })
+        response = send_request(
+            proc,
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-06-18",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test-client", "version": "1.0.0"},
+                },
+            },
+        )
 
         if response and "result" in response:
             server_info = response["result"].get("serverInfo", {})
-            print(f"   ✓ Server initialized: {server_info.get('name', 'Unknown')} "
-                  f"v{server_info.get('version', 'Unknown')}")
+            print(
+                f"   ✓ Server initialized: {server_info.get('name', 'Unknown')} "
+                f"v{server_info.get('version', 'Unknown')}"
+            )
             print(f"   Protocol version: {response['result'].get('protocolVersion')}")
         else:
             print(f"   ✗ Failed to initialize: {response}")
@@ -73,21 +78,22 @@ def test_mcp_server():
         # 2. Complete initialization with correct notification
         print("\n2. Sending initialized notification...")
         print("   Note: Using 'notifications/initialized' (not just 'initialized')")
-        send_request(proc, {
-            "jsonrpc": "2.0",
-            "method": "notifications/initialized",  # CORRECT format
-            "params": {}
-        }, timeout=0.5)  # Short timeout as no response expected
+        send_request(
+            proc,
+            {
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized",  # CORRECT format
+                "params": {},
+            },
+            timeout=0.5,
+        )  # Short timeout as no response expected
         print("   ✓ Notification sent")
 
         # 3. List available tools
         print("\n3. Requesting tools list...")
-        response = send_request(proc, {
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "tools/list",
-            "params": {}
-        })
+        response = send_request(
+            proc, {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}
+        )
 
         if response and "result" in response:
             tools = response["result"].get("tools", [])
@@ -104,25 +110,27 @@ def test_mcp_server():
 
         # 4. Test a tool call
         print("\n4. Testing tool call...")
-        response = send_request(proc, {
-            "jsonrpc": "2.0",
-            "id": 3,
-            "method": "tools/call",
-            "params": {
-                "name": "browser_query_logs",
-                "arguments": {
-                    "port": 8888,
-                    "last_n": 10
-                }
-            }
-        })
+        response = send_request(
+            proc,
+            {
+                "jsonrpc": "2.0",
+                "id": 3,
+                "method": "tools/call",
+                "params": {
+                    "name": "browser_query_logs",
+                    "arguments": {"port": 8888, "last_n": 10},
+                },
+            },
+        )
 
         if response and "result" in response:
             print("   ✓ Tool call successful")
         elif response and "error" in response:
             # Expected if no browser is connected
-            print(f"   ✓ Tool call processed (error expected if no browser): "
-                  f"{response['error'].get('message', 'Unknown error')}")
+            print(
+                f"   ✓ Tool call processed (error expected if no browser): "
+                f"{response['error'].get('message', 'Unknown error')}"
+            )
         else:
             print("   ✗ No response received")
 
@@ -132,6 +140,7 @@ def test_mcp_server():
     except Exception as e:
         print(f"\n❌ Test failed with exception: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 

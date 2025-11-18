@@ -9,14 +9,14 @@ from pathlib import Path
 def test_imports():
     """Test if all required modules can be imported."""
     modules = [
-        'src.cli.main',
-        'src.container.service_container',
-        'src.services.browser_service',
-        'src.services.websocket_service',
-        'src.services.storage_service',
-        'src.services.mcp_service',
-        'src.services.screenshot_service',
-        'src.services.dashboard_service',
+        "src.cli.main",
+        "src.container.service_container",
+        "src.services.browser_service",
+        "src.services.websocket_service",
+        "src.services.storage_service",
+        "src.services.mcp_service",
+        "src.services.screenshot_service",
+        "src.services.dashboard_service",
     ]
 
     print("Testing module imports...")
@@ -34,13 +34,14 @@ def test_imports():
 
     return True
 
+
 def test_static_files():
     """Test if static files are in place."""
-    base_path = Path(__file__).parent / 'src' / 'static'
+    base_path = Path(__file__).parent / "src" / "static"
     files = [
-        'test-page.html',
-        'extension-installer.html',
-        'dashboard/index.html',
+        "test-page.html",
+        "extension-installer.html",
+        "dashboard/index.html",
     ]
 
     print("\nTesting static files...")
@@ -54,15 +55,16 @@ def test_static_files():
 
     return True
 
+
 def test_extension():
     """Test if extension files exist."""
-    ext_path = Path(__file__).parent / 'extension'
+    ext_path = Path(__file__).parent / "extension"
     required_files = [
-        'manifest.json',
-        'background.js',
-        'content.js',
-        'popup.html',
-        'popup.js',
+        "manifest.json",
+        "background.js",
+        "content.js",
+        "popup.html",
+        "popup.js",
     ]
 
     print("\nTesting extension files...")
@@ -75,6 +77,7 @@ def test_extension():
             return False
 
     return True
+
 
 def main():
     """Run all tests."""
@@ -106,6 +109,7 @@ def main():
     else:
         print("✗ Some tests failed. Please check the setup.")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())
