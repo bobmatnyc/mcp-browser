@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Browser Extension Verification</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .status-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-weight: 500;
+            margin: 5px 0;
+        }
+        .connected {
+            background: #10b981;
+            color: white;
+        }
+        .disconnected {
+            background: #ef4444;
+            color: white;
+        }
+        .pending {
+            background: #f59e0b;
+            color: white;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .log-output {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .test-section {
+            margin-top: 20px;
+        }
+        .info {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="status-card">
+        <h1>🔌 MCP Browser Extension Verification</h1>
+        <p>This page helps verify that the MCP Browser extension is installed and working correctly.</p>
+    </div>
+
+    <div class="status-card">
+        <h2>📊 Extension Status</h2>
+        <p>Extension Detected: <span id="ext-status" class="status pending">Checking...</span></p>
+        <p>WebSocket Connection: <span id="ws-status" class="status pending">Checking...</span></p>
+        <p>Server Port: <span id="port-status">-</span></p>
+
+        <div class="info">
+            <strong>Instructions:</strong>
+            <ol>
+                <li>Make sure the MCP Browser server is running (<code>python -m src.cli.main start</code>)</li>
+                <li>Install the extension from <code>.mcp-browser/extension/</code> in Chrome</li>
+                <li>Click the extension icon in toolbar and check connection status</li>
+                <li>Use the test buttons below to verify console capture</li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="status-card test-section">
+        <h2>🧪 Console Log Tests</h2>
+        <p>Click these buttons to generate console messages. If the extension is working, these should be captured and sent to the MCP server.</p>
+
+        <div>
+            <button onclick="testLog()">📝 Test console.log</button>
+            <button onclick="testWarn()">⚠️ Test console.warn</button>
+            <button onclick="testError()">❌ Test console.error</button>
+            <button onclick="testInfo()">ℹ️ Test console.info</button>
+            <button onclick="testAll()">🔄 Test All</button>
+        </div>
+
+        <div class="log-output" id="log-output">
+            Console output will appear here...
+        </div>
+    </div>
+
+    <div class="status-card">
+        <h2>🔍 Diagnostics</h2>
+        <button onclick="checkExtension()">🔎 Check Extension</button>
+        <button onclick="checkWebSocket()">🌐 Check WebSocket</button>
+        <button onclick="clearLogs()">🗑️ Clear Logs</button>
+
+        <div id="diagnostics" style="margin-top: 10px; font-family: monospace; background: #f8f9fa; padding: 10px; border-radius: 4px; display: none;">
+        </div>
+    </div>
+
+    <script>
+        const logOutput = document.getElementById('log-output');
+        const extStatus = document.getElementById('ext-status');
+        const wsStatus = document.getElementById('ws-status');
+        const portStatus = document.getElementById('port-status');
+        const diagnostics = document.getElementById('diagnostics');
+
+        // Check for extension
+        function checkExtension() {
+            const hasMarker = document.querySelector('[data-mcp-browser-extension]');
+            const hasGlobal = typeof window.__MCP_BROWSER_EXTENSION__ !== 'undefined';
+            const hasClass = document.documentElement.classList.contains('mcp-browser-extension');
+
+            const isInstalled = hasMarker || hasGlobal || hasClass;
+
+            if (isInstalled) {
+                extStatus.textContent = 'Installed ✓';
+                extStatus.className = 'status connected';
+
+                if (window.__MCP_BROWSER_EXTENSION__) {
+                    const version = window.__MCP_BROWSER_EXTENSION__.version || 'Unknown';
+                    diagnostics.innerHTML = `Extension Version: ${version}<br>Detection Methods:<br>`;
+                    diagnostics.innerHTML += `- DOM Marker: ${hasMarker ? '✓' : '✗'}<br>`;
+                    diagnostics.innerHTML += `- Global Variable: ${hasGlobal ? '✓' : '✗'}<br>`;
+                    diagnostics.innerHTML += `- CSS Class: ${hasClass ? '✓' : '✗'}`;
+                }
+            } else {
+                extStatus.textContent = 'Not Detected';
+                extStatus.className = 'status disconnected';
+                diagnostics.innerHTML = 'Extension not detected. Please install from .mcp-browser/extension/';
+            }
+
+            diagnostics.style.display = 'block';
+            addToLog('Extension check completed', 'info');
+        }
+
+        // Check WebSocket connection
+        async function checkWebSocket() {
+            wsStatus.textContent = 'Testing...';
+            wsStatus.className = 'status pending';
+
+            for (let port = 8875; port <= 8895; port++) {
+                try {
+                    const ws = new WebSocket(`ws://localhost:${port}`);
+
+                    await new Promise((resolve, reject) => {
+                        ws.onopen = () => {
+                            wsStatus.textContent = 'Connected ✓';
+                            wsStatus.className = 'status connected';
+                            portStatus.textContent = port;
+                            ws.close();
+                            resolve();
+                        };
+                        ws.onerror = reject;
+                        ws.onclose = reject;
+                        setTimeout(reject, 500);
+                    });
+
+                    addToLog(`WebSocket connected on port ${port}`, 'success');
+                    break;
+                } catch (e) {
+                    // Try next port
+                }
+            }
+
+            if (wsStatus.textContent === 'Testing...') {
+                wsStatus.textContent = 'Not Connected';
+                wsStatus.className = 'status disconnected';
+                addToLog('No WebSocket server found on ports 8875-8895', 'error');
+            }
+        }
+
+        // Test functions
+        function testLog() {
+            const msg = `Test log message at ${new Date().toLocaleTimeString()}`;
+            console.log(msg);
+            addToLog(`LOG: ${msg}`, 'log');
+        }
+
+        function testWarn() {
+            const msg = `Test warning at ${new Date().toLocaleTimeString()}`;
+            console.warn(msg);
+            addToLog(`WARN: ${msg}`, 'warn');
+        }
+
+        function testError() {
+            const msg = `Test error at ${new Date().toLocaleTimeString()}`;
+            console.error(msg);
+            addToLog(`ERROR: ${msg}`, 'error');
+        }
+
+        function testInfo() {
+            const msg = `Test info at ${new Date().toLocaleTimeString()}`;
+            console.info(msg);
+            addToLog(`INFO: ${msg}`, 'info');
+        }
+
+        function testAll() {
+            testLog();
+            testWarn();
+            testError();
+            testInfo();
+            addToLog('All console methods tested!', 'success');
+        }
+
+        function clearLogs() {
+            logOutput.innerHTML = 'Console output cleared.';
+        }
+
+        function addToLog(message, type) {
+            const timestamp = new Date().toLocaleTimeString();
+            const color = {
+                log: '#94a3b8',
+                warn: '#fbbf24',
+                error: '#ef4444',
+                info: '#60a5fa',
+                success: '#10b981'
+            }[type] || '#94a3b8';
+
+            logOutput.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+
+        // Auto-check on page load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                checkExtension();
+                checkWebSocket();
+                addToLog('Page loaded - automatic checks completed', 'info');
+            }, 500);
+        });
+    </script>
+</body>
+</html>

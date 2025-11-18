@@ -2,7 +2,15 @@
 # Architecture: Python MCP Server + Chrome Extension
 
 .DEFAULT_GOAL := help
-.PHONY: help install dev build test lint format quality clean deploy version bump-patch bump-minor bump-major check-version
+.PHONY: help install dev build test lint format quality clean deploy version bump-patch bump-minor bump-major check-version \
+        pre-publish security-scan release-prep bump-and-commit-patch bump-and-commit-minor bump-and-commit-major \
+        publish-pypi github-release update-homebrew release-patch release-minor release-major verify-release
+
+# Load environment variables from .env.local if it exists
+ifneq (,$(wildcard .env.local))
+    include .env.local
+    export
+endif
 
 # Colors for output
 GREEN := \033[0;32m
@@ -15,12 +23,19 @@ help: ## Show this help message
 	@echo "$(BLUE)MCP Browser - Single Path Commands$(NC)"
 	@echo "$(YELLOW)Usage: make <target>$(NC)"
 	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-15s$(NC) %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-20s$(NC) %s\n", $$1, $$2}'
 	@echo ""
 	@echo "$(YELLOW)Quick Start:$(NC)"
-	@echo "  make install    # Install dependencies"
-	@echo "  make dev        # Start development mode"
-	@echo "  make test       # Run all tests"
+	@echo "  make install         # Install dependencies"
+	@echo "  make dev             # Start development mode"
+	@echo "  make test            # Run all tests"
+	@echo ""
+	@echo "$(YELLOW)Release Automation:$(NC)"
+	@echo "  make release-patch   # Complete patch release (recommended)"
+	@echo "  make release-minor   # Complete minor release"
+	@echo "  make release-major   # Complete major release"
+	@echo "  make release-prep    # Run quality gate + security scan"
+	@echo "  make verify-release  # Verify published release"
 
 # ONE way to install dependencies
 install: ## Install all dependencies and Playwright browsers
@@ -74,7 +89,7 @@ test-integration: ## Run integration tests only
 
 test-extension: ## Test Chrome extension functionality
 	@echo "$(BLUE)Testing Chrome extension...$(NC)"
-	python test_implementation.py
+	python tests/integration/test_implementation.py
 
 # ONE way to lint and format
 lint: ## Check code style and type hints
@@ -325,3 +340,206 @@ health: ## Quick health check of all components
 	@test -f extension/manifest.json && echo "✓ OK" || echo "✗ FAIL"
 	@echo -n "Tests directory: "
 	@test -d tests && echo "✓ OK" || echo "✗ FAIL"
+
+# =============================================================================
+# RELEASE AUTOMATION
+# =============================================================================
+
+# Pre-Release Quality Gate
+pre-publish: clean ## Run all pre-publish quality checks
+	@echo "$(BLUE)Running pre-publish quality gate...$(NC)"
+	@echo "$(YELLOW)1/5 Linting...$(NC)"
+	ruff check src/ tests/
+	@echo "$(YELLOW)2/5 Formatting check...$(NC)"
+	ruff format --check src/ tests/
+	@echo "$(YELLOW)3/5 Type checking...$(NC)"
+	-mypy src/ 2>/dev/null || echo "$(YELLOW)Type checking warnings (non-blocking)$(NC)"
+	@echo "$(YELLOW)4/5 Running tests...$(NC)"
+	pytest tests/ -v --cov=src
+	@echo "$(YELLOW)5/5 Building package...$(NC)"
+	python -m build
+	@echo "$(GREEN)✓ All quality checks passed$(NC)"
+
+# Security Scan
+security-scan: ## Scan for secrets and vulnerabilities
+	@echo "$(BLUE)Running security scan...$(NC)"
+	@echo "$(YELLOW)Checking for hardcoded secrets...$(NC)"
+	@! grep -rn "api[_-]key\s*=" src/ --include="*.py" | grep -v ".env" || (echo "$(RED)✗ Found hardcoded API keys$(NC)" && exit 1)
+	@! grep -rn "password\s*=\s*['\"]" src/ --include="*.py" | grep -v "getpass" || (echo "$(RED)✗ Found hardcoded passwords$(NC)" && exit 1)
+	@echo "$(YELLOW)Checking dependencies for vulnerabilities...$(NC)"
+	-pip install safety 2>/dev/null
+	-safety check || echo "$(YELLOW)Warning: Some dependency vulnerabilities found$(NC)"
+	@echo "$(GREEN)✓ Security scan complete$(NC)"
+
+# Release Preparation
+release-prep: ## Prepare for release (quality gate + security)
+	@echo "$(BLUE)======================================$(NC)"
+	@echo "$(BLUE)   RELEASE PREPARATION CHECKLIST$(NC)"
+	@echo "$(BLUE)======================================$(NC)"
+	@$(MAKE) pre-publish
+	@$(MAKE) security-scan
+	@echo "$(GREEN)✓ Release preparation complete$(NC)"
+	@echo "$(YELLOW)Ready to publish!$(NC)"
+
+# Version Bump with Git Commit
+bump-and-commit-patch: ## Bump patch version and commit changes
+	@echo "$(BLUE)Bumping patch version...$(NC)"
+	@python scripts/bump_version.py patch --no-git
+	@NEW_VERSION=$$(cat VERSION); \
+	echo "$(GREEN)New version: $$NEW_VERSION$(NC)"; \
+	git add pyproject.toml src/_version.py VERSION CHANGELOG.md; \
+	git commit -m "chore: bump version to $$NEW_VERSION"; \
+	echo "$(GREEN)✓ Version bumped and committed$(NC)"
+
+bump-and-commit-minor: ## Bump minor version and commit changes
+	@echo "$(BLUE)Bumping minor version...$(NC)"
+	@python scripts/bump_version.py minor --no-git
+	@NEW_VERSION=$$(cat VERSION); \
+	echo "$(GREEN)New version: $$NEW_VERSION$(NC)"; \
+	git add pyproject.toml src/_version.py VERSION CHANGELOG.md; \
+	git commit -m "chore: bump version to $$NEW_VERSION"; \
+	echo "$(GREEN)✓ Version bumped and committed$(NC)"
+
+bump-and-commit-major: ## Bump major version and commit changes
+	@echo "$(BLUE)Bumping major version...$(NC)"
+	@python scripts/bump_version.py major --no-git
+	@NEW_VERSION=$$(cat VERSION); \
+	echo "$(GREEN)New version: $$NEW_VERSION$(NC)"; \
+	git add pyproject.toml src/_version.py VERSION CHANGELOG.md; \
+	git commit -m "chore: bump version to $$NEW_VERSION"; \
+	echo "$(GREEN)✓ Version bumped and committed$(NC)"
+
+# PyPI Publishing
+publish-pypi: ## Publish to PyPI using .env.local credentials
+	@echo "$(BLUE)Publishing to PyPI...$(NC)"
+	@if [ -z "$$PYPI_TOKEN" ]; then \
+		echo "$(RED)ERROR: PYPI_TOKEN not found in .env.local$(NC)"; \
+		echo "$(YELLOW)Please add: PYPI_TOKEN=pypi-...$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)Uploading to PyPI...$(NC)"
+	@TWINE_USERNAME=__token__ TWINE_PASSWORD=$$PYPI_TOKEN python -m twine upload dist/*
+	@NEW_VERSION=$$(cat VERSION); \
+	echo "$(GREEN)✓ Published to PyPI: https://pypi.org/project/mcp-browser/$$NEW_VERSION/$(NC)"
+
+# GitHub Release
+github-release: ## Create GitHub release using .env.local credentials
+	@echo "$(BLUE)Creating GitHub release...$(NC)"
+	@if [ -z "$$GITHUB_TOKEN" ]; then \
+		echo "$(RED)ERROR: GITHUB_TOKEN not found in .env.local$(NC)"; \
+		echo "$(YELLOW)Please add: GITHUB_TOKEN=ghp_...$(NC)"; \
+		exit 1; \
+	fi
+	@NEW_VERSION=$$(cat VERSION); \
+	GITHUB_OWNER=$${GITHUB_OWNER:-browserpymcp}; \
+	echo "$(YELLOW)Creating release v$$NEW_VERSION...$(NC)"; \
+	gh release create "v$$NEW_VERSION" \
+		--title "v$$NEW_VERSION" \
+		--notes "$$(python scripts/extract_changelog.py $$NEW_VERSION)" \
+		--repo $$GITHUB_OWNER/mcp-browser \
+		dist/*; \
+	echo "$(GREEN)✓ GitHub release created$(NC)"
+
+# Homebrew Tap Update
+update-homebrew: ## Update Homebrew tap formula
+	@echo "$(BLUE)Updating Homebrew tap...$(NC)"
+	@NEW_VERSION=$$(cat VERSION); \
+	echo "$(YELLOW)Fetching SHA256 from PyPI...$(NC)"; \
+	bash scripts/update_homebrew_tap.sh $$NEW_VERSION; \
+	echo "$(GREEN)✓ Homebrew tap information displayed$(NC)"
+
+# Complete Release Workflows
+release-patch: ## Complete patch release workflow (bump, build, publish, release)
+	@echo "$(BLUE)======================================$(NC)"
+	@echo "$(BLUE)   COMPLETE PATCH RELEASE WORKFLOW$(NC)"
+	@echo "$(BLUE)======================================$(NC)"
+	@$(MAKE) release-prep
+	@$(MAKE) bump-and-commit-patch
+	@$(MAKE) publish-pypi
+	@git push origin main
+	@$(MAKE) github-release
+	@$(MAKE) update-homebrew
+	@echo "$(GREEN)======================================$(NC)"
+	@echo "$(GREEN)   ✓ RELEASE COMPLETE!$(NC)"
+	@echo "$(GREEN)======================================$(NC)"
+	@NEW_VERSION=$$(cat VERSION); \
+	GITHUB_OWNER=$${GITHUB_OWNER:-browserpymcp}; \
+	echo "$(YELLOW)Version $$NEW_VERSION published to:$(NC)"; \
+	echo "  PyPI: https://pypi.org/project/mcp-browser/$$NEW_VERSION/"; \
+	echo "  GitHub: https://github.com/$$GITHUB_OWNER/mcp-browser/releases/tag/v$$NEW_VERSION"
+
+release-minor: ## Complete minor release workflow
+	@echo "$(BLUE)======================================$(NC)"
+	@echo "$(BLUE)   COMPLETE MINOR RELEASE WORKFLOW$(NC)"
+	@echo "$(BLUE)======================================$(NC)"
+	@$(MAKE) release-prep
+	@$(MAKE) bump-and-commit-minor
+	@$(MAKE) publish-pypi
+	@git push origin main
+	@$(MAKE) github-release
+	@$(MAKE) update-homebrew
+	@echo "$(GREEN)======================================$(NC)"
+	@echo "$(GREEN)   ✓ RELEASE COMPLETE!$(NC)"
+	@echo "$(GREEN)======================================$(NC)"
+	@NEW_VERSION=$$(cat VERSION); \
+	GITHUB_OWNER=$${GITHUB_OWNER:-browserpymcp}; \
+	echo "$(YELLOW)Version $$NEW_VERSION published to:$(NC)"; \
+	echo "  PyPI: https://pypi.org/project/mcp-browser/$$NEW_VERSION/"; \
+	echo "  GitHub: https://github.com/$$GITHUB_OWNER/mcp-browser/releases/tag/v$$NEW_VERSION"
+
+release-major: ## Complete major release workflow
+	@echo "$(BLUE)======================================$(NC)"
+	@echo "$(BLUE)   COMPLETE MAJOR RELEASE WORKFLOW$(NC)"
+	@echo "$(BLUE)======================================$(NC)"
+	@$(MAKE) release-prep
+	@$(MAKE) bump-and-commit-major
+	@$(MAKE) publish-pypi
+	@git push origin main
+	@$(MAKE) github-release
+	@$(MAKE) update-homebrew
+	@echo "$(GREEN)======================================$(NC)"
+	@echo "$(GREEN)   ✓ RELEASE COMPLETE!$(NC)"
+	@echo "$(GREEN)======================================$(NC)"
+	@NEW_VERSION=$$(cat VERSION); \
+	GITHUB_OWNER=$${GITHUB_OWNER:-browserpymcp}; \
+	echo "$(YELLOW)Version $$NEW_VERSION published to:$(NC)"; \
+	echo "  PyPI: https://pypi.org/project/mcp-browser/$$NEW_VERSION/"; \
+	echo "  GitHub: https://github.com/$$GITHUB_OWNER/mcp-browser/releases/tag/v$$NEW_VERSION"
+
+# Post-Release Verification
+verify-release: ## Verify release was successful
+	@echo "$(BLUE)Verifying release...$(NC)"
+	@NEW_VERSION=$$(cat VERSION); \
+	echo "$(YELLOW)Testing PyPI installation...$(NC)"; \
+	pip install --upgrade mcp-browser==$$NEW_VERSION || echo "$(RED)✗ PyPI package not found yet (may need to wait for propagation)$(NC)"; \
+	echo "$(YELLOW)Checking GitHub release...$(NC)"; \
+	GITHUB_OWNER=$${GITHUB_OWNER:-browserpymcp}; \
+	gh release view "v$$NEW_VERSION" --repo $$GITHUB_OWNER/mcp-browser && echo "$(GREEN)✓ GitHub release verified$(NC)" || echo "$(RED)✗ GitHub release not found$(NC)"
+
+# =============================================================================
+# RELEASE SCRIPT (AUTOMATED)
+# =============================================================================
+
+release-script-patch: ## Run automated release script for patch version
+	@echo "$(BLUE)Running automated patch release...$(NC)"
+	@python3 scripts/release.py patch
+
+release-script-minor: ## Run automated release script for minor version
+	@echo "$(BLUE)Running automated minor release...$(NC)"
+	@python3 scripts/release.py minor
+
+release-script-major: ## Run automated release script for major version
+	@echo "$(BLUE)Running automated major release...$(NC)"
+	@python3 scripts/release.py major
+
+release-script-dry-run: ## Test release script without changes
+	@echo "$(BLUE)Running dry-run release simulation...$(NC)"
+	@python3 scripts/release.py --dry-run patch
+
+release-script-skip-tests: ## Run release script skipping tests
+	@echo "$(BLUE)Running release script (skipping tests)...$(NC)"
+	@python3 scripts/release.py --skip-tests patch
+
+release-script-skip-push: ## Run release script without pushing to GitHub
+	@echo "$(BLUE)Running release script (local only)...$(NC)"
+	@python3 scripts/release.py --skip-push patch

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MCP Browser Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e8f5e9;
+            border-radius: 4px;
+            border-left: 4px solid #4caf50;
+        }
+        .instructions {
+            margin: 20px 0;
+            padding: 15px;
+            background: #fff3cd;
+            border-radius: 4px;
+            border-left: 4px solid #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌐 MCP Browser Console Test</h1>
+
+        <div class="instructions">
+            <h3>📋 Instructions:</h3>
+            <ol>
+                <li>Make sure MCP Browser extension is installed and connected to port <strong>8876</strong></li>
+                <li>Click the buttons below to generate console messages</li>
+                <li>Check the server logs at <code>.mcp-browser/logs/</code></li>
+                <li>Or view live at <a href="http://localhost:8080" target="_blank">http://localhost:8080</a></li>
+            </ol>
+        </div>
+
+        <h2>Test Console Messages:</h2>
+
+        <button onclick="testLog()">📝 Send Log Message</button>
+        <button onclick="testInfo()">ℹ️ Send Info Message</button>
+        <button onclick="testWarn()">⚠️ Send Warning</button>
+        <button onclick="testError()">❌ Send Error</button>
+        <button onclick="testMultiple()">🔥 Send Multiple Messages</button>
+        <button onclick="testObject()">📦 Log Object</button>
+
+        <div class="status" id="status">
+            Click a button to send test messages to the console...
+        </div>
+    </div>
+
+    <script>
+        let messageCount = 0;
+
+        function updateStatus(message) {
+            document.getElementById('status').innerHTML = `
+                <strong>✅ Sent:</strong> ${message}<br>
+                <strong>Total messages:</strong> ${++messageCount}<br>
+                <small>Check DevTools Console (F12) and MCP Browser logs</small>
+            `;
+        }
+
+        function testLog() {
+            const msg = `Test LOG message at ${new Date().toISOString()}`;
+            console.log(msg);
+            updateStatus(msg);
+        }
+
+        function testInfo() {
+            const msg = `Test INFO message at ${new Date().toISOString()}`;
+            console.info(msg);
+            updateStatus(msg);
+        }
+
+        function testWarn() {
+            const msg = `Test WARNING at ${new Date().toISOString()}`;
+            console.warn(msg);
+            updateStatus(msg);
+        }
+
+        function testError() {
+            const msg = `Test ERROR at ${new Date().toISOString()}`;
+            console.error(msg);
+            updateStatus(msg);
+        }
+
+        function testMultiple() {
+            const timestamp = new Date().toISOString();
+            console.log(`[1/5] Starting batch test at ${timestamp}`);
+            console.info(`[2/5] Processing data...`);
+            console.warn(`[3/5] Memory usage high`);
+            console.error(`[4/5] Connection timeout (simulated)`);
+            console.log(`[5/5] Batch complete!`);
+            updateStatus(`Sent 5 messages in batch at ${timestamp}`);
+            messageCount += 4; // Add 4 more since we already increment by 1
+        }
+
+        function testObject() {
+            const testData = {
+                timestamp: new Date().toISOString(),
+                browser: navigator.userAgent,
+                viewport: {
+                    width: window.innerWidth,
+                    height: window.innerHeight
+                },
+                data: {
+                    test: true,
+                    nested: {
+                        value: 42,
+                        array: [1, 2, 3]
+                    }
+                }
+            };
+            console.log('Test object:', testData);
+            updateStatus('Logged complex object - check console for details');
+        }
+
+        // Send an initial message on page load
+        console.log('🚀 MCP Browser Test Page loaded at', new Date().toISOString());
+        console.info('Extension should capture all console messages from this page');
+    </script>
+</body>
+</html>

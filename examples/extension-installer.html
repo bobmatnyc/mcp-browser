@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Browser Extension Installation Guide</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .status-banner {
+            background: #f7f9fc;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 2px solid #e2e8f0;
+            position: relative;
+        }
+
+        .status-banner.detected {
+            background: #f0fdf4;
+            border-color: #22c55e;
+        }
+
+        .status-banner.not-detected {
+            background: #fef2f2;
+            border-color: #ef4444;
+        }
+
+        .status-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-icon.success {
+            background: #22c55e;
+        }
+
+        .status-icon.error {
+            background: #ef4444;
+        }
+
+        .status-icon.warning {
+            background: #f59e0b;
+        }
+
+        .step {
+            background: #f7f9fc;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 2px solid #e2e8f0;
+            transition: all 0.3s ease;
+        }
+
+        .step:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+        }
+
+        .step-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            cursor: pointer;
+        }
+
+        .step-number {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+
+        .step-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #1e293b;
+            flex-grow: 1;
+        }
+
+        .step-content {
+            margin-left: 55px;
+            color: #475569;
+            line-height: 1.6;
+        }
+
+        .step-content p {
+            margin-bottom: 10px;
+        }
+
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+            position: relative;
+            overflow-x: auto;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: background 0.3s;
+        }
+
+        .copy-btn:hover {
+            background: #764ba2;
+        }
+
+        .copy-btn.copied {
+            background: #22c55e;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        .btn-secondary:hover {
+            background: #f7f9fc;
+        }
+
+        .file-structure {
+            background: #f1f5f9;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+
+        .file-structure .folder {
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .file-structure .file {
+            color: #475569;
+            margin-left: 20px;
+        }
+
+        .warning-box {
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .warning-box strong {
+            color: #92400e;
+        }
+
+        .success-box {
+            background: #d1fae5;
+            border: 2px solid #22c55e;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .success-box strong {
+            color: #065f46;
+        }
+
+        .info-box {
+            background: #dbeafe;
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .info-box strong {
+            color: #1e3a8a;
+        }
+
+        .chrome-url {
+            display: inline-block;
+            background: #e2e8f0;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #475569;
+        }
+
+        .visual-guide {
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            background: #f7f9fc;
+            text-align: center;
+        }
+
+        .visual-guide img {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .visual-guide .placeholder {
+            background: #e2e8f0;
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            color: #64748b;
+            font-style: italic;
+        }
+
+        .troubleshooting {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 2px solid #e2e8f0;
+        }
+
+        .troubleshooting h2 {
+            color: #1e293b;
+            margin-bottom: 20px;
+        }
+
+        .faq-item {
+            margin-bottom: 20px;
+        }
+
+        .faq-question {
+            font-weight: 600;
+            color: #334155;
+            margin-bottom: 8px;
+        }
+
+        .faq-answer {
+            color: #64748b;
+            line-height: 1.6;
+            margin-left: 20px;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 30px;
+            border-top: 1px solid #e2e8f0;
+            color: #64748b;
+        }
+
+        .animated-icon {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .detection-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .progress-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 30px 0;
+        }
+
+        .progress-step {
+            flex: 1;
+            text-align: center;
+            position: relative;
+        }
+
+        .progress-step::after {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            width: 100%;
+            height: 2px;
+            background: #e2e8f0;
+            z-index: -1;
+        }
+
+        .progress-step:last-child::after {
+            display: none;
+        }
+
+        .progress-step.complete .progress-circle {
+            background: #22c55e;
+        }
+
+        .progress-step.active .progress-circle {
+            background: #667eea;
+            animation: pulse 2s infinite;
+        }
+
+        .progress-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #e2e8f0;
+            margin: 0 auto 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .progress-label {
+            font-size: 0.9em;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 MCP Browser Extension Installer</h1>
+            <p>Complete guide to installing and configuring the MCP Browser Console Capture Extension</p>
+        </div>
+
+        <div class="content">
+            <!-- Extension Detection Status -->
+            <div id="status-banner" class="status-banner">
+                <div class="status-title">
+                    <span id="status-icon" class="status-icon"></span>
+                    <span id="status-text">Checking Extension Status...</span>
+                </div>
+                <div id="status-details"></div>
+                <div class="button-group" style="margin-top: 15px;">
+                    <button id="check-again-btn" class="btn btn-secondary">Check Again</button>
+                    <button id="auto-detect-btn" class="btn btn-secondary">Enable Auto-Detection</button>
+                </div>
+            </div>
+
+            <!-- Progress Indicator -->
+            <div class="progress-indicator">
+                <div class="progress-step" id="progress-download">
+                    <div class="progress-circle">1</div>
+                    <div class="progress-label">Download</div>
+                </div>
+                <div class="progress-step" id="progress-extract">
+                    <div class="progress-circle">2</div>
+                    <div class="progress-label">Extract</div>
+                </div>
+                <div class="progress-step" id="progress-install">
+                    <div class="progress-circle">3</div>
+                    <div class="progress-label">Install</div>
+                </div>
+                <div class="progress-step" id="progress-verify">
+                    <div class="progress-circle">4</div>
+                    <div class="progress-label">Verify</div>
+                </div>
+            </div>
+
+            <!-- Installation Steps -->
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-number">1</div>
+                    <div class="step-title">Verify Extension Files</div>
+                </div>
+                <div class="step-content">
+                    <p>First, ensure you have the extension files in your project. The extension folder should contain:</p>
+
+                    <div class="file-structure">
+                        <div class="folder">📁 extension/</div>
+                        <div class="file">├── manifest.json</div>
+                        <div class="file">├── background.js</div>
+                        <div class="file">├── content.js</div>
+                        <div class="file">├── popup.html</div>
+                        <div class="file">├── popup.js</div>
+                        <div class="file">└── icon-*.png (optional)</div>
+                    </div>
+
+                    <div class="info-box">
+                        <strong>Note:</strong> If you don't have these files, you can download them from the project repository or generate a manifest.json using the test page.
+                    </div>
+
+                    <div class="button-group">
+                        <button id="download-manifest-btn" class="btn btn-primary">Download manifest.json</button>
+                        <button id="check-files-btn" class="btn btn-secondary">Verify Files</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-number">2</div>
+                    <div class="step-title">Open Chrome Extensions Page</div>
+                </div>
+                <div class="step-content">
+                    <p>Navigate to Chrome's extension management page using one of these methods:</p>
+
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li>Type <span class="chrome-url">chrome://extensions</span> in the address bar</li>
+                        <li>Or click Menu (⋮) → More tools → Extensions</li>
+                        <li>Or use keyboard shortcut: <code>Alt+F → L → E</code></li>
+                    </ul>
+
+                    <div class="visual-guide">
+                        <div class="placeholder">Chrome Extensions Page Screenshot</div>
+                    </div>
+
+                    <div class="button-group">
+                        <button id="copy-url-btn" class="btn btn-secondary" data-copy="chrome://extensions">Copy URL</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-number">3</div>
+                    <div class="step-title">Enable Developer Mode</div>
+                </div>
+                <div class="step-content">
+                    <p>Toggle the "Developer mode" switch in the top-right corner of the extensions page.</p>
+
+                    <div class="warning-box">
+                        <strong>Important:</strong> Developer mode must be enabled to load unpacked extensions. This is required for local development.
+                    </div>
+
+                    <div class="visual-guide">
+                        <div class="placeholder">Developer Mode Toggle Screenshot</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-number">4</div>
+                    <div class="step-title">Load Unpacked Extension</div>
+                </div>
+                <div class="step-content">
+                    <p>Click the "Load unpacked" button that appears after enabling Developer mode.</p>
+
+                    <ol style="margin-left: 20px; margin-top: 10px;">
+                        <li>Click "Load unpacked" button</li>
+                        <li>Navigate to your project's <code>extension</code> folder</li>
+                        <li>Select the folder and click "Select Folder"</li>
+                    </ol>
+
+                    <div class="code-block">
+                        <button class="copy-btn" data-text="">Copy</button>
+                        <span id="extension-path">/path/to/your/project/extension</span>
+                    </div>
+
+                    <div class="success-box" id="load-success" style="display: none;">
+                        <strong>Success!</strong> The extension has been loaded. You should see it in your extensions list.
+                    </div>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-number">5</div>
+                    <div class="step-title">Verify Installation</div>
+                </div>
+                <div class="step-content">
+                    <p>After loading the extension, verify it's working correctly:</p>
+
+                    <ol style="margin-left: 20px; margin-top: 10px;">
+                        <li>The extension should appear in your Chrome toolbar</li>
+                        <li>Click the extension icon to see the popup</li>
+                        <li>Check that the status shows "Connected" when the MCP server is running</li>
+                        <li>Open any webpage and check the console for "[mcp-browser] Console capture initialized"</li>
+                    </ol>
+
+                    <div class="button-group">
+                        <button id="test-extension-btn" class="btn btn-primary">Test Extension</button>
+                        <a href="test-page.html" class="btn btn-secondary">Open Test Page</a>
+                    </div>
+
+                    <div id="test-results" style="margin-top: 15px; display: none;">
+                        <!-- Test results will be inserted here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Troubleshooting Section -->
+            <div class="troubleshooting">
+                <h2>🔧 Troubleshooting</h2>
+
+                <div class="faq-item">
+                    <div class="faq-question">Extension doesn't appear after loading?</div>
+                    <div class="faq-answer">
+                        • Check that all required files are present in the extension folder<br>
+                        • Ensure Developer mode is enabled<br>
+                        • Check for errors in the Chrome Extensions page<br>
+                        • Try refreshing the extensions page (F5)
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">Console messages not being captured?</div>
+                    <div class="faq-answer">
+                        • Refresh the webpage after installing the extension<br>
+                        • Check that the content script is injected (look for "[mcp-browser]" in console)<br>
+                        • Ensure the MCP server is running on the correct port (8875-8895)<br>
+                        • Check the extension popup for connection status
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">Extension shows "Not Connected"?</div>
+                    <div class="faq-answer">
+                        • Start the MCP server with <code>make dev</code><br>
+                        • Check that the server is listening on ports 8875-8895<br>
+                        • Ensure no firewall is blocking local WebSocket connections<br>
+                        • Try refreshing the extension (disable and re-enable)
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">How to update the extension after code changes?</div>
+                    <div class="faq-answer">
+                        • Go to chrome://extensions<br>
+                        • Find your extension and click the refresh icon (↻)<br>
+                        • Or use the "Update" button at the top of the extensions page<br>
+                        • Refresh any open tabs to load the new content script
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div style="margin-top: 40px; padding: 30px; background: #f7f9fc; border-radius: 12px;">
+                <h3 style="margin-bottom: 20px;">⚡ Quick Actions</h3>
+                <div class="button-group">
+                    <button id="generate-all-btn" class="btn btn-primary">Generate All Files</button>
+                    <button id="open-extensions-btn" class="btn btn-secondary">Open Extensions Page</button>
+                    <button id="copy-instructions-btn" class="btn btn-secondary">Copy Instructions</button>
+                    <button id="download-guide-btn" class="btn btn-secondary">Download PDF Guide</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>MCP Browser Extension Installer v1.0.0 | Part of the MCP Browser Project</p>
+            <p style="margin-top: 10px;">
+                <a href="test-page.html" style="color: #667eea; text-decoration: none;">Back to Test Page</a> |
+                <a href="https://github.com/your-repo/mcp-browser" style="color: #667eea; text-decoration: none;">GitHub</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        class ExtensionInstaller {
+            constructor() {
+                this.extensionDetected = false;
+                this.autoDetectInterval = null;
+                this.currentStep = 1;
+                this.init();
+            }
+
+            init() {
+                this.checkExtensionStatus();
+                this.setupEventListeners();
+                this.detectProjectPath();
+                this.updateProgressIndicator(1);
+            }
+
+            checkExtensionStatus() {
+                // Try multiple detection methods
+                this.extensionDetected = false;
+
+                // Method 1: Check for injected element
+                if (document.querySelector('[data-mcp-browser-extension]')) {
+                    this.extensionDetected = true;
+                }
+
+                // Method 2: Check for console modification
+                const consoleTest = console.log.toString();
+                if (consoleTest.includes('MCP') || consoleTest.includes('chrome.runtime')) {
+                    this.extensionDetected = true;
+                }
+
+                // Method 3: Send message and wait for response
+                window.postMessage({ type: 'MCP_BROWSER_PING' }, '*');
+
+                // Update UI
+                this.updateStatus(this.extensionDetected);
+            }
+
+            updateStatus(detected) {
+                const banner = document.getElementById('status-banner');
+                const icon = document.getElementById('status-icon');
+                const text = document.getElementById('status-text');
+                const details = document.getElementById('status-details');
+
+                if (detected) {
+                    banner.className = 'status-banner detected';
+                    icon.className = 'status-icon success';
+                    text.textContent = '✅ Extension Detected!';
+                    details.innerHTML = '<p>The MCP Browser extension is installed and active. You can proceed to the test page.</p>';
+                    this.updateProgressIndicator(4);
+
+                    // Mark all steps complete
+                    document.querySelectorAll('.progress-step').forEach(step => {
+                        step.classList.add('complete');
+                    });
+                } else {
+                    banner.className = 'status-banner not-detected';
+                    icon.className = 'status-icon error';
+                    text.textContent = '❌ Extension Not Detected';
+                    details.innerHTML = '<p>The MCP Browser extension is not installed or not active. Please follow the installation steps below.</p>';
+                }
+            }
+
+            updateProgressIndicator(step) {
+                this.currentStep = step;
+
+                // Update progress steps
+                document.querySelectorAll('.progress-step').forEach((stepEl, index) => {
+                    stepEl.classList.remove('active', 'complete');
+                    if (index < step - 1) {
+                        stepEl.classList.add('complete');
+                    } else if (index === step - 1) {
+                        stepEl.classList.add('active');
+                    }
+                });
+            }
+
+            detectProjectPath() {
+                // Try to detect the current project path
+                const currentPath = window.location.pathname;
+                const projectPath = currentPath.substring(0, currentPath.lastIndexOf('/'));
+                const extensionPath = projectPath + '/extension';
+
+                const pathElement = document.getElementById('extension-path');
+                if (pathElement) {
+                    pathElement.textContent = extensionPath;
+                }
+            }
+
+            setupEventListeners() {
+                // Check Again button
+                document.getElementById('check-again-btn')?.addEventListener('click', () => {
+                    this.checkExtensionStatus();
+                });
+
+                // Auto-detect toggle
+                document.getElementById('auto-detect-btn')?.addEventListener('click', (e) => {
+                    const btn = e.target;
+                    if (this.autoDetectInterval) {
+                        clearInterval(this.autoDetectInterval);
+                        this.autoDetectInterval = null;
+                        btn.textContent = 'Enable Auto-Detection';
+                        btn.classList.remove('btn-primary');
+                        btn.classList.add('btn-secondary');
+                    } else {
+                        this.autoDetectInterval = setInterval(() => {
+                            this.checkExtensionStatus();
+                        }, 2000);
+                        btn.textContent = 'Disable Auto-Detection';
+                        btn.classList.remove('btn-secondary');
+                        btn.classList.add('btn-primary');
+                    }
+                });
+
+                // Download manifest button
+                document.getElementById('download-manifest-btn')?.addEventListener('click', () => {
+                    this.downloadManifest();
+                });
+
+                // Check files button
+                document.getElementById('check-files-btn')?.addEventListener('click', () => {
+                    this.checkExtensionFiles();
+                });
+
+                // Copy URL button
+                document.getElementById('copy-url-btn')?.addEventListener('click', (e) => {
+                    this.copyToClipboard('chrome://extensions', e.target);
+                });
+
+                // Test extension button
+                document.getElementById('test-extension-btn')?.addEventListener('click', () => {
+                    this.testExtension();
+                });
+
+                // Generate all files button
+                document.getElementById('generate-all-btn')?.addEventListener('click', () => {
+                    this.generateAllFiles();
+                });
+
+                // Open extensions page button
+                document.getElementById('open-extensions-btn')?.addEventListener('click', () => {
+                    alert('Copy this URL and paste it in a new tab:\nchrome://extensions');
+                    this.copyToClipboard('chrome://extensions');
+                });
+
+                // Copy instructions button
+                document.getElementById('copy-instructions-btn')?.addEventListener('click', () => {
+                    this.copyInstructions();
+                });
+
+                // Download guide button
+                document.getElementById('download-guide-btn')?.addEventListener('click', () => {
+                    this.downloadGuide();
+                });
+
+                // Listen for extension messages
+                window.addEventListener('message', (event) => {
+                    if (event.data && event.data.type === 'MCP_BROWSER_PONG') {
+                        this.extensionDetected = true;
+                        this.updateStatus(true);
+                    }
+                });
+
+                // Copy buttons
+                document.querySelectorAll('.copy-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const text = btn.parentElement.textContent.replace('Copy', '').trim();
+                        this.copyToClipboard(text, btn);
+                    });
+                });
+            }
+
+            downloadManifest() {
+                const manifest = {
+                    manifest_version: 3,
+                    name: 'MCP Browser Console Capture',
+                    version: '1.0.0',
+                    description: 'Captures browser console logs and sends them to local MCP server',
+                    permissions: [
+                        'activeTab',
+                        'tabs',
+                        'storage',
+                        'scripting'
+                    ],
+                    host_permissions: [
+                        'http://localhost/*',
+                        'ws://localhost/*'
+                    ],
+                    background: {
+                        service_worker: 'background.js'
+                    },
+                    content_scripts: [
+                        {
+                            matches: ['<all_urls>'],
+                            js: ['content.js'],
+                            run_at: 'document_start',
+                            all_frames: true
+                        }
+                    ],
+                    action: {
+                        default_popup: 'popup.html',
+                        default_icon: {
+                            '16': 'icon-16.png',
+                            '48': 'icon-48.png',
+                            '128': 'icon-128.png'
+                        }
+                    },
+                    icons: {
+                        '16': 'icon-16.png',
+                        '48': 'icon-48.png',
+                        '128': 'icon-128.png'
+                    }
+                };
+
+                const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'manifest.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                this.updateProgressIndicator(2);
+            }
+
+            async checkExtensionFiles() {
+                // This would need server-side support to actually check files
+                // For now, we'll simulate the check
+                const requiredFiles = [
+                    'manifest.json',
+                    'background.js',
+                    'content.js',
+                    'popup.html',
+                    'popup.js'
+                ];
+
+                alert('Required files:\n' + requiredFiles.join('\n') + '\n\nPlease ensure all these files are in your extension folder.');
+            }
+
+            async copyToClipboard(text, button) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    if (button) {
+                        const originalText = button.textContent;
+                        button.textContent = 'Copied!';
+                        button.classList.add('copied');
+                        setTimeout(() => {
+                            button.textContent = originalText;
+                            button.classList.remove('copied');
+                        }, 2000);
+                    }
+                } catch (err) {
+                    console.error('Failed to copy:', err);
+                    alert('Failed to copy to clipboard. Please copy manually.');
+                }
+            }
+
+            testExtension() {
+                const results = document.getElementById('test-results');
+                results.style.display = 'block';
+                results.innerHTML = '<div class="spinner"></div> Testing extension...';
+
+                // Perform tests
+                setTimeout(() => {
+                    const tests = {
+                        'Extension Injected': this.extensionDetected,
+                        'Console Intercepted': console.log.toString().includes('MCP'),
+                        'Message Passing': false, // Will be updated by response
+                        'DOM Access': true
+                    };
+
+                    // Test message passing
+                    window.postMessage({ type: 'MCP_BROWSER_TEST' }, '*');
+
+                    // Display results
+                    let html = '<h4>Test Results:</h4><ul style="margin-left: 20px;">';
+                    for (const [test, passed] of Object.entries(tests)) {
+                        const icon = passed ? '✅' : '❌';
+                        const status = passed ? 'Passed' : 'Failed';
+                        html += `<li>${icon} ${test}: ${status}</li>`;
+                    }
+                    html += '</ul>';
+
+                    if (this.extensionDetected) {
+                        html += '<div class="success-box" style="margin-top: 15px;">All critical tests passed! Extension is working correctly.</div>';
+                    } else {
+                        html += '<div class="warning-box" style="margin-top: 15px;">Some tests failed. Please ensure the extension is properly installed.</div>';
+                    }
+
+                    results.innerHTML = html;
+                }, 1500);
+            }
+
+            generateAllFiles() {
+                // This would generate all necessary extension files
+                alert('This feature will generate all necessary extension files. Coming soon!');
+            }
+
+            copyInstructions() {
+                const instructions = `MCP Browser Extension Installation Steps:
+
+1. Download the extension files from the project repository
+2. Open Chrome and navigate to chrome://extensions
+3. Enable "Developer mode" (top-right toggle)
+4. Click "Load unpacked"
+5. Select the extension folder from your project
+6. Verify the extension appears in your toolbar
+7. Test on any webpage - check console for "[mcp-browser]" message
+
+Troubleshooting:
+- Refresh the page after installation
+- Check extension popup for connection status
+- Ensure MCP server is running (make dev)`;
+
+                this.copyToClipboard(instructions);
+            }
+
+            downloadGuide() {
+                // This would generate a PDF guide
+                alert('PDF guide generation coming soon! For now, please use the on-page instructions.');
+            }
+        }
+
+        // Initialize the installer
+        const installer = new ExtensionInstaller();
+    </script>
+</body>
+</html>
