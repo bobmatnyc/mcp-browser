@@ -205,7 +205,7 @@ def test_cleanup_flags_help():
     runner = CliRunner()
     result = runner.invoke(cli, ["uninstall", "--help"])
 
-    print(f"\n📤 Help output (cleanup flags):\n")
+    print("\n📤 Help output (cleanup flags):\n")
 
     # Check for new flags
     flags_to_check = [
@@ -228,9 +228,9 @@ def test_cleanup_flags_help():
 
     # Assertions
     assert result.exit_code == 0, "❌ Help should exit with code 0"
-    assert len(found_flags) == len(
-        flags_to_check
-    ), f"❌ Missing flags: {set(flags_to_check) - set(found_flags)}"
+    assert len(found_flags) == len(flags_to_check), (
+        f"❌ Missing flags: {set(flags_to_check) - set(found_flags)}"
+    )
 
     print("\n✅ TEST 6 PASSED: All cleanup flags present in help")
     return True
@@ -243,17 +243,15 @@ def test_dry_run_flag():
     print("=" * 70)
 
     runner = CliRunner()
-    result = runner.invoke(
-        cli, ["uninstall", "--target", "claude-code", "--dry-run"]
-    )
+    result = runner.invoke(cli, ["uninstall", "--target", "claude-code", "--dry-run"])
 
     print(f"\n📤 Command output:\n{result.output}")
 
     # Assertions
     assert result.exit_code == 0, "❌ Should exit gracefully"
-    assert (
-        "dry run" in result.output.lower() or "would" in result.output.lower()
-    ), "❌ Should indicate dry run mode"
+    assert "dry run" in result.output.lower() or "would" in result.output.lower(), (
+        "❌ Should indicate dry run mode"
+    )
 
     print("\n✅ TEST 7 PASSED: Dry run mode works")
     return True
@@ -266,9 +264,7 @@ def test_clean_all_flag():
     print("=" * 70)
 
     runner = CliRunner()
-    result = runner.invoke(
-        cli, ["uninstall", "--clean-all", "--dry-run"]
-    )
+    result = runner.invoke(cli, ["uninstall", "--clean-all", "--dry-run"])
 
     print(f"\n📤 Command output:\n{result.output}")
 
@@ -287,9 +283,7 @@ def test_yes_flag():
     print("=" * 70)
 
     runner = CliRunner()
-    result = runner.invoke(
-        cli, ["uninstall", "--dry-run", "-y"]
-    )
+    result = runner.invoke(cli, ["uninstall", "--dry-run", "-y"])
 
     print(f"\n📤 Command output:\n{result.output}")
 

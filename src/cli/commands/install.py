@@ -1,7 +1,6 @@
 """Install command implementation for Claude Code/Desktop integration."""
 
 import json
-import logging
 import shutil
 import sys
 from datetime import datetime
@@ -467,9 +466,7 @@ def create_backup(directories: List[Path], backup_path: Path) -> bool:
 
                 console.print(f"  [dim]Backed up: {directory} → {backup_dest}[/dim]")
             except (OSError, PermissionError) as e:
-                console.print(
-                    f"  [yellow]⚠ Could not backup {directory}: {e}[/yellow]"
-                )
+                console.print(f"  [yellow]⚠ Could not backup {directory}: {e}[/yellow]")
                 # Continue with other directories
 
         return True
@@ -530,7 +527,7 @@ def remove_data_directories(
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_path = Path.home() / ".mcp-browser-backups" / timestamp
 
-        console.print(f"\n[bold]Creating backup...[/bold]")
+        console.print("\n[bold]Creating backup...[/bold]")
         if not create_backup(directories, backup_path):
             error_msg = "Backup failed - aborting removal"
             errors.append(error_msg)
@@ -917,9 +914,7 @@ def uninstall(
                     table.add_row(directory, "[dim]N/A[/dim]")
 
             console.print(table)
-            console.print(
-                f"\n[bold]Total size:[/bold] {summary['formatted_size']}\n"
-            )
+            console.print(f"\n[bold]Total size:[/bold] {summary['formatted_size']}\n")
 
             if dry_run:
                 console.print(
@@ -943,9 +938,7 @@ def uninstall(
             else:
                 not_found_count += 1
         else:
-            console.print(
-                f"  [dim]Would remove mcp-browser from {config_path}[/dim]"
-            )
+            console.print(f"  [dim]Would remove mcp-browser from {config_path}[/dim]")
             removed_count += 1
 
     # Uninstall from Claude Desktop
@@ -965,9 +958,7 @@ def uninstall(
             else:
                 not_found_count += 1
         else:
-            console.print(
-                f"  [dim]Would remove mcp-browser from {config_path}[/dim]"
-            )
+            console.print(f"  [dim]Would remove mcp-browser from {config_path}[/dim]")
             removed_count += 1
 
     # Phase 3: Handle cleanup operations
@@ -984,9 +975,7 @@ def uninstall(
             )
             if summary["directories"]:
                 if not confirm_removal(summary["directories"], "remove these items"):
-                    console.print(
-                        "\n[yellow]⚠ Cleanup cancelled by user[/yellow]"
-                    )
+                    console.print("\n[yellow]⚠ Cleanup cancelled by user[/yellow]")
                     # Skip cleanup but continue with summary
                     clean_extensions = False
                     clean_data = False
@@ -1047,7 +1036,9 @@ def uninstall(
     if not dry_run:
         summary_lines.append("[bold]Next steps:[/bold]\n")
         summary_lines.append("1. Restart Claude Code or Claude Desktop\n")
-        summary_lines.append("2. The mcp-browser MCP server will no longer be available\n\n")
+        summary_lines.append(
+            "2. The mcp-browser MCP server will no longer be available\n\n"
+        )
         summary_lines.append("[dim]To uninstall the package:[/dim]\n")
         summary_lines.append("  [cyan]pip uninstall mcp-browser[/cyan]")
 
