@@ -228,3 +228,4 @@ temp/
 virtualenv/
 yarn-debug.log*
 yarn-error.log*
+docs/research/
