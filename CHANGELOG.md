@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2025-11-29
+
+### Added
+- Enhanced uninstall command with granular cleanup options
+- Backup functionality with timestamped archives before removal
+- Safety features: dry-run preview, confirmation prompts
+- Cleanup flags: `--clean-local`, `--clean-global`, `--clean-all`
+- Playwright browser cache removal option (`--playwright`)
+- Directory size calculation and human-readable formatting
+- Comprehensive documentation (UNINSTALL.md, INSTALLATION.md)
+- 25 new unit tests for cleanup functionality
+
+### Features
+- `--clean-local`: Remove local project files (./mcp-browser-extension/, ./.mcp-browser/)
+- `--clean-global`: Remove user data directory (~/.mcp-browser/)
+- `--clean-all`: Complete removal (all of the above + Playwright cache)
+- `--backup`/`--no-backup`: Control backup creation (default: enabled)
+- `--dry-run`: Preview what would be removed without executing
+- `-y`/`--yes`: Skip confirmation prompts for automated workflows
+
+### Safety Enhancements
+- Automatic backups to `~/.mcp-browser-backups/` before removal
+- Interactive confirmation prompts for all destructive operations
+- Preview mode to review changes before execution
+- Selective cleanup levels for user control
+- Graceful error handling with clear messages
+
+### Documentation
+- Comprehensive UNINSTALL.md guide with recovery instructions (620 lines)
+- INSTALLATION.md with platform-specific setup details (773 lines)
+- README.md updated with detailed uninstall scenarios and examples
+- Safety best practices and example workflows
+- Troubleshooting guide for common issues
+
+### Testing
+- 25 new unit tests in `tests/unit/test_uninstall_cleanup.py`
+- Updated integration tests with new flag coverage
+- All 45 tests passing (100% success rate)
+- Test coverage for all cleanup scenarios
+
+### Backward Compatibility
+- No breaking changes to existing functionality
+- Default uninstall behavior preserved (MCP config removal only)
+- All new flags are optional and opt-in
+- Existing tests continue to pass
+
+### Technical Details
+- 10 new helper functions for discovery, backup, and cleanup
+- Rich console output with tables, panels, and color coding
+- Timestamped backup directory naming: `backup-YYYYMMDD-HHMMSS`
+- Size calculation with human-readable formats (B, KB, MB, GB)
+- Selective cleanup based on user flags
+
 ## [2.0.11] - 2025-11-18
 
 
