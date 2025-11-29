@@ -139,7 +139,7 @@ mcp-browser quickstart
 - ✅ Configures optimal settings for your system
 - ✅ Provides troubleshooting for any issues
 
-**Need detailed installation help?** See [INSTALLATION.md](INSTALLATION.md) for platform-specific instructions, troubleshooting, and alternative methods.
+**Need detailed installation help?** See [INSTALLATION.md](docs/guides/INSTALLATION.md) for platform-specific instructions, troubleshooting, and alternative methods.
 
 ## 🎯 Usage
 
@@ -190,26 +190,80 @@ mcp-browser clean          # Clean old logs and data
 
 ### Uninstalling MCP Browser
 
-To remove MCP Browser from your Claude configuration:
+MCP Browser provides flexible uninstall options from simple MCP config removal to complete cleanup.
+
+#### Quick Uninstall (MCP Config Only)
 
 ```bash
 # Remove from Claude Code (default)
 mcp-browser uninstall
 
-# Remove from Claude Desktop only
+# Remove from Claude Desktop
 mcp-browser uninstall --target claude-desktop
 
-# Remove from both Claude Code and Claude Desktop
+# Remove from both
 mcp-browser uninstall --target both
 ```
 
-The uninstall command will:
-- Remove the mcp-browser entry from the MCP configuration file
-- Preserve all other MCP server configurations
-- Handle missing or invalid configuration files gracefully
-- Provide clear feedback about what was removed
+#### Complete Cleanup
 
-**Note:** This only removes the MCP configuration. To completely uninstall the package:
+```bash
+# Preview what would be removed (recommended first step)
+mcp-browser uninstall --clean-all --dry-run
+
+# Remove everything with confirmation
+mcp-browser uninstall --clean-all
+
+# Remove everything without confirmation (use with caution)
+mcp-browser uninstall --clean-all --yes
+```
+
+#### Cleanup Options
+
+| Flag | Description | What Gets Removed |
+|------|-------------|-------------------|
+| `--clean-local` | Clean project files | `./mcp-browser-extension/`, `./.mcp-browser/` |
+| `--clean-global` | Clean user data | `~/.mcp-browser/` (data, logs, config) |
+| `--clean-all` | Complete removal | All of the above + Playwright cache |
+| `--playwright` | Remove Playwright cache | `~/.cache/ms-playwright/` (or OS equivalent) |
+| `--backup` / `--no-backup` | Control backup creation | Creates timestamped backup (default: enabled) |
+| `--dry-run` | Preview changes | Shows what would be removed without doing it |
+| `-y`, `--yes` | Skip confirmations | Removes without prompting (dangerous) |
+
+#### Safety Features
+
+- **Automatic Backups**: By default, creates timestamped backups in `~/.mcp-browser-backups/` before removing data
+- **Confirmation Prompts**: Asks for confirmation before destructive operations (unless `--yes` is used)
+- **Preview Mode**: Use `--dry-run` to see exactly what would be removed
+- **Selective Cleanup**: Choose specific cleanup levels based on your needs
+
+#### Example Scenarios
+
+```bash
+# Scenario 1: Remove MCP config only (safest)
+mcp-browser uninstall
+
+# Scenario 2: Clean local project files only
+mcp-browser uninstall --clean-local
+
+# Scenario 3: Clean global data with backup
+mcp-browser uninstall --clean-global
+
+# Scenario 4: Preview complete removal
+mcp-browser uninstall --clean-all --dry-run
+
+# Scenario 5: Complete removal with backup
+mcp-browser uninstall --clean-all
+
+# Scenario 6: Nuclear option (no backup, no confirmation)
+mcp-browser uninstall --clean-all --no-backup --yes
+```
+
+**For detailed uninstall instructions and recovery options, see [UNINSTALL.md](docs/guides/UNINSTALL.md)**
+
+#### Uninstall the Package Itself
+
+After removing configurations and data, uninstall the package:
 
 ```bash
 # If installed with pip

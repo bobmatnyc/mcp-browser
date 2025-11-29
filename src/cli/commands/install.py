@@ -1,13 +1,16 @@
 """Install command implementation for Claude Code/Desktop integration."""
 
 import json
+import logging
 import shutil
 import sys
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, Literal, Optional
+from typing import Dict, List, Literal, Optional, Tuple
 
 import click
 from rich.panel import Panel
+from rich.table import Table
 
 from ..utils import console
 
@@ -272,6 +275,349 @@ def remove_from_mcp_config(config_path: Path) -> bool:
     return False
 
 
+# ============================================================================
+# Enhanced Uninstall Helper Functions
+# ============================================================================
+
+
+def find_extension_directories() -> List[Path]:
+    """Find all mcp-browser extension directories.
+
+    Returns:
+        List of paths to extension directories
+    """
+    directories = []
+
+    # Check current directory for extension
+    local_extension = Path.cwd() / "mcp-browser-extension"
+    if local_extension.exists() and local_extension.is_dir():
+        directories.append(local_extension)
+
+    # Check .mcp-browser/extension in current directory
+    local_mcp_extension = Path.cwd() / ".mcp-browser" / "extension"
+    if local_mcp_extension.exists() and local_mcp_extension.is_dir():
+        directories.append(local_mcp_extension)
+
+    return directories
+
+
+def get_data_directories() -> List[Path]:
+    """Find all data directories to clean.
+
+    Returns:
+        List of paths to data directories
+    """
+    directories = []
+    home = Path.home()
+
+    # Check global .mcp-browser directory
+    global_mcp = home / ".mcp-browser"
+    if global_mcp.exists() and global_mcp.is_dir():
+        # Add subdirectories individually
+        for subdir in ["data", "logs", "config"]:
+            subdir_path = global_mcp / subdir
+            if subdir_path.exists() and subdir_path.is_dir():
+                directories.append(subdir_path)
+
+        # Also check for the parent directory itself
+        directories.append(global_mcp)
+
+    # Check local .mcp-browser directory
+    local_mcp = Path.cwd() / ".mcp-browser"
+    if local_mcp.exists() and local_mcp.is_dir():
+        directories.append(local_mcp)
+
+    return directories
+
+
+def get_playwright_cache_dir() -> Optional[Path]:
+    """Get Playwright browser cache directory.
+
+    Returns:
+        Path to Playwright cache, or None if not found
+    """
+    if sys.platform == "darwin" or sys.platform == "linux":
+        cache_dir = Path.home() / ".cache" / "ms-playwright"
+    elif sys.platform == "win32":
+        import os
+
+        local_appdata = os.environ.get("LOCALAPPDATA")
+        if local_appdata:
+            cache_dir = Path(local_appdata) / "ms-playwright"
+        else:
+            return None
+    else:
+        return None
+
+    if cache_dir.exists() and cache_dir.is_dir():
+        return cache_dir
+
+    return None
+
+
+def get_directory_size(path: Path) -> int:
+    """Calculate total size of a directory in bytes.
+
+    Args:
+        path: Directory path
+
+    Returns:
+        Total size in bytes
+    """
+    total = 0
+    try:
+        for item in path.rglob("*"):
+            if item.is_file():
+                try:
+                    total += item.stat().st_size
+                except (OSError, PermissionError):
+                    pass
+    except (OSError, PermissionError):
+        pass
+
+    return total
+
+
+def format_size(size_bytes: int) -> str:
+    """Format size in bytes to human-readable string.
+
+    Args:
+        size_bytes: Size in bytes
+
+    Returns:
+        Formatted string (e.g., "1.5 MB")
+    """
+    for unit in ["B", "KB", "MB", "GB"]:
+        if size_bytes < 1024.0:
+            return f"{size_bytes:.1f} {unit}"
+        size_bytes /= 1024.0
+    return f"{size_bytes:.1f} TB"
+
+
+def get_cleanup_summary(
+    include_extensions: bool, include_data: bool, include_playwright: bool
+) -> Dict:
+    """Generate preview of what will be removed (read-only).
+
+    Args:
+        include_extensions: Whether to include extension directories
+        include_data: Whether to include data directories
+        include_playwright: Whether to include Playwright cache
+
+    Returns:
+        Dictionary with files, directories, and total_size keys
+    """
+    directories = []
+    total_size = 0
+
+    if include_extensions:
+        ext_dirs = find_extension_directories()
+        for ext_dir in ext_dirs:
+            directories.append(ext_dir)
+            total_size += get_directory_size(ext_dir)
+
+    if include_data:
+        data_dirs = get_data_directories()
+        for data_dir in data_dirs:
+            if data_dir not in directories:  # Avoid duplicates
+                directories.append(data_dir)
+                total_size += get_directory_size(data_dir)
+
+    if include_playwright:
+        pw_cache = get_playwright_cache_dir()
+        if pw_cache:
+            directories.append(pw_cache)
+            total_size += get_directory_size(pw_cache)
+
+    return {
+        "directories": [str(d) for d in directories],
+        "total_size": total_size,
+        "formatted_size": format_size(total_size),
+    }
+
+
+def create_backup(directories: List[Path], backup_path: Path) -> bool:
+    """Create timestamped backup of directories before removal.
+
+    Args:
+        directories: List of directories to backup
+        backup_path: Path to backup directory
+
+    Returns:
+        True on success, False on failure
+    """
+    try:
+        # Create backup directory
+        backup_path.mkdir(parents=True, exist_ok=True)
+
+        for directory in directories:
+            if not directory.exists():
+                continue
+
+            # Create backup subdirectory preserving structure
+            rel_path = directory.name
+            backup_dest = backup_path / rel_path
+
+            # Use shutil.copytree for directory copy
+            try:
+                if directory.is_dir():
+                    shutil.copytree(directory, backup_dest, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(directory, backup_dest)
+
+                console.print(f"  [dim]Backed up: {directory} → {backup_dest}[/dim]")
+            except (OSError, PermissionError) as e:
+                console.print(
+                    f"  [yellow]⚠ Could not backup {directory}: {e}[/yellow]"
+                )
+                # Continue with other directories
+
+        return True
+
+    except Exception as e:
+        console.print(f"[red]✗ Backup failed: {e}[/red]")
+        return False
+
+
+def remove_extension_directories(dry_run: bool = False) -> Tuple[int, List[str]]:
+    """Remove extension directories.
+
+    Args:
+        dry_run: If True, only show what would be removed
+
+    Returns:
+        Tuple of (count_removed, errors)
+    """
+    directories = find_extension_directories()
+    count = 0
+    errors = []
+
+    for directory in directories:
+        try:
+            if dry_run:
+                console.print(f"  [dim]Would remove: {directory}[/dim]")
+                count += 1
+            else:
+                shutil.rmtree(directory)
+                console.print(f"  [green]✓[/green] Removed: {directory}")
+                count += 1
+        except (OSError, PermissionError) as e:
+            error_msg = f"Could not remove {directory}: {e}"
+            errors.append(error_msg)
+            console.print(f"  [red]✗ {error_msg}[/red]")
+
+    return count, errors
+
+
+def remove_data_directories(
+    dry_run: bool = False, backup: bool = True
+) -> Tuple[int, List[str]]:
+    """Remove data directories with optional backup.
+
+    Args:
+        dry_run: If True, only show what would be removed
+        backup: If True and not dry_run, create backup before removal
+
+    Returns:
+        Tuple of (count_removed, errors)
+    """
+    directories = get_data_directories()
+    count = 0
+    errors = []
+
+    # Create backup if requested
+    if backup and not dry_run and directories:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = Path.home() / ".mcp-browser-backups" / timestamp
+
+        console.print(f"\n[bold]Creating backup...[/bold]")
+        if not create_backup(directories, backup_path):
+            error_msg = "Backup failed - aborting removal"
+            errors.append(error_msg)
+            console.print(f"[red]✗ {error_msg}[/red]")
+            return 0, errors
+
+        console.print(f"[green]✓[/green] Backup created at: {backup_path}\n")
+
+    for directory in directories:
+        try:
+            if dry_run:
+                console.print(f"  [dim]Would remove: {directory}[/dim]")
+                count += 1
+            else:
+                # Remove subdirectories first, then parent if it's empty
+                if directory.exists():
+                    shutil.rmtree(directory)
+                    console.print(f"  [green]✓[/green] Removed: {directory}")
+                    count += 1
+        except (OSError, PermissionError) as e:
+            error_msg = f"Could not remove {directory}: {e}"
+            errors.append(error_msg)
+            console.print(f"  [red]✗ {error_msg}[/red]")
+
+    return count, errors
+
+
+def remove_playwright_cache(dry_run: bool = False) -> Tuple[int, List[str]]:
+    """Remove Playwright browser cache.
+
+    Args:
+        dry_run: If True, only show what would be removed
+
+    Returns:
+        Tuple of (count_removed, errors)
+    """
+    cache_dir = get_playwright_cache_dir()
+    errors = []
+
+    if not cache_dir:
+        return 0, errors
+
+    try:
+        if dry_run:
+            console.print(f"  [dim]Would remove: {cache_dir}[/dim]")
+            return 1, errors
+        else:
+            shutil.rmtree(cache_dir)
+            console.print(f"  [green]✓[/green] Removed: {cache_dir}")
+            return 1, errors
+    except (OSError, PermissionError) as e:
+        error_msg = f"Could not remove {cache_dir}: {e}"
+        errors.append(error_msg)
+        console.print(f"  [red]✗ {error_msg}[/red]")
+        return 0, errors
+
+
+def confirm_removal(items: List[str], operation: str) -> bool:
+    """Prompt user for confirmation with detailed item list.
+
+    Args:
+        items: List of items to be removed
+        operation: Description of operation
+
+    Returns:
+        True if confirmed, False otherwise
+    """
+    if not items:
+        return False
+
+    # Create a Rich table for display
+    table = Table(title=f"Items to {operation}", show_header=True, header_style="bold")
+    table.add_column("Path", style="cyan")
+
+    for item in items:
+        table.add_row(item)
+
+    console.print()
+    console.print(table)
+    console.print()
+
+    return click.confirm(f"Do you want to {operation}?", default=False)
+
+
+# ============================================================================
+
+
 @click.command()
 @click.option(
     "--target",
@@ -431,18 +777,68 @@ def install(target: str, force: bool, extension: bool):
     default="claude-code",
     help="Target to uninstall from (default: claude-code)",
 )
-def uninstall(target: str):
+@click.option(
+    "--clean-global",
+    is_flag=True,
+    help="Remove ~/.mcp-browser/ directory",
+)
+@click.option(
+    "--clean-local",
+    is_flag=True,
+    help="Remove local .mcp-browser/ and extension/",
+)
+@click.option(
+    "--clean-all",
+    is_flag=True,
+    help="Remove all MCP config, data, and extensions",
+)
+@click.option(
+    "--backup/--no-backup",
+    default=True,
+    help="Create backup before removing data (default: True)",
+)
+@click.option(
+    "--playwright",
+    is_flag=True,
+    help="Also remove Playwright browser cache",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show what would be removed without doing it",
+)
+@click.option(
+    "--yes",
+    "-y",
+    is_flag=True,
+    help="Skip confirmation prompts",
+)
+def uninstall(
+    target: str,
+    clean_global: bool,
+    clean_local: bool,
+    clean_all: bool,
+    backup: bool,
+    playwright: bool,
+    dry_run: bool,
+    yes: bool,
+):
     """🗑️ Remove MCP Browser configuration from Claude Code/Desktop.
 
     \b
     Removes the mcp-browser configuration from Claude Code or Claude Desktop
-    MCP server settings. This does not uninstall the package itself.
+    MCP server settings. Can also clean up data directories and extensions.
 
     \b
     Examples:
       mcp-browser uninstall                         # Remove from Claude Code
       mcp-browser uninstall --target claude-desktop # Remove from Claude Desktop
       mcp-browser uninstall --target both           # Remove from both
+      mcp-browser uninstall --clean-all             # Remove everything
+      mcp-browser uninstall --clean-global          # Remove ~/.mcp-browser/
+      mcp-browser uninstall --dry-run --clean-all   # Preview what would be removed
+      mcp-browser uninstall --clean-all --no-backup # Skip backup
+      mcp-browser uninstall --clean-all -y          # Skip confirmation
 
     \b
     Configuration locations:
@@ -453,20 +849,84 @@ def uninstall(target: str):
         • Windows: %APPDATA%/Claude/
 
     \b
+    Cleanup options:
+      --clean-local:   Remove ./mcp-browser-extension/ and ./.mcp-browser/
+      --clean-global:  Remove ~/.mcp-browser/ (data, logs, config)
+      --clean-all:     Remove all of the above
+      --playwright:    Also remove Playwright browser cache
+      --backup:        Create backup before removal (default: True)
+      --dry-run:       Preview without making changes
+      -y, --yes:       Skip confirmation prompts
+
+    \b
     After uninstallation:
       1. Restart Claude Code or Claude Desktop
       2. The 'mcp-browser' MCP server will no longer be available
       3. To uninstall the package itself, use: pip uninstall mcp-browser
     """
+    # Determine what to clean
+    clean_extensions = clean_local or clean_all
+    clean_data = clean_global or clean_all
+    clean_playwright = playwright or clean_all
+
+    # Build status message
+    status_parts = [f"Target: [cyan]{target}[/cyan]"]
+    if clean_all:
+        status_parts.append("Clean: [cyan]All data and extensions[/cyan]")
+    else:
+        clean_items = []
+        if clean_local:
+            clean_items.append("local")
+        if clean_global:
+            clean_items.append("global")
+        if playwright:
+            clean_items.append("playwright")
+        if clean_items:
+            status_parts.append(f"Clean: [cyan]{', '.join(clean_items)}[/cyan]")
+
+    if dry_run:
+        status_parts.append("[yellow]Mode: DRY RUN[/yellow]")
+    if not backup:
+        status_parts.append("[yellow]Backup: Disabled[/yellow]")
+
     console.print(
         Panel.fit(
             "[bold]Removing MCP Browser Configuration[/bold]\n\n"
-            f"Target: [cyan]{target}[/cyan]",
+            + "\n".join(status_parts),
             title="Uninstallation",
             border_style="blue",
         )
     )
 
+    # Phase 1: Show preview if dry-run or if cleanup requested
+    if dry_run or clean_extensions or clean_data or clean_playwright:
+        summary = get_cleanup_summary(clean_extensions, clean_data, clean_playwright)
+
+        if summary["directories"]:
+            console.print("\n[bold]Preview of directories to be removed:[/bold]")
+            table = Table(show_header=True, header_style="bold")
+            table.add_column("Directory", style="cyan")
+            table.add_column("Size", style="yellow", justify="right")
+
+            for directory in summary["directories"]:
+                dir_path = Path(directory)
+                if dir_path.exists():
+                    size = get_directory_size(dir_path)
+                    table.add_row(directory, format_size(size))
+                else:
+                    table.add_row(directory, "[dim]N/A[/dim]")
+
+            console.print(table)
+            console.print(
+                f"\n[bold]Total size:[/bold] {summary['formatted_size']}\n"
+            )
+
+            if dry_run:
+                console.print(
+                    "[yellow]This is a dry run - no changes will be made[/yellow]\n"
+                )
+
+    # Phase 2: Handle MCP config removal
     removed_count = 0
     not_found_count = 0
     total_count = 0
@@ -474,18 +934,24 @@ def uninstall(target: str):
     # Uninstall from Claude Code
     if target in ["claude-code", "both"]:
         total_count += 1
-        console.print("\n[bold]Removing from Claude Code...[/bold]")
+        console.print("[bold]Removing from Claude Code...[/bold]")
         config_path = get_claude_code_config_path()
 
-        if remove_from_mcp_config(config_path):
-            removed_count += 1
+        if not dry_run:
+            if remove_from_mcp_config(config_path):
+                removed_count += 1
+            else:
+                not_found_count += 1
         else:
-            not_found_count += 1
+            console.print(
+                f"  [dim]Would remove mcp-browser from {config_path}[/dim]"
+            )
+            removed_count += 1
 
     # Uninstall from Claude Desktop
     if target in ["claude-desktop", "both"]:
         total_count += 1
-        console.print("\n[bold]Removing from Claude Desktop...[/bold]")
+        console.print("[bold]Removing from Claude Desktop...[/bold]")
         config_path = get_claude_desktop_config_path()
 
         if config_path is None:
@@ -493,45 +959,102 @@ def uninstall(target: str):
                 f"[red]✗[/red] Claude Desktop config path not found for {sys.platform}"
             )
             not_found_count += 1
-        elif remove_from_mcp_config(config_path):
-            removed_count += 1
+        elif not dry_run:
+            if remove_from_mcp_config(config_path):
+                removed_count += 1
+            else:
+                not_found_count += 1
         else:
-            not_found_count += 1
-
-    # Summary
-    console.print()
-    if removed_count == total_count:
-        console.print(
-            Panel.fit(
-                "[bold green]✓ Uninstallation Complete![/bold green]\n\n"
-                f"Removed mcp-browser from {removed_count} configuration(s)\n\n"
-                "[bold]Next steps:[/bold]\n"
-                "1. Restart Claude Code or Claude Desktop\n"
-                "2. The mcp-browser MCP server will no longer be available\n\n"
-                "[dim]To uninstall the package:[/dim]\n"
-                "  [cyan]pip uninstall mcp-browser[/cyan]",
-                title="Success",
-                border_style="green",
+            console.print(
+                f"  [dim]Would remove mcp-browser from {config_path}[/dim]"
             )
+            removed_count += 1
+
+    # Phase 3: Handle cleanup operations
+    cleanup_errors = []
+    cleanup_count = 0
+
+    if clean_extensions or clean_data or clean_playwright:
+        console.print()
+
+        # Confirm unless --yes flag is set or it's a dry-run
+        if not dry_run and not yes:
+            summary = get_cleanup_summary(
+                clean_extensions, clean_data, clean_playwright
+            )
+            if summary["directories"]:
+                if not confirm_removal(summary["directories"], "remove these items"):
+                    console.print(
+                        "\n[yellow]⚠ Cleanup cancelled by user[/yellow]"
+                    )
+                    # Skip cleanup but continue with summary
+                    clean_extensions = False
+                    clean_data = False
+                    clean_playwright = False
+
+        # Remove extensions
+        if clean_extensions:
+            console.print("\n[bold]Removing extension directories...[/bold]")
+            count, errors = remove_extension_directories(dry_run)
+            cleanup_count += count
+            cleanup_errors.extend(errors)
+
+        # Remove data directories
+        if clean_data:
+            console.print("\n[bold]Removing data directories...[/bold]")
+            count, errors = remove_data_directories(dry_run, backup)
+            cleanup_count += count
+            cleanup_errors.extend(errors)
+
+        # Remove Playwright cache
+        if clean_playwright:
+            console.print("\n[bold]Removing Playwright cache...[/bold]")
+            count, errors = remove_playwright_cache(dry_run)
+            cleanup_count += count
+            cleanup_errors.extend(errors)
+
+    # Phase 4: Summary
+    console.print()
+
+    # Build summary message
+    summary_lines = []
+
+    if dry_run:
+        summary_lines.append("[bold yellow]DRY RUN COMPLETE[/bold yellow]\n")
+        summary_lines.append("No actual changes were made\n")
+
+    if removed_count == total_count:
+        summary_lines.append(
+            f"[green]✓[/green] Would remove mcp-browser from {removed_count} configuration(s)\n"
+            if dry_run
+            else f"[green]✓[/green] Removed mcp-browser from {removed_count} configuration(s)\n"
         )
     elif removed_count > 0:
-        console.print(
-            Panel.fit(
-                f"[bold yellow]⚠ Partial Removal[/bold yellow]\n\n"
-                f"Removed from {removed_count} of {total_count} targets\n"
-                f"Not found in {not_found_count} target(s)\n\n"
-                "Check messages above for details",
-                title="Warning",
-                border_style="yellow",
-            )
+        summary_lines.append(
+            f"[yellow]⚠[/yellow] Removed from {removed_count} of {total_count} targets\n"
         )
-    else:
-        console.print(
-            Panel.fit(
-                "[bold yellow]⚠ Nothing to Remove[/bold yellow]\n\n"
-                "mcp-browser was not found in any of the specified configurations\n\n"
-                "[dim]To install, use:[/dim] [cyan]mcp-browser install[/cyan]",
-                title="Not Found",
-                border_style="yellow",
-            )
+
+    if cleanup_count > 0:
+        summary_lines.append(
+            f"[green]✓[/green] Would clean {cleanup_count} directories\n"
+            if dry_run
+            else f"[green]✓[/green] Cleaned {cleanup_count} directories\n"
         )
+
+    if cleanup_errors:
+        summary_lines.append(f"[red]✗[/red] {len(cleanup_errors)} errors occurred\n")
+
+    if not dry_run:
+        summary_lines.append("[bold]Next steps:[/bold]\n")
+        summary_lines.append("1. Restart Claude Code or Claude Desktop\n")
+        summary_lines.append("2. The mcp-browser MCP server will no longer be available\n\n")
+        summary_lines.append("[dim]To uninstall the package:[/dim]\n")
+        summary_lines.append("  [cyan]pip uninstall mcp-browser[/cyan]")
+
+    console.print(
+        Panel.fit(
+            "".join(summary_lines),
+            title="Complete" if not dry_run else "Dry Run Summary",
+            border_style="green" if not cleanup_errors else "yellow",
+        )
+    )

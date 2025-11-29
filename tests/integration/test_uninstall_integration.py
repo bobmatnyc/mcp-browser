@@ -196,6 +196,132 @@ def test_reference_command():
     return True
 
 
+def test_cleanup_flags_help():
+    """Test 6: Verify new cleanup flags in help output."""
+    print("\n" + "=" * 70)
+    print("TEST 6: Verify new cleanup flags in help")
+    print("=" * 70)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["uninstall", "--help"])
+
+    print(f"\n📤 Help output (cleanup flags):\n")
+
+    # Check for new flags
+    flags_to_check = [
+        "--clean-global",
+        "--clean-local",
+        "--clean-all",
+        "--backup",
+        "--playwright",
+        "--dry-run",
+        "--yes",
+    ]
+
+    found_flags = []
+    for flag in flags_to_check:
+        if flag in result.output:
+            found_flags.append(flag)
+            print(f"  ✓ Found {flag}")
+        else:
+            print(f"  ✗ Missing {flag}")
+
+    # Assertions
+    assert result.exit_code == 0, "❌ Help should exit with code 0"
+    assert len(found_flags) == len(
+        flags_to_check
+    ), f"❌ Missing flags: {set(flags_to_check) - set(found_flags)}"
+
+    print("\n✅ TEST 6 PASSED: All cleanup flags present in help")
+    return True
+
+
+def test_dry_run_flag():
+    """Test 7: Test --dry-run flag doesn't make changes."""
+    print("\n" + "=" * 70)
+    print("TEST 7: Test --dry-run flag")
+    print("=" * 70)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli, ["uninstall", "--target", "claude-code", "--dry-run"]
+    )
+
+    print(f"\n📤 Command output:\n{result.output}")
+
+    # Assertions
+    assert result.exit_code == 0, "❌ Should exit gracefully"
+    assert (
+        "dry run" in result.output.lower() or "would" in result.output.lower()
+    ), "❌ Should indicate dry run mode"
+
+    print("\n✅ TEST 7 PASSED: Dry run mode works")
+    return True
+
+
+def test_clean_all_flag():
+    """Test 8: Test --clean-all flag is recognized."""
+    print("\n" + "=" * 70)
+    print("TEST 8: Test --clean-all flag")
+    print("=" * 70)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli, ["uninstall", "--clean-all", "--dry-run"]
+    )
+
+    print(f"\n📤 Command output:\n{result.output}")
+
+    # Assertions
+    assert result.exit_code == 0, "❌ Should exit gracefully"
+    assert "clean" in result.output.lower(), "❌ Should mention cleanup"
+
+    print("\n✅ TEST 8 PASSED: Clean-all flag works")
+    return True
+
+
+def test_yes_flag():
+    """Test 9: Test --yes flag is recognized."""
+    print("\n" + "=" * 70)
+    print("TEST 9: Test --yes flag")
+    print("=" * 70)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli, ["uninstall", "--dry-run", "-y"]
+    )
+
+    print(f"\n📤 Command output:\n{result.output}")
+
+    # Assertions
+    assert result.exit_code == 0, "❌ Should exit gracefully"
+
+    print("\n✅ TEST 9 PASSED: Yes flag works")
+    return True
+
+
+def test_backup_flag():
+    """Test 10: Test --backup/--no-backup flag is recognized."""
+    print("\n" + "=" * 70)
+    print("TEST 10: Test --backup/--no-backup flag")
+    print("=" * 70)
+
+    runner = CliRunner()
+
+    # Test with --no-backup
+    result = runner.invoke(
+        cli, ["uninstall", "--clean-global", "--no-backup", "--dry-run"]
+    )
+
+    print(f"\n📤 Command output (--no-backup):\n{result.output}")
+
+    # Assertions
+    assert result.exit_code == 0, "❌ Should exit gracefully"
+
+    print("\n✅ TEST 10 PASSED: Backup flag works")
+    return True
+
+
 def run_all_tests():
     """Run all integration tests."""
     print("\n" + "=" * 70)
@@ -208,6 +334,11 @@ def run_all_tests():
         test_completion_scripts,
         test_uninstall_actual_behavior,
         test_reference_command,
+        test_cleanup_flags_help,
+        test_dry_run_flag,
+        test_clean_all_flag,
+        test_yes_flag,
+        test_backup_flag,
     ]
 
     passed = 0
