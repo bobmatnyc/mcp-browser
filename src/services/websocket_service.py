@@ -134,6 +134,49 @@ class WebSocketService:
         await self.send_message(websocket, ack_message)
         logger.info(f"Sent connection_ack with {len(replay_messages[:100])} replayed messages")
 
+    async def handle_gap_recovery(self, message: dict, websocket: WebSocketServerProtocol) -> None:
+        """Handle gap recovery request - send messages in requested sequence range.
+
+        Args:
+            message: Gap recovery request message
+            websocket: WebSocket connection
+        """
+        from_sequence = message.get('fromSequence', 0)
+        to_sequence = message.get('toSequence', 0)
+
+        logger.info(f"Gap recovery requested: sequences {from_sequence} to {to_sequence}")
+
+        # Validate request
+        if from_sequence <= 0 or to_sequence < from_sequence:
+            logger.warning(f"Invalid gap recovery request: {from_sequence} to {to_sequence}")
+            await self.send_message(websocket, {
+                'type': 'gap_recovery_response',
+                'success': False,
+                'error': 'Invalid sequence range',
+                'messages': []
+            })
+            return
+
+        # Limit recovery size to prevent abuse
+        max_recovery = 100
+        if to_sequence - from_sequence + 1 > max_recovery:
+            to_sequence = from_sequence + max_recovery - 1
+            logger.warning(f"Gap recovery limited to {max_recovery} messages")
+
+        # Find messages in range
+        recovery_messages = self._get_messages_in_range(from_sequence, to_sequence)
+
+        # Send recovery response
+        await self.send_message(websocket, {
+            'type': 'gap_recovery_response',
+            'success': True,
+            'fromSequence': from_sequence,
+            'toSequence': to_sequence,
+            'messages': recovery_messages
+        })
+
+        logger.info(f"Gap recovery complete: sent {len(recovery_messages)} messages")
+
     def _get_messages_after_sequence(self, last_sequence: int) -> List[dict]:
         """Get messages with sequence > last_sequence.
 
@@ -146,6 +189,21 @@ class WebSocketService:
         return [
             msg for msg in self.message_buffer
             if msg.get('sequence', 0) > last_sequence
+        ]
+
+    def _get_messages_in_range(self, from_seq: int, to_seq: int) -> List[Dict[str, Any]]:
+        """Get messages with sequence numbers in the given range (inclusive).
+
+        Args:
+            from_seq: Starting sequence number (inclusive)
+            to_seq: Ending sequence number (inclusive)
+
+        Returns:
+            List of messages in the sequence range
+        """
+        return [
+            msg for msg in self.message_buffer
+            if msg.get('sequence', 0) >= from_seq and msg.get('sequence', 0) <= to_seq
         ]
 
     def _add_sequence(self, message: dict) -> dict:
@@ -224,6 +282,11 @@ class WebSocketService:
                 await self.handle_connection_init(data, websocket)
                 return
 
+            # Handle gap recovery request
+            if message_type == "gap_recovery":
+                await self.handle_gap_recovery(data, websocket)
+                return
+
             # Handle heartbeat - respond with pong immediately
             if message_type == "heartbeat":
                 pong_response = {
@@ -283,14 +346,18 @@ class WebSocketService:
         except Exception as e:
             logger.error(f"Failed to send message: {e}")
 
-    async def broadcast_message(self, message: Dict[str, Any]) -> None:
+    async def broadcast_message(self, message: Dict[str, Any], add_sequence: bool = False) -> None:
         """Broadcast a message to all connected clients.
 
         Args:
             message: Message to broadcast
+            add_sequence: If True, add sequence number and buffer message for replay
         """
         if not self._connections:
             return
+
+        if add_sequence:
+            message = self._add_sequence(message)
 
         message_str = json.dumps(message)
         tasks = []

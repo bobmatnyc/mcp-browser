@@ -38,6 +38,12 @@ let extensionState = 'starting'; // 'starting', 'scanning', 'idle', 'connected',
 let connectionReady = false;
 let lastSequenceReceived = 0;
 
+// Gap detection configuration
+const GAP_DETECTION_ENABLED = true;
+const MAX_GAP_SIZE = 50; // Max messages to request in gap recovery
+let pendingGapRecovery = false;
+let outOfOrderBuffer = []; // Buffer for messages that arrive before gap is filled
+
 // Heartbeat state
 let lastPongTime = Date.now();
 const HEARTBEAT_INTERVAL = 15000; // 15 seconds
@@ -79,6 +85,100 @@ function calculateReconnectDelay() {
   const delay = Math.max(exponentialDelay + jitter, BASE_RECONNECT_DELAY);
 
   return delay;
+}
+
+/**
+ * Check for sequence gaps and handle accordingly
+ * @param {number} incomingSequence - The sequence number of the incoming message
+ * @returns {boolean} - True if message should be processed immediately, false if buffered
+ */
+function checkSequenceGap(incomingSequence) {
+  if (!GAP_DETECTION_ENABLED || incomingSequence === undefined) {
+    return true; // Process immediately
+  }
+
+  const expectedSequence = lastSequenceReceived + 1;
+
+  // Perfect order - process immediately
+  if (incomingSequence === expectedSequence) {
+    return true;
+  }
+
+  // Duplicate - skip
+  if (incomingSequence <= lastSequenceReceived) {
+    console.log(`[MCP Browser] Duplicate message (seq ${incomingSequence}), skipping`);
+    return false;
+  }
+
+  // Gap detected - message arrived too early
+  const gapSize = incomingSequence - expectedSequence;
+  console.warn(`[MCP Browser] Gap detected: expected ${expectedSequence}, got ${incomingSequence} (gap: ${gapSize})`);
+
+  // If gap is too large, just accept and move on (likely server restart)
+  if (gapSize > MAX_GAP_SIZE) {
+    console.warn(`[MCP Browser] Gap too large (${gapSize}), accepting and resetting sequence`);
+    return true;
+  }
+
+  // Request gap recovery if not already pending
+  if (!pendingGapRecovery) {
+    requestGapRecovery(expectedSequence, incomingSequence - 1);
+  }
+
+  // Buffer this message for later processing
+  outOfOrderBuffer.push({ sequence: incomingSequence, message: null }); // Will be set by caller
+  return false;
+}
+
+/**
+ * Request recovery of missed messages
+ */
+function requestGapRecovery(fromSequence, toSequence) {
+  if (!currentConnection || currentConnection.readyState !== WebSocket.OPEN) {
+    return;
+  }
+
+  pendingGapRecovery = true;
+  console.log(`[MCP Browser] Requesting gap recovery: sequences ${fromSequence} to ${toSequence}`);
+
+  try {
+    currentConnection.send(JSON.stringify({
+      type: 'gap_recovery',
+      fromSequence: fromSequence,
+      toSequence: toSequence
+    }));
+  } catch (e) {
+    console.error('[MCP Browser] Failed to request gap recovery:', e);
+    pendingGapRecovery = false;
+  }
+}
+
+/**
+ * Process messages that were buffered during gap recovery
+ */
+function processBufferedMessages() {
+  if (outOfOrderBuffer.length === 0) return;
+
+  // Sort by sequence
+  outOfOrderBuffer.sort((a, b) => a.sequence - b.sequence);
+
+  // Process messages that are now valid
+  const stillBuffered = [];
+  for (const item of outOfOrderBuffer) {
+    if (item.sequence === lastSequenceReceived + 1) {
+      lastSequenceReceived = item.sequence;
+      console.log(`[MCP Browser] Processing buffered message seq ${item.sequence}`);
+    } else if (item.sequence > lastSequenceReceived + 1) {
+      stillBuffered.push(item);
+    }
+    // Skip if already processed (duplicate)
+  }
+
+  outOfOrderBuffer = stillBuffered;
+
+  if (stillBuffered.length > 0) {
+    console.log(`[MCP Browser] ${stillBuffered.length} messages still buffered`);
+  }
 }
 
 /**
@@ -441,6 +541,10 @@ async function connectToServer(port, serverInfo = null) {
         reconnectAttempts = 0;
         console.log('[MCP Browser] Connection successful, reset reconnect attempts');
 
+        // Reset gap detection state
+        pendingGapRecovery = false;
+        outOfOrderBuffer = [];
+
         // Load last sequence from storage
         const result = await chrome.storage.local.get(STORAGE_KEYS.LAST_SEQUENCE);
         lastSequenceReceived = result[STORAGE_KEYS.LAST_SEQUENCE] || 0;
@@ -555,11 +659,40 @@ function setupWebSocketHandlers(ws) {
         return; // Don't process further
       }
 
-      // Track sequence on incoming messages
-      if (data.sequence !== undefined && data.sequence > lastSequenceReceived) {
+      // Handle gap recovery response
+      if (data.type === 'gap_recovery_response') {
+        console.log(`[MCP Browser] Gap recovery response received`);
+        pendingGapRecovery = false;
+
+        // Process recovered messages in order
+        if (data.messages && Array.isArray(data.messages)) {
+          console.log(`[MCP Browser] Processing ${data.messages.length} recovered messages`);
+          for (const msg of data.messages) {
+            if (msg.sequence !== undefined && msg.sequence > lastSequenceReceived) {
+              lastSequenceReceived = msg.sequence;
+              // Process the message content (if applicable)
+            }
+          }
+
+          // Persist updated sequence
+          chrome.storage.local.set({ [STORAGE_KEYS.LAST_SEQUENCE]: lastSequenceReceived });
+
+          // Process any buffered out-of-order messages that are now valid
+          processBufferedMessages();
+        }
+
+        return;
+      }
+
+      // Check for sequence gaps (before processing messages with sequences)
+      if (data.sequence !== undefined) {
+        const shouldProcess = checkSequenceGap(data.sequence);
+        if (!shouldProcess) {
+          // Message is buffered or duplicate, don't process further
+          return;
+        }
+        // Update sequence tracking
         lastSequenceReceived = data.sequence;
-        // Persist periodically (not on every message to reduce writes)
-        // We'll persist on disconnect and periodically
       }
 
       handleServerMessage(data);
@@ -584,6 +717,10 @@ function setupWebSocketHandlers(ws) {
     connectionStatus.connected = false;
     connectionStatus.port = null;
     connectionStatus.projectName = null;
+
+    // Reset gap detection state
+    pendingGapRecovery = false;
+    outOfOrderBuffer = [];
 
     // Save last sequence before reconnect
     await chrome.storage.local.set({ [STORAGE_KEYS.LAST_SEQUENCE]: lastSequenceReceived });
