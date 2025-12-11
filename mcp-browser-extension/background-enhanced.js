@@ -33,6 +33,11 @@ let currentConnection = null;
 let messageQueue = [];
 let extensionState = 'starting'; // 'starting', 'scanning', 'idle', 'connected', 'error'
 
+// Heartbeat state
+let lastPongTime = Date.now();
+const HEARTBEAT_INTERVAL = 15000; // 15 seconds
+const PONG_TIMEOUT = 10000; // 10 seconds (25s total before timeout)
+
 // Active ports to content scripts for keepalive
 const activePorts = new Map(); // tabId -> port
 
@@ -98,8 +103,8 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 function startHeartbeat() {
   console.log('[MCP Browser] Starting heartbeat alarm');
   chrome.alarms.create('heartbeat', {
-    delayInMinutes: 0.25,  // Every 15 seconds
-    periodInMinutes: 0.25
+    delayInMinutes: HEARTBEAT_INTERVAL / 60000,
+    periodInMinutes: HEARTBEAT_INTERVAL / 60000
   });
 }
 
@@ -112,12 +117,27 @@ function stopHeartbeat() {
 }
 
 /**
- * Send heartbeat ping to keep connection alive
+ * Send heartbeat and check for pong timeout
  */
 function sendHeartbeat() {
   if (currentConnection && currentConnection.readyState === WebSocket.OPEN) {
+    // Check if we received pong recently
+    const timeSinceLastPong = Date.now() - lastPongTime;
+    if (timeSinceLastPong > HEARTBEAT_INTERVAL + PONG_TIMEOUT) {
+      console.warn(`[MCP Browser] Heartbeat timeout - no pong for ${timeSinceLastPong}ms, reconnecting`);
+      // Close connection and trigger reconnect
+      currentConnection.close();
+      stopHeartbeat();
+      chrome.alarms.create('reconnect', { delayInMinutes: 1 / 60 }); // 1 second
+      return;
+    }
+
+    // Send heartbeat with timestamp
     try {
-      currentConnection.send(JSON.stringify({ type: 'ping' }));
+      currentConnection.send(JSON.stringify({
+        type: 'heartbeat',
+        timestamp: Date.now()
+      }));
       console.log('[MCP Browser] Heartbeat sent');
     } catch (e) {
       console.warn('[MCP Browser] Heartbeat failed:', e);
@@ -384,6 +404,10 @@ async function connectToServer(port, serverInfo = null) {
       ws.onopen = async () => {
         clearTimeout(timeout);
         currentConnection = ws;
+
+        // Reset pong time on new connection
+        lastPongTime = Date.now();
+
         setupWebSocketHandlers(ws);
 
         // Update connection status
@@ -446,6 +470,14 @@ function setupWebSocketHandlers(ws) {
   ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
+
+      // Handle pong response
+      if (data.type === 'pong') {
+        lastPongTime = Date.now();
+        console.log('[MCP Browser] Pong received');
+        return; // Don't process further
+      }
+
       handleServerMessage(data);
     } catch (error) {
       console.error('[MCP Browser] Failed to parse server message:', error);

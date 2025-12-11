@@ -151,6 +151,15 @@ class WebSocketService:
             data = json.loads(message)
             message_type = data.get("type", "unknown")
 
+            # Handle heartbeat - respond with pong immediately
+            if message_type == "heartbeat":
+                pong_response = {
+                    "type": "pong",
+                    "timestamp": data.get("timestamp", 0)
+                }
+                await self.send_message(websocket, pong_response)
+                return
+
             # Handle server info request
             if message_type == "server_info":
                 import os
