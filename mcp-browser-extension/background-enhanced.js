@@ -33,6 +33,9 @@ let currentConnection = null;
 let messageQueue = [];
 let extensionState = 'starting'; // 'starting', 'scanning', 'idle', 'connected', 'error'
 
+// Active ports to content scripts for keepalive
+const activePorts = new Map(); // tabId -> port
+
 // Connection status
 const connectionStatus = {
   connected: false,
@@ -44,6 +47,35 @@ const connectionStatus = {
   connectionTime: null,
   availableServers: []
 };
+
+/**
+ * Handle keepalive port connections from content scripts.
+ * Maintaining open ports prevents service worker termination.
+ */
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name === 'keepalive') {
+    const tabId = port.sender?.tab?.id;
+    if (tabId) {
+      console.log(`[MCP Browser] Keepalive port connected from tab ${tabId}`);
+      activePorts.set(tabId, port);
+
+      port.onDisconnect.addListener(() => {
+        console.log(`[MCP Browser] Keepalive port disconnected from tab ${tabId}`);
+        activePorts.delete(tabId);
+      });
+
+      // Optional: Send acknowledgment
+      port.postMessage({ type: 'keepalive_ack' });
+    }
+  }
+});
+
+/**
+ * Get count of active keepalive ports
+ */
+function getActivePortCount() {
+  return activePorts.size;
+}
 
 /**
  * Chrome Alarms handler for persistent timers
@@ -564,6 +596,16 @@ async function flushMessageQueue() {
   await clearStoredQueue();
   console.log('[MCP Browser] Queue flush complete');
 }
+
+/**
+ * Clean up ports when tabs are closed
+ */
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (activePorts.has(tabId)) {
+    console.log(`[MCP Browser] Tab ${tabId} closed, removing port`);
+    activePorts.delete(tabId);
+  }
+});
 
 // Handle messages from popup and content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
