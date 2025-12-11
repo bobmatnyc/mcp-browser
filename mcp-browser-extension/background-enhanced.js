@@ -15,7 +15,8 @@ const STORAGE_KEYS = {
   MESSAGE_QUEUE: 'mcp_message_queue',
   LAST_CONNECTED_PORT: 'mcp_last_connected_port',
   LAST_CONNECTED_PROJECT: 'mcp_last_connected_project',
-  LAST_SEQUENCE: 'mcp_last_sequence'
+  LAST_SEQUENCE: 'mcp_last_sequence',
+  PORT_PROJECT_MAP: 'mcp_port_project_map'
 };
 
 // Max queue size to prevent storage bloat
@@ -33,6 +34,9 @@ let activeServers = new Map(); // port -> server info
 let currentConnection = null;
 let messageQueue = [];
 let extensionState = 'starting'; // 'starting', 'scanning', 'idle', 'connected', 'error'
+
+// Port to project mapping for faster reconnection
+let portProjectMap = {}; // port -> { project_id, project_name, project_path, last_seen }
 
 // Connection handshake state
 let connectionReady = false;
@@ -371,6 +375,52 @@ async function clearConnectionState() {
 }
 
 /**
+ * Load port-project mapping from storage
+ */
+async function loadPortProjectMap() {
+  try {
+    const result = await chrome.storage.local.get(STORAGE_KEYS.PORT_PROJECT_MAP);
+    portProjectMap = result[STORAGE_KEYS.PORT_PROJECT_MAP] || {};
+    console.log(`[MCP Browser] Loaded ${Object.keys(portProjectMap).length} port-project mappings`);
+  } catch (e) {
+    console.error('[MCP Browser] Failed to load port-project map:', e);
+  }
+}
+
+/**
+ * Save port-project mapping to storage
+ */
+async function savePortProjectMap() {
+  try {
+    await chrome.storage.local.set({ [STORAGE_KEYS.PORT_PROJECT_MAP]: portProjectMap });
+  } catch (e) {
+    console.error('[MCP Browser] Failed to save port-project map:', e);
+  }
+}
+
+/**
+ * Update port-project mapping from server info
+ */
+async function updatePortProjectMapping(port, serverInfo) {
+  portProjectMap[port] = {
+    project_id: serverInfo.project_id,
+    project_name: serverInfo.project_name,
+    project_path: serverInfo.project_path,
+    last_seen: Date.now()
+  };
+
+  await savePortProjectMap();
+
+  // Update badge tooltip with project name
+  const projectName = serverInfo.project_name || 'Unknown';
+  chrome.action.setTitle({
+    title: `MCP Browser: ${projectName} (port ${port})`
+  });
+
+  console.log(`[MCP Browser] Updated mapping: port ${port} → ${projectName}`);
+}
+
+/**
  * Update extension badge to reflect current status
  * States:
  * - RED: Not functional or error state
@@ -471,13 +521,22 @@ async function probePort(port) {
             ws.close();
             // Only accept servers with valid project information
             if (data.project_name && data.project_name !== 'Unknown') {
-              resolve({
+              const serverInfo = {
                 port: port,
                 projectName: data.project_name,
                 projectPath: data.project_path || '',
                 version: data.version || '1.0.0',
                 connected: false
-              });
+              };
+
+              // Update port-project mapping if identity is present
+              if (data.project_id) {
+                updatePortProjectMapping(port, data).catch(err => {
+                  console.error('[MCP Browser] Failed to update port mapping:', err);
+                });
+              }
+
+              resolve(serverInfo);
             } else {
               // Not a valid MCP Browser server
               ws.close();
@@ -631,6 +690,17 @@ function setupWebSocketHandlers(ws) {
         extensionState = 'connected';
         updateBadgeStatus();
 
+        // Update port-project mapping if identity is present
+        if (data.project_id) {
+          updatePortProjectMapping(connectionStatus.port, {
+            project_id: data.project_id,
+            project_name: data.project_name,
+            project_path: data.project_path || connectionStatus.projectPath
+          }).catch(err => {
+            console.error('[MCP Browser] Failed to update port mapping:', err);
+          });
+        }
+
         // Handle replayed messages if any
         if (data.replay && Array.isArray(data.replay)) {
           console.log(`[MCP Browser] Receiving ${data.replay.length} replayed messages`);
@@ -741,26 +811,56 @@ function setupWebSocketHandlers(ws) {
 }
 
 /**
+ * Try to connect to a specific port
+ */
+async function tryConnectToPort(port) {
+  const serverInfo = await probePort(port);
+  if (serverInfo) {
+    const connected = await connectToServer(port);
+    if (connected) {
+      console.log(`[MCP Browser] Connected to port ${port}`);
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Auto-connect to the best available server
  */
 async function autoConnect() {
   try {
     console.log('[MCP Browser] Auto-connect starting...');
 
+    // Load port mappings if not already loaded
+    if (Object.keys(portProjectMap).length === 0) {
+      await loadPortProjectMap();
+    }
+
     // First, try to reconnect to last known server
     const { port: lastPort, projectName: lastProject } = await loadConnectionState();
     if (lastPort) {
-      console.log(`[MCP Browser] Attempting reconnect to last server: port ${lastPort}`);
-      const serverInfo = await probePort(lastPort);
-      if (serverInfo) {
-        const connected = await connectToServer(lastPort, serverInfo);
-        if (connected) {
-          return;
-        }
+      console.log(`[MCP Browser] Trying last connected port: ${lastPort}`);
+      const connected = await tryConnectToPort(lastPort);
+      if (connected) return;
+    }
+
+    // Second, try known project ports (from mapping)
+    const knownPorts = Object.keys(portProjectMap).map(p => parseInt(p)).sort((a, b) => {
+      // Sort by last_seen, most recent first
+      return (portProjectMap[b]?.last_seen || 0) - (portProjectMap[a]?.last_seen || 0);
+    });
+
+    for (const port of knownPorts) {
+      if (port !== lastPort) { // Don't retry lastPort
+        console.log(`[MCP Browser] Trying known project port: ${port} (${portProjectMap[port]?.project_name})`);
+        const connected = await tryConnectToPort(port);
+        if (connected) return;
       }
     }
 
-    // If no last connection or it failed, scan for servers
+    // Fall back to full port scan
+    console.log('[MCP Browser] Known ports failed, scanning...');
     const servers = await scanForServers();
 
     if (servers.length === 0) {
@@ -939,6 +1039,9 @@ chrome.runtime.onInstalled.addListener(async () => {
   // Load persisted message queue
   await loadMessageQueue();
 
+  // Load port-project mappings
+  await loadPortProjectMap();
+
   // Inject content script into all existing tabs
   chrome.tabs.query({}, (tabs) => {
     tabs.forEach(tab => {
@@ -967,6 +1070,9 @@ chrome.runtime.onStartup.addListener(async () => {
 
   // Load persisted message queue
   await loadMessageQueue();
+
+  // Load port-project mappings
+  await loadPortProjectMap();
 
   autoConnect();
 
