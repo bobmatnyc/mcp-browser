@@ -53,6 +53,11 @@ class ExtensionTimeoutError(Exception):
     pass
 
 
+class BrowserNotAvailableError(Exception):
+    """Raised when browser is not available for CDP connection."""
+    pass
+
+
 class Capability(Flag):
     """Browser control capabilities using Flag for bitwise operations.
 
@@ -379,6 +384,119 @@ class BrowserController:
 
         except Exception as e:
             logger.error(f"Error closing CDP connection: {e}")
+
+    async def connect_to_existing_browser(self, cdp_port: int = 9222) -> Dict[str, Any]:
+        """Connect to existing Chrome browser via CDP.
+
+        Args:
+            cdp_port: Port where Chrome is running with CDP (default 9222)
+
+        Returns:
+            Dict with connection status, browser version, and page count:
+            {
+                "success": bool,
+                "browser_version": str,
+                "page_count": int,
+                "cdp_port": int,
+                "error": Optional[str]
+            }
+
+        Raises:
+            BrowserNotAvailableError: If Chrome is not running with CDP
+
+        Example:
+            # Start Chrome with: chrome --remote-debugging-port=9222
+            result = await controller.connect_to_existing_browser(9222)
+            if result["success"]:
+                print(f"Connected to {result['browser_version']}")
+        """
+        import aiohttp
+
+        # Check if Chrome is running with remote debugging using aiohttp
+        cdp_url = f"http://localhost:{cdp_port}/json/version"
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(cdp_url, timeout=aiohttp.ClientTimeout(total=5)) as response:
+                    if response.status != 200:
+                        raise BrowserNotAvailableError(
+                            f"CDP endpoint returned status {response.status}. "
+                            f"Ensure Chrome is running with --remote-debugging-port={cdp_port}"
+                        )
+
+                    version_info = await response.json()
+                    browser_version = version_info.get("Browser", "Unknown")
+
+        except aiohttp.ClientConnectionError:
+            raise BrowserNotAvailableError(
+                f"Cannot connect to Chrome on port {cdp_port}. "
+                f"Start Chrome with: chrome --remote-debugging-port={cdp_port}"
+            )
+        except asyncio.TimeoutError:
+            raise BrowserNotAvailableError(
+                f"Connection to Chrome on port {cdp_port} timed out. "
+                f"Ensure Chrome is running with --remote-debugging-port={cdp_port}"
+            )
+        except Exception as e:
+            raise BrowserNotAvailableError(
+                f"Failed to check CDP availability: {str(e)}"
+            )
+
+        # Connect via Playwright's connect_over_cdp
+        try:
+            if not PLAYWRIGHT_AVAILABLE:
+                return {
+                    "success": False,
+                    "error": "Playwright not installed. Install with: pip install playwright && playwright install",
+                    "browser_version": None,
+                    "page_count": 0,
+                    "cdp_port": cdp_port
+                }
+
+            # Initialize Playwright if needed
+            if not self.playwright:
+                self.playwright = await async_playwright().start()
+
+            # Connect to existing browser via CDP
+            endpoint = f"http://localhost:{cdp_port}"
+            logger.info(f"Connecting to browser via CDP: {endpoint}")
+
+            self.cdp_browser = await self.playwright.chromium.connect_over_cdp(endpoint)
+
+            # Count pages across all contexts
+            page_count = 0
+            if self.cdp_browser.contexts:
+                for context in self.cdp_browser.contexts:
+                    page_count += len(context.pages)
+
+                # Set first available page as active
+                if self.cdp_browser.contexts[0].pages:
+                    self.cdp_page = self.cdp_browser.contexts[0].pages[0]
+
+            logger.info(
+                f"CDP connection established: {browser_version}, "
+                f"{page_count} page(s) available"
+            )
+
+            return {
+                "success": True,
+                "browser_version": browser_version,
+                "page_count": page_count,
+                "cdp_port": cdp_port,
+                "error": None
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to connect to browser via CDP: {e}")
+            await self.close_cdp()
+
+            return {
+                "success": False,
+                "error": f"Failed to connect via CDP: {str(e)}",
+                "browser_version": browser_version,
+                "page_count": 0,
+                "cdp_port": cdp_port
+            }
 
     async def _has_cdp_connection(self) -> bool:
         """Check if CDP browser is connected and has pages.

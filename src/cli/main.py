@@ -16,6 +16,7 @@ from rich.panel import Panel
 from .._version import __version__
 from .commands import (
     browser,
+    connect,
     dashboard,
     doctor,
     extension,
@@ -185,6 +186,7 @@ def reference():
   [cyan]uninstall[/cyan]   - Remove MCP config from Claude
   [cyan]extension[/cyan]   - Manage Chrome extension
   [cyan]browser[/cyan]     - Browser interaction and testing
+  [cyan]connect[/cyan]     - Connect to existing Chrome via CDP
 
 [bold]Quick Start:[/bold]
   1. pip install mcp-browser
@@ -353,6 +355,7 @@ cli.add_command(install)
 cli.add_command(uninstall)
 cli.add_command(extension)
 cli.add_command(browser)
+cli.add_command(connect)
 
 
 def main():
