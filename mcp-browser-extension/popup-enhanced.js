@@ -1,100 +1,94 @@
 /**
- * Enhanced popup script for MCP Browser
+ * Enhanced popup script for MCP Browser - Connection Dashboard
  * Features:
- * - Multi-server display
- * - Project identification
- * - Server selection
- * Version: 1.0.4 - Auto-versioning enabled
+ * - Multi-connection display with detailed status
+ * - Unassigned tab management
+ * - Per-connection disconnect
+ * - Manual tab assignment
+ * - Auto-refresh dashboard
+ * Version: 2.0.0 - Connection Dashboard
  */
 
-let currentServers = [];
-let connectedPort = null;
+let currentConnections = [];
+let pendingTabs = [];
+let refreshInterval = null;
 
-// Update UI based on connection status
-function updateStatus() {
-  chrome.runtime.sendMessage({ type: 'get_status' }, (response) => {
-    if (!response) {
-      showError('Extension error');
-      return;
-    }
+/**
+ * Load complete dashboard state
+ */
+async function loadDashboard() {
+  try {
+    // Get overall status
+    const status = await sendMessage({ type: 'get_status' });
 
-    const statusIndicator = document.getElementById('status-indicator');
-    const statusText = document.getElementById('status-text');
-    const projectRow = document.getElementById('project-row');
-    const projectName = document.getElementById('project-name');
-    const portRow = document.getElementById('port-row');
-    const portValue = document.getElementById('port-value');
-    const messageCount = document.getElementById('message-count');
-    const disconnectButton = document.getElementById('disconnect-button');
+    // Get active connections
+    const connectionsResponse = await sendMessage({ type: 'get_connections' });
+    currentConnections = connectionsResponse?.connections || [];
 
-    if (response.connected) {
-      statusIndicator.className = 'status-indicator connected';
-      statusText.textContent = 'Connected';
-      connectedPort = response.port;
+    // Get pending/unassigned tabs
+    const pendingResponse = await sendMessage({ type: 'get_pending_tabs' });
+    pendingTabs = pendingResponse?.pendingTabs || [];
 
-      // Show project info
-      if (response.projectName) {
-        projectRow.style.display = 'flex';
-        projectName.textContent = response.projectName;
-      }
+    // Update all UI sections
+    updateOverallStatus(status);
+    renderConnections(currentConnections);
+    renderUnassignedTabs(pendingTabs);
 
-      // Show port
-      portRow.style.display = 'flex';
-      portValue.textContent = response.port;
-
-      // Show disconnect button
-      disconnectButton.style.display = 'block';
-
-      // Update message count
-      messageCount.textContent = response.messageCount || '0';
-
-      // Clear error
-      document.getElementById('error-container').innerHTML = '';
-
-      // Update server list to show connected state
-      updateServerList();
-    } else {
-      statusIndicator.className = 'status-indicator disconnected';
-      statusText.textContent = 'Disconnected';
-      projectRow.style.display = 'none';
-      portRow.style.display = 'none';
-      disconnectButton.style.display = 'none';
-      connectedPort = null;
-
-      if (response.lastError) {
-        showError(response.lastError);
-      }
-    }
-
-    // Update available servers if present
-    if (response.availableServers && response.availableServers.length > 0) {
-      // Filter to only show valid MCP Browser servers
-      const validServers = response.availableServers.filter(server => {
-        return server.projectName &&
-               server.projectName !== 'Unknown' &&
-               server.projectName !== 'Unknown Project' &&
-               !server.projectName.startsWith('Port ');
-      });
-      currentServers = validServers;
-      showServers(validServers);
-    }
-  });
+  } catch (error) {
+    console.error('[Popup] Failed to load dashboard:', error);
+    showError('Failed to load dashboard data');
+  }
 }
 
-// Show available servers
-function showServers(servers) {
-  const container = document.getElementById('servers-container');
-  const list = document.getElementById('servers-list');
+/**
+ * Update overall status indicators
+ */
+function updateOverallStatus(status) {
+  const statusIndicator = document.getElementById('status-indicator');
+  const statusText = document.getElementById('status-text');
+  const connectionCount = document.getElementById('connection-count');
+  const messageCount = document.getElementById('message-count');
 
-  // Filter out any servers without valid project names
-  const validServers = servers.filter(server => {
-    return server.projectName &&
-           server.projectName !== 'Unknown' &&
-           server.projectName !== 'Unknown Project' &&
-           !server.projectName.startsWith('Port ');
-  });
+  if (!status) {
+    statusIndicator.className = 'status-indicator disconnected';
+    statusText.textContent = 'Error';
+    connectionCount.textContent = '0';
+    messageCount.textContent = '0';
+    return;
+  }
 
-  if (!validServers || validServers.length === 0) {
+  // Update connection count
+  const activeCount = status.totalConnections || 0;
+  connectionCount.textContent = activeCount;
+
+  // Update status indicator
+  if (activeCount > 0) {
+    statusIndicator.className = 'status-indicator connected';
+    statusText.textContent = `Connected (${activeCount})`;
+  } else {
+    statusIndicator.className = 'status-indicator disconnected';
+    statusText.textContent = 'No Connections';
+  }
+
+  // Update message count
+  messageCount.textContent = status.messageCount || '0';
+
+  // Clear error if connected
+  if (activeCount > 0) {
+    document.getElementById('error-container').innerHTML = '';
+  } else if (status.lastError) {
+    showError(status.lastError);
+  }
+}
+
+/**
+ * Render active connections
+ */
+function renderConnections(connections) {
+  const container = document.getElementById('connections-container');
+  const list = document.getElementById('connections-list');
+
+  if (!connections || connections.length === 0) {
     container.style.display = 'none';
     return;
   }
@@ -102,98 +96,305 @@ function showServers(servers) {
   container.style.display = 'block';
   list.innerHTML = '';
 
-  validServers.forEach(server => {
-    const item = document.createElement('div');
-    item.className = 'server-item';
-
-    if (server.port === connectedPort) {
-      item.className += ' connected';
-    }
-
-    item.innerHTML = `
-      <div style="display: flex; align-items: center; margin-bottom: 4px;">
-        <span class="server-port">${server.port}</span>
-        <span class="server-project">${server.projectName}</span>
-      </div>
-      <div class="server-path">${server.projectPath || 'No path specified'}</div>
-    `;
-
-    item.onclick = () => connectToServer(server);
-    list.appendChild(item);
+  connections.forEach(connection => {
+    const card = createConnectionCard(connection);
+    list.appendChild(card);
   });
 }
 
-// Connect to a specific server
-function connectToServer(server) {
-  if (server.port === connectedPort) {
-    return; // Already connected
+/**
+ * Create connection card element
+ */
+function createConnectionCard(connection) {
+  const card = document.createElement('div');
+  card.className = 'connection-card';
+  if (!connection.ready) {
+    card.classList.add('disconnected');
   }
 
-  const statusText = document.getElementById('status-text');
-  statusText.textContent = 'Connecting...';
+  // Connection header
+  const header = document.createElement('div');
+  header.className = 'connection-header';
 
-  chrome.runtime.sendMessage({
-    type: 'connect_to_server',
-    port: server.port,
-    serverInfo: server
-  }, (response) => {
-    if (response && response.success) {
-      updateStatus();
-    } else {
-      showError(`Failed to connect to port ${server.port}`);
-      updateStatus();
-    }
+  const info = document.createElement('div');
+  info.className = 'connection-info';
+
+  const title = document.createElement('div');
+  title.className = 'connection-title';
+
+  // Status dot
+  const statusDot = document.createElement('span');
+  statusDot.className = `connection-status-dot ${connection.ready ? '' : 'disconnected'}`;
+  title.appendChild(statusDot);
+
+  // Project name
+  const projectName = document.createElement('span');
+  projectName.className = 'connection-project';
+  projectName.textContent = connection.projectName || `Port ${connection.port}`;
+  title.appendChild(projectName);
+
+  // Expand indicator
+  const expandIndicator = document.createElement('span');
+  expandIndicator.className = 'expand-indicator';
+  expandIndicator.textContent = '▶';
+  title.appendChild(expandIndicator);
+
+  info.appendChild(title);
+
+  // Port and tab count
+  const meta = document.createElement('div');
+  meta.style.display = 'flex';
+  meta.style.gap = '8px';
+  meta.style.alignItems = 'center';
+
+  const portBadge = document.createElement('span');
+  portBadge.className = 'connection-port';
+  portBadge.textContent = `Port ${connection.port}`;
+  meta.appendChild(portBadge);
+
+  const tabBadge = document.createElement('span');
+  tabBadge.className = 'tab-count-badge';
+  tabBadge.textContent = `${connection.tabCount} tab${connection.tabCount !== 1 ? 's' : ''}`;
+  meta.appendChild(tabBadge);
+
+  if (connection.isPrimary) {
+    const primaryBadge = document.createElement('span');
+    primaryBadge.style.fontSize = '10px';
+    primaryBadge.style.opacity = '0.7';
+    primaryBadge.textContent = '(primary)';
+    meta.appendChild(primaryBadge);
+  }
+
+  info.appendChild(meta);
+  header.appendChild(info);
+
+  // Disconnect button
+  const disconnectBtn = document.createElement('button');
+  disconnectBtn.className = 'disconnect-btn';
+  disconnectBtn.textContent = '×';
+  disconnectBtn.title = 'Disconnect';
+  disconnectBtn.onclick = (e) => {
+    e.stopPropagation();
+    handleDisconnect(connection.port);
+  };
+  header.appendChild(disconnectBtn);
+
+  card.appendChild(header);
+
+  // Connection details (expandable)
+  const details = document.createElement('div');
+  details.className = 'connection-details';
+
+  if (connection.projectPath) {
+    const pathRow = document.createElement('div');
+    pathRow.className = 'connection-detail-row';
+    pathRow.innerHTML = `<span>Path:</span><span style="font-size: 10px; opacity: 0.8;">${truncate(connection.projectPath, 40)}</span>`;
+    details.appendChild(pathRow);
+  }
+
+  const queueRow = document.createElement('div');
+  queueRow.className = 'connection-detail-row';
+  queueRow.innerHTML = `<span>Queue Size:</span><span>${connection.queueSize || 0}</span>`;
+  details.appendChild(queueRow);
+
+  const statusRow = document.createElement('div');
+  statusRow.className = 'connection-detail-row';
+  statusRow.innerHTML = `<span>Status:</span><span>${connection.ready ? 'Ready' : 'Connecting...'}</span>`;
+  details.appendChild(statusRow);
+
+  card.appendChild(details);
+
+  // Toggle details on header click
+  header.onclick = () => {
+    details.classList.toggle('expanded');
+    expandIndicator.classList.toggle('expanded');
+  };
+
+  return card;
+}
+
+/**
+ * Render unassigned tabs
+ */
+function renderUnassignedTabs(tabs) {
+  const container = document.getElementById('unassigned-container');
+  const list = document.getElementById('unassigned-list');
+  const count = document.getElementById('unassigned-count');
+
+  count.textContent = tabs.length;
+
+  if (!tabs || tabs.length === 0) {
+    container.style.display = 'none';
+    return;
+  }
+
+  container.style.display = 'block';
+  list.innerHTML = '';
+
+  tabs.forEach(tab => {
+    const tabCard = createUnassignedTabCard(tab);
+    list.appendChild(tabCard);
   });
 }
 
-// Scan for available servers
-function scanServers() {
-  const statusText = document.getElementById('status-text');
+/**
+ * Create unassigned tab card
+ */
+function createUnassignedTabCard(tab) {
+  const card = document.createElement('div');
+  card.className = 'unassigned-tab';
+
+  // Tab info
+  const info = document.createElement('div');
+  info.className = 'unassigned-tab-info';
+
+  const title = document.createElement('div');
+  title.className = 'unassigned-tab-title';
+  title.textContent = getTitleFromUrl(tab.url);
+  title.title = getTitleFromUrl(tab.url);
+  info.appendChild(title);
+
+  const url = document.createElement('div');
+  url.className = 'unassigned-tab-url';
+  url.textContent = truncate(tab.url, 50);
+  url.title = tab.url;
+  info.appendChild(url);
+
+  card.appendChild(info);
+
+  // Backend selection dropdown
+  const dropdown = document.createElement('select');
+  dropdown.className = 'tab-assign-dropdown';
+
+  const defaultOption = document.createElement('option');
+  defaultOption.value = '';
+  defaultOption.textContent = 'Select...';
+  dropdown.appendChild(defaultOption);
+
+  currentConnections.forEach(conn => {
+    const option = document.createElement('option');
+    option.value = conn.port;
+    option.textContent = `${conn.projectName} (${conn.port})`;
+    dropdown.appendChild(option);
+  });
+
+  card.appendChild(dropdown);
+
+  // Assign button
+  const assignBtn = document.createElement('button');
+  assignBtn.className = 'assign-btn';
+  assignBtn.textContent = 'Assign';
+  assignBtn.disabled = true;
+
+  dropdown.onchange = () => {
+    assignBtn.disabled = !dropdown.value;
+  };
+
+  assignBtn.onclick = () => {
+    if (dropdown.value) {
+      handleAssignTab(tab.tabId, parseInt(dropdown.value));
+    }
+  };
+
+  card.appendChild(assignBtn);
+
+  return card;
+}
+
+/**
+ * Handle disconnect from backend
+ */
+async function handleDisconnect(port) {
+  try {
+    const response = await sendMessage({
+      type: 'disconnect',
+      port: port
+    });
+
+    if (response) {
+      console.log(`[Popup] Disconnected from port ${port}`);
+      // Refresh dashboard immediately
+      await loadDashboard();
+    }
+  } catch (error) {
+    console.error(`[Popup] Failed to disconnect from port ${port}:`, error);
+    showError(`Failed to disconnect from port ${port}`);
+  }
+}
+
+/**
+ * Handle manual tab assignment
+ */
+async function handleAssignTab(tabId, port) {
+  try {
+    const response = await sendMessage({
+      type: 'assign_tab_to_port',
+      tabId: tabId,
+      port: port
+    });
+
+    if (response && response.success) {
+      console.log(`[Popup] Assigned tab ${tabId} to port ${port}`);
+      // Refresh dashboard immediately
+      await loadDashboard();
+    } else {
+      showError(`Failed to assign tab to port ${port}`);
+    }
+  } catch (error) {
+    console.error(`[Popup] Failed to assign tab ${tabId}:`, error);
+    showError(`Failed to assign tab`);
+  }
+}
+
+/**
+ * Handle scan for backends
+ */
+async function handleScanBackends() {
   const scanButton = document.getElementById('scan-button');
+  const originalText = scanButton.textContent;
 
-  statusText.textContent = 'Scanning...';
-  scanButton.disabled = true;
+  try {
+    scanButton.disabled = true;
+    scanButton.classList.add('scanning');
+    scanButton.textContent = '🔄 Scanning...';
 
-  chrome.runtime.sendMessage({ type: 'scan_servers' }, (response) => {
-    scanButton.disabled = false;
+    const response = await sendMessage({ type: 'scan_servers' });
 
     if (response && response.servers) {
-      // Filter to only valid MCP Browser servers
-      const validServers = response.servers.filter(server => {
-        return server.projectName &&
-               server.projectName !== 'Unknown' &&
-               server.projectName !== 'Unknown Project' &&
-               !server.projectName.startsWith('Port ');
-      });
-
-      currentServers = validServers;
-
-      if (validServers.length === 0) {
-        showError('No MCP Browser servers found');
-        document.getElementById('servers-container').style.display = 'none';
-      } else {
-        showServers(validServers);
-
-        // Auto-connect if only one server
-        if (validServers.length === 1 && !connectedPort) {
-          connectToServer(validServers[0]);
-        }
-      }
+      console.log(`[Popup] Found ${response.servers.length} servers`);
     }
 
-    updateStatus();
+    // Refresh dashboard after scan
+    await loadDashboard();
+
+  } catch (error) {
+    console.error('[Popup] Scan failed:', error);
+    showError('Failed to scan for backends');
+  } finally {
+    scanButton.disabled = false;
+    scanButton.classList.remove('scanning');
+    scanButton.textContent = originalText;
+  }
+}
+
+/**
+ * Send message to background script with promise wrapper
+ */
+function sendMessage(message) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(message, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError);
+      } else {
+        resolve(response);
+      }
+    });
   });
 }
 
-// Disconnect from current server
-function disconnect() {
-  chrome.runtime.sendMessage({ type: 'disconnect' }, () => {
-    updateStatus();
-    scanServers(); // Rescan after disconnect
-  });
-}
-
-// Show error message
+/**
+ * Show error message
+ */
 function showError(message) {
   const errorContainer = document.getElementById('error-container');
   errorContainer.innerHTML = `
@@ -201,16 +402,66 @@ function showError(message) {
       ${message}
     </div>
   `;
+
+  // Auto-hide after 5 seconds
+  setTimeout(() => {
+    errorContainer.innerHTML = '';
+  }, 5000);
 }
 
-// Update server list display
-function updateServerList() {
-  if (currentServers.length > 0) {
-    showServers(currentServers);
+/**
+ * Truncate text to max length
+ */
+function truncate(text, maxLength) {
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength - 3) + '...';
+}
+
+/**
+ * Get readable title from URL
+ */
+function getTitleFromUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname;
+    const path = urlObj.pathname;
+
+    if (path && path !== '/') {
+      return `${hostname}${path}`;
+    }
+    return hostname;
+  } catch (e) {
+    return url;
   }
 }
 
-// Test button handler
+/**
+ * Start auto-refresh
+ */
+function startAutoRefresh() {
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+  }
+
+  refreshInterval = setInterval(() => {
+    loadDashboard();
+  }, 2000);
+}
+
+/**
+ * Stop auto-refresh
+ */
+function stopAutoRefresh() {
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+    refreshInterval = null;
+  }
+}
+
+// Event Listeners
+document.getElementById('scan-button').addEventListener('click', handleScanBackends);
+
 document.getElementById('test-button').addEventListener('click', () => {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs[0]) {
@@ -230,22 +481,17 @@ document.getElementById('test-button').addEventListener('click', () => {
         setTimeout(() => {
           button.textContent = 'Generate Test Message';
           button.disabled = false;
-          updateStatus();
         }, 1500);
       });
     }
   });
 });
 
-// Scan button handler
-document.getElementById('scan-button').addEventListener('click', scanServers);
-
-// Disconnect button handler
-document.getElementById('disconnect-button').addEventListener('click', disconnect);
+// Cleanup on popup close
+window.addEventListener('unload', () => {
+  stopAutoRefresh();
+});
 
 // Initial load
-updateStatus();
-scanServers(); // Auto-scan on popup open
-
-// Update status periodically
-setInterval(updateStatus, 2000);
+loadDashboard();
+startAutoRefresh();

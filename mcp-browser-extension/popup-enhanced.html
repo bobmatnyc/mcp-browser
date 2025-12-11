@@ -2,11 +2,11 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>MCP Browser Status</title>
+  <title>MCP Browser Dashboard</title>
   <style>
     body {
-      width: 350px;
-      min-height: 250px;
+      width: 450px;
+      min-height: 300px;
       margin: 0;
       padding: 16px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -27,59 +27,6 @@
       padding: 12px;
       margin-bottom: 12px;
       backdrop-filter: blur(10px);
-    }
-
-    .servers-container {
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 12px;
-      backdrop-filter: blur(10px);
-      max-height: 200px;
-      overflow-y: auto;
-    }
-
-    .server-item {
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 6px;
-      padding: 10px;
-      margin-bottom: 8px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      border: 2px solid transparent;
-    }
-
-    .server-item:hover {
-      background: rgba(255, 255, 255, 0.2);
-      transform: translateX(2px);
-    }
-
-    .server-item.connected {
-      border-color: #4CAF50;
-      background: rgba(76, 175, 80, 0.2);
-    }
-
-    .server-port {
-      font-weight: bold;
-      font-size: 14px;
-      display: inline-block;
-      background: rgba(255, 255, 255, 0.2);
-      padding: 2px 8px;
-      border-radius: 4px;
-      margin-right: 8px;
-    }
-
-    .server-project {
-      font-weight: 600;
-      margin-bottom: 4px;
-    }
-
-    .server-path {
-      font-size: 11px;
-      opacity: 0.8;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
     }
 
     .status-row {
@@ -117,6 +64,250 @@
       box-shadow: 0 0 10px rgba(244, 67, 54, 0.6);
     }
 
+    /* Active Connections Section */
+    .connections-container {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      backdrop-filter: blur(10px);
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      opacity: 0.9;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .connection-card {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 8px;
+      border: 2px solid rgba(76, 175, 80, 0.5);
+      position: relative;
+      transition: all 0.3s ease;
+    }
+
+    .connection-card:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: translateX(2px);
+    }
+
+    .connection-card.disconnected {
+      border-color: rgba(244, 67, 54, 0.5);
+      opacity: 0.7;
+    }
+
+    .connection-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+
+    .connection-info {
+      flex: 1;
+    }
+
+    .connection-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .connection-status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #4CAF50;
+      box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
+    }
+
+    .connection-status-dot.disconnected {
+      background-color: #F44336;
+      box-shadow: 0 0 8px rgba(244, 67, 54, 0.6);
+    }
+
+    .connection-project {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .connection-port {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .tab-count-badge {
+      display: inline-block;
+      background: rgba(76, 175, 80, 0.3);
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .disconnect-btn {
+      background: rgba(244, 67, 54, 0.2);
+      border: 1px solid rgba(244, 67, 54, 0.5);
+      color: white;
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .disconnect-btn:hover {
+      background: rgba(244, 67, 54, 0.4);
+      transform: scale(1.1);
+    }
+
+    .connection-details {
+      display: none;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+      font-size: 12px;
+    }
+
+    .connection-details.expanded {
+      display: block;
+    }
+
+    .connection-detail-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 4px 0;
+      opacity: 0.9;
+    }
+
+    .connection-path {
+      font-size: 11px;
+      opacity: 0.8;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin-top: 4px;
+    }
+
+    /* Unassigned Tabs Section */
+    .unassigned-container {
+      background: rgba(255, 193, 7, 0.15);
+      border: 1px solid rgba(255, 193, 7, 0.3);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      backdrop-filter: blur(10px);
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .unassigned-tab {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      padding: 8px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .unassigned-tab-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .unassigned-tab-title {
+      font-size: 12px;
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin-bottom: 2px;
+    }
+
+    .unassigned-tab-url {
+      font-size: 10px;
+      opacity: 0.7;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tab-assign-dropdown {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+      min-width: 80px;
+    }
+
+    .tab-assign-dropdown option {
+      background: #764ba2;
+      color: white;
+    }
+
+    .assign-btn {
+      background: rgba(76, 175, 80, 0.3);
+      border: 1px solid rgba(76, 175, 80, 0.5);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .assign-btn:hover {
+      background: rgba(76, 175, 80, 0.5);
+      transform: scale(1.05);
+    }
+
+    .assign-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .no-unassigned {
+      text-align: center;
+      padding: 12px;
+      opacity: 0.7;
+      font-size: 12px;
+    }
+
+    .no-connections {
+      text-align: center;
+      padding: 20px;
+      opacity: 0.7;
+      font-size: 13px;
+    }
+
+    /* Action Buttons */
     .action-button {
       width: 100%;
       padding: 10px;
@@ -141,20 +332,8 @@
       cursor: not-allowed;
     }
 
-    .section-title {
-      font-size: 12px;
-      font-weight: 600;
-      margin-bottom: 8px;
-      opacity: 0.9;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .message-count {
-      text-align: center;
-      margin-top: 16px;
-      font-size: 12px;
-      opacity: 0.8;
+    .action-button.scanning {
+      background: rgba(255, 193, 7, 0.3);
     }
 
     .error-message {
@@ -166,74 +345,93 @@
       font-size: 12px;
     }
 
-    .no-servers {
+    .message-count {
       text-align: center;
-      padding: 20px;
-      opacity: 0.7;
-      font-size: 13px;
+      margin-top: 16px;
+      font-size: 12px;
+      opacity: 0.8;
     }
 
     /* Scrollbar styling */
-    .servers-container::-webkit-scrollbar {
+    .connections-container::-webkit-scrollbar,
+    .unassigned-container::-webkit-scrollbar {
       width: 6px;
     }
 
-    .servers-container::-webkit-scrollbar-track {
+    .connections-container::-webkit-scrollbar-track,
+    .unassigned-container::-webkit-scrollbar-track {
       background: rgba(255, 255, 255, 0.1);
       border-radius: 3px;
     }
 
-    .servers-container::-webkit-scrollbar-thumb {
+    .connections-container::-webkit-scrollbar-thumb,
+    .unassigned-container::-webkit-scrollbar-thumb {
       background: rgba(255, 255, 255, 0.3);
       border-radius: 3px;
     }
 
-    .servers-container::-webkit-scrollbar-thumb:hover {
+    .connections-container::-webkit-scrollbar-thumb:hover,
+    .unassigned-container::-webkit-scrollbar-thumb:hover {
       background: rgba(255, 255, 255, 0.4);
+    }
+
+    .expand-indicator {
+      font-size: 10px;
+      margin-left: 4px;
+      transition: transform 0.2s ease;
+    }
+
+    .expand-indicator.expanded {
+      transform: rotate(90deg);
     }
   </style>
 </head>
 <body>
-  <h1>🌐 MCP Browser</h1>
+  <h1>🌐 MCP Browser Dashboard</h1>
 
-  <!-- Current Connection Status -->
+  <!-- Overall Status -->
   <div class="status-container">
     <div class="status-row">
-      <span class="status-label">Status:</span>
+      <span class="status-label">System Status:</span>
       <span class="status-value">
         <span id="status-indicator" class="status-indicator disconnected"></span>
-        <span id="status-text">Scanning...</span>
+        <span id="status-text">Initializing...</span>
       </span>
     </div>
-    <div class="status-row" id="project-row" style="display: none;">
-      <span class="status-label">Project:</span>
-      <span class="status-value" id="project-name">-</span>
-    </div>
-    <div class="status-row" id="port-row" style="display: none;">
-      <span class="status-label">Port:</span>
-      <span class="status-value" id="port-value">-</span>
+    <div class="status-row">
+      <span class="status-label">Active Connections:</span>
+      <span class="status-value" id="connection-count">0</span>
     </div>
     <div class="status-row">
-      <span class="status-label">Messages:</span>
+      <span class="status-label">Total Messages:</span>
       <span class="status-value" id="message-count">0</span>
     </div>
   </div>
 
-  <!-- Available Servers -->
-  <div class="servers-container" id="servers-container" style="display: none;">
-    <div class="section-title">Available Servers</div>
-    <div id="servers-list"></div>
+  <!-- Active Connections -->
+  <div id="connections-container" class="connections-container" style="display: none;">
+    <div class="section-title">Active Connections</div>
+    <div id="connections-list">
+      <!-- Dynamically populated connection cards -->
+    </div>
+  </div>
+
+  <!-- Unassigned Tabs -->
+  <div id="unassigned-container" class="unassigned-container" style="display: none;">
+    <div class="section-title">Unassigned Tabs (<span id="unassigned-count">0</span>)</div>
+    <div id="unassigned-list">
+      <!-- Tabs awaiting backend assignment -->
+    </div>
   </div>
 
   <!-- Action Buttons -->
-  <button id="scan-button" class="action-button">🔍 Scan for Servers</button>
-  <button id="disconnect-button" class="action-button" style="display: none;">Disconnect</button>
+  <button id="scan-button" class="action-button">🔍 Scan for Backends</button>
   <button id="test-button" class="action-button">Generate Test Message</button>
 
   <div id="error-container"></div>
 
   <div class="message-count">
-    Console capture active on <strong>active tab only</strong>
+    Dashboard auto-refreshes every 2 seconds
   </div>
 
   <script src="popup-enhanced.js"></script>
