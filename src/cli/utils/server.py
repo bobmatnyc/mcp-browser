@@ -171,17 +171,28 @@ class BrowserMCPServer:
         # Register screenshot service
         self.container.register("screenshot_service", lambda c: ScreenshotService())
 
+        # Register capability detector
+        async def create_capability_detector(c):
+            browser_controller = await c.get("browser_controller")
+            # Import here to avoid circular dependency
+            from ...services.browser_controller import CapabilityDetector
+            return CapabilityDetector(browser_controller)
+
+        self.container.register("capability_detector", create_capability_detector)
+
         # Register MCP service with dependencies
         async def create_mcp_service(c):
             browser = await c.get("browser_service")
             screenshot = await c.get("screenshot_service")
             dom_interaction = await c.get("dom_interaction_service")
             browser_controller = await c.get("browser_controller")
+            capability_detector = await c.get("capability_detector")
             return MCPService(
                 browser_service=browser,
                 screenshot_service=screenshot,
                 dom_interaction_service=dom_interaction,
                 browser_controller=browser_controller,
+                capability_detector=capability_detector,
             )
 
         self.container.register("mcp_service", create_mcp_service)
@@ -439,12 +450,19 @@ class BrowserMCPServer:
                 config=self.config,
             )
 
+        # Create capability detector
+        capability_detector = None
+        if browser_controller:
+            from ...services.browser_controller import CapabilityDetector
+            capability_detector = CapabilityDetector(browser_controller)
+
         # Create MCP service with dependencies
         mcp = MCPService(
             browser_service=browser,
             screenshot_service=screenshot,
             dom_interaction_service=dom_interaction,
             browser_controller=browser_controller,
+            capability_detector=capability_detector,
         )
 
         # Note: We don't start WebSocket server in MCP mode

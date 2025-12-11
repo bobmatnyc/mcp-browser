@@ -28,6 +28,7 @@ methods by implementing same interface pattern.
 
 import asyncio
 import logging
+from enum import Flag, auto
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,181 @@ class ExtensionNotConnectedError(Exception):
 class ExtensionTimeoutError(Exception):
     """Raised when extension operation times out."""
     pass
+
+
+class Capability(Flag):
+    """Browser control capabilities using Flag for bitwise operations.
+
+    Capabilities can be combined using bitwise OR (|) and checked using bitwise AND (&).
+    Example: EXTENSION_CAPS = CONSOLE_CAPTURE | MULTI_TAB | DOM_INTERACTION
+    """
+    CONSOLE_CAPTURE = auto()  # Capture console logs from browser
+    MULTI_TAB = auto()  # Manage multiple tabs
+    DOM_INTERACTION = auto()  # Click, fill, get elements
+    SCREENSHOTS = auto()  # Capture screenshots
+    CRASH_RECOVERY = auto()  # Recover from browser crashes
+    CROSS_BROWSER = auto()  # Support multiple browser types
+
+
+# Capability sets for each control method
+EXTENSION_CAPS = (
+    Capability.CONSOLE_CAPTURE
+    | Capability.MULTI_TAB
+    | Capability.DOM_INTERACTION
+)
+
+CDP_CAPS = (
+    Capability.DOM_INTERACTION
+    | Capability.SCREENSHOTS
+    | Capability.CRASH_RECOVERY
+    | Capability.CROSS_BROWSER
+)
+
+APPLESCRIPT_CAPS = Capability.DOM_INTERACTION
+
+
+class CapabilityDetector:
+    """Detects available browser control capabilities.
+
+    Checks which control methods are available and reports their capabilities.
+    Capabilities update dynamically based on active connections.
+
+    Example:
+        detector = CapabilityDetector(browser_controller)
+        capabilities = await detector.detect()
+        if Capability.CONSOLE_CAPTURE in capabilities:
+            print("Console capture available!")
+
+        report = await detector.get_capability_report()
+        # Returns human-readable capability information
+    """
+
+    def __init__(self, browser_controller: 'BrowserController'):
+        """Initialize capability detector.
+
+        Args:
+            browser_controller: BrowserController instance to inspect
+        """
+        self.controller = browser_controller
+
+    async def detect(self) -> Capability:
+        """Detect available capabilities based on active connections.
+
+        Returns:
+            Combined Capability flags representing available capabilities
+
+        Example:
+            caps = await detector.detect()
+            # caps might be: CONSOLE_CAPTURE | MULTI_TAB | DOM_INTERACTION
+        """
+        available = Capability(0)  # Start with no capabilities
+
+        # Check extension connection (all ports)
+        has_extension = await self._has_any_extension_connection()
+        if has_extension:
+            available |= EXTENSION_CAPS
+
+        # Check CDP connection
+        has_cdp = await self.controller._has_cdp_connection()
+        if has_cdp:
+            available |= CDP_CAPS
+
+        # Check AppleScript availability
+        has_applescript = self._has_applescript()
+        if has_applescript:
+            available |= APPLESCRIPT_CAPS
+
+        return available
+
+    async def get_capability_report(self) -> Dict[str, Any]:
+        """Get human-readable capability report.
+
+        Returns:
+            Dictionary with capability details:
+            {
+                "capabilities": ["CONSOLE_CAPTURE", "MULTI_TAB", ...],
+                "methods": {
+                    "extension": {"available": bool, "capabilities": [...]},
+                    "cdp": {"available": bool, "capabilities": [...]},
+                    "applescript": {"available": bool, "capabilities": [...]}
+                },
+                "summary": "human-readable summary"
+            }
+        """
+        capabilities = await self.detect()
+
+        # Check individual methods
+        has_extension = await self._has_any_extension_connection()
+        has_cdp = await self.controller._has_cdp_connection()
+        has_applescript = self._has_applescript()
+
+        # Build capability list
+        capability_names = []
+        for cap in Capability:
+            if cap in capabilities:
+                capability_names.append(cap.name)
+
+        # Build method details
+        methods = {
+            "extension": {
+                "available": has_extension,
+                "capabilities": [c.name for c in Capability if c in EXTENSION_CAPS],
+                "description": "Browser extension (WebSocket) - best performance"
+            },
+            "cdp": {
+                "available": has_cdp,
+                "capabilities": [c.name for c in Capability if c in CDP_CAPS],
+                "description": "Chrome DevTools Protocol - cross-platform"
+            },
+            "applescript": {
+                "available": has_applescript,
+                "capabilities": [c.name for c in Capability if c in APPLESCRIPT_CAPS],
+                "description": "AppleScript (macOS) - reliable fallback"
+            }
+        }
+
+        # Build summary
+        active_methods = [name for name, info in methods.items() if info["available"]]
+        if not active_methods:
+            summary = "No browser control methods available. Install extension or start browser with CDP."
+        elif len(active_methods) == 1:
+            summary = f"Using {active_methods[0]} for browser control."
+        else:
+            summary = f"Multiple methods available: {', '.join(active_methods)}. Using automatic fallback."
+
+        return {
+            "capabilities": capability_names,
+            "methods": methods,
+            "summary": summary,
+            "active_methods": active_methods
+        }
+
+    async def _has_any_extension_connection(self) -> bool:
+        """Check if any browser extension is connected.
+
+        Returns:
+            True if at least one extension connection exists
+        """
+        if not self.controller.browser_service:
+            return False
+
+        try:
+            # Check if browser_state has any active connections
+            connections = self.controller.browser_service.browser_state.connections
+            return len(connections) > 0
+        except Exception as e:
+            logger.debug(f"Error checking extension connections: {e}")
+            return False
+
+    def _has_applescript(self) -> bool:
+        """Check if AppleScript is available.
+
+        Returns:
+            True if running on macOS with AppleScript service
+        """
+        if not self.controller.applescript:
+            return False
+        return self.controller.applescript.is_macos
 
 
 class BrowserController:

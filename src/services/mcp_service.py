@@ -18,6 +18,7 @@ class MCPService:
         screenshot_service=None,
         dom_interaction_service=None,
         browser_controller=None,
+        capability_detector=None,
     ):
         """Initialize MCP service.
 
@@ -26,11 +27,13 @@ class MCPService:
             screenshot_service: Screenshot service for captures
             dom_interaction_service: DOM interaction service for element manipulation
             browser_controller: Optional BrowserController for AppleScript fallback
+            capability_detector: Optional CapabilityDetector for capability reporting
         """
         self.browser_service = browser_service
         self.screenshot_service = screenshot_service
         self.dom_interaction_service = dom_interaction_service
         self.browser_controller = browser_controller
+        self.capability_detector = capability_detector
         # Initialize server with version info
         self.server = Server(
             name="mcp-browser",
@@ -314,6 +317,15 @@ class MCPService:
                         "required": ["port"],
                     },
                 ),
+                Tool(
+                    name="get_capabilities",
+                    description="Get current browser control capabilities and available methods",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {},
+                        "required": [],
+                    },
+                ),
             ]
 
         @self.server.call_tool()
@@ -344,6 +356,8 @@ class MCPService:
                 return await self._handle_select_option(arguments)
             elif name == "browser_extract_content":
                 return await self._handle_extract_content(arguments)
+            elif name == "get_capabilities":
+                return await self._handle_get_capabilities(arguments)
             else:
                 return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
@@ -838,6 +852,67 @@ class MCPService:
                 TextContent(
                     type="text",
                     text=f"Failed to extract content: {result.get('error', 'Unknown error')}",
+                )
+            ]
+
+    async def _handle_get_capabilities(
+        self, arguments: Dict[str, Any]
+    ) -> List[TextContent]:
+        """Handle capability detection request.
+
+        Args:
+            arguments: Tool arguments (empty for this tool)
+
+        Returns:
+            List of text content responses
+        """
+        if not self.capability_detector:
+            return [
+                TextContent(
+                    type="text",
+                    text="Capability detection not available (detector not initialized)"
+                )
+            ]
+
+        try:
+            report = await self.capability_detector.get_capability_report()
+
+            # Format the report nicely
+            output_lines = [
+                "# Browser Control Capabilities",
+                "",
+                f"**Summary:** {report['summary']}",
+                "",
+                "## Available Capabilities",
+                ""
+            ]
+
+            if report['capabilities']:
+                for cap in report['capabilities']:
+                    output_lines.append(f"- {cap}")
+            else:
+                output_lines.append("- None")
+
+            output_lines.extend(["", "## Control Methods", ""])
+
+            for method_name, method_info in report['methods'].items():
+                status = "✓ Available" if method_info['available'] else "✗ Unavailable"
+                output_lines.append(f"### {method_name.title()} {status}")
+                output_lines.append(f"*{method_info['description']}*")
+                output_lines.append("")
+                output_lines.append("**Capabilities:**")
+                for cap in method_info['capabilities']:
+                    output_lines.append(f"- {cap}")
+                output_lines.append("")
+
+            return [TextContent(type="text", text="\n".join(output_lines))]
+
+        except Exception as e:
+            logger.exception("Failed to get capabilities")
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Failed to detect capabilities: {str(e)}"
                 )
             ]
 
