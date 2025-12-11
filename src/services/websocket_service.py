@@ -3,7 +3,8 @@
 import asyncio
 import json
 import logging
-from typing import Any, Callable, Dict, Optional, Set
+from collections import deque
+from typing import Any, Callable, Dict, List, Optional, Set
 
 import websockets
 from websockets.server import WebSocketServerProtocol
@@ -32,6 +33,10 @@ class WebSocketService:
         self._connections: Set[WebSocketServerProtocol] = set()
         self._message_handlers: Dict[str, Callable] = {}
         self._connection_handlers: Dict[str, Callable] = {}
+
+        # State recovery components
+        self.message_buffer: deque = deque(maxlen=1000)  # Keep last 1000 messages
+        self.current_sequence: int = 0
 
     async def start(self) -> int:
         """Start WebSocket server with port auto-discovery.
@@ -94,6 +99,69 @@ class WebSocketService:
         """
         self._connection_handlers[event] = handler
 
+    async def handle_connection_init(self, message: dict, websocket: WebSocketServerProtocol) -> None:
+        """Handle connection initialization handshake.
+
+        Args:
+            message: The connection_init message
+            websocket: WebSocket connection
+        """
+        last_sequence = message.get('lastSequence', 0)
+        extension_version = message.get('extensionVersion', 'unknown')
+        capabilities = message.get('capabilities', [])
+
+        logger.info(f"Connection init from extension v{extension_version}, lastSequence={last_sequence}")
+        logger.info(f"Client capabilities: {capabilities}")
+
+        # Find messages the client missed
+        replay_messages = self._get_messages_after_sequence(last_sequence)
+
+        # Import version info
+        try:
+            from .._version import __version__
+            server_version = __version__
+        except ImportError:
+            server_version = "2.1.1"  # Fallback
+
+        # Send connection acknowledgment with replay
+        ack_message = {
+            'type': 'connection_ack',
+            'serverVersion': server_version,
+            'currentSequence': self.current_sequence,
+            'replay': replay_messages[:100]  # Limit replay to 100 messages
+        }
+
+        await self.send_message(websocket, ack_message)
+        logger.info(f"Sent connection_ack with {len(replay_messages[:100])} replayed messages")
+
+    def _get_messages_after_sequence(self, last_sequence: int) -> List[dict]:
+        """Get messages with sequence > last_sequence.
+
+        Args:
+            last_sequence: Last sequence number received by client
+
+        Returns:
+            List of messages that occurred after the given sequence
+        """
+        return [
+            msg for msg in self.message_buffer
+            if msg.get('sequence', 0) > last_sequence
+        ]
+
+    def _add_sequence(self, message: dict) -> dict:
+        """Add sequence number to message and buffer it.
+
+        Args:
+            message: Message to sequence
+
+        Returns:
+            Message with sequence number added
+        """
+        self.current_sequence += 1
+        message['sequence'] = self.current_sequence
+        self.message_buffer.append(message.copy())
+        return message
+
     async def _handle_connection(
         self, websocket: WebSocketServerProtocol, path: str = None
     ) -> None:
@@ -151,6 +219,11 @@ class WebSocketService:
             data = json.loads(message)
             message_type = data.get("type", "unknown")
 
+            # Handle connection initialization handshake
+            if message_type == "connection_init":
+                await self.handle_connection_init(data, websocket)
+                return
+
             # Handle heartbeat - respond with pong immediately
             if message_type == "heartbeat":
                 pong_response = {
@@ -194,15 +267,18 @@ class WebSocketService:
             logger.error(f"Error handling message: {e}")
 
     async def send_message(
-        self, websocket: WebSocketServerProtocol, message: Dict[str, Any]
+        self, websocket: WebSocketServerProtocol, message: Dict[str, Any], add_sequence: bool = False
     ) -> None:
         """Send a message to a specific WebSocket connection.
 
         Args:
             websocket: WebSocket connection
             message: Message to send
+            add_sequence: If True, add sequence number and buffer message for replay
         """
         try:
+            if add_sequence:
+                message = self._add_sequence(message)
             await websocket.send(json.dumps(message))
         except Exception as e:
             logger.error(f"Failed to send message: {e}")

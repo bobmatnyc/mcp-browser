@@ -14,7 +14,8 @@ const SCAN_INTERVAL_MINUTES = 0.5; // Scan for servers every 30 seconds (0.5 min
 const STORAGE_KEYS = {
   MESSAGE_QUEUE: 'mcp_message_queue',
   LAST_CONNECTED_PORT: 'mcp_last_connected_port',
-  LAST_CONNECTED_PROJECT: 'mcp_last_connected_project'
+  LAST_CONNECTED_PROJECT: 'mcp_last_connected_project',
+  LAST_SEQUENCE: 'mcp_last_sequence'
 };
 
 // Max queue size to prevent storage bloat
@@ -32,6 +33,10 @@ let activeServers = new Map(); // port -> server info
 let currentConnection = null;
 let messageQueue = [];
 let extensionState = 'starting'; // 'starting', 'scanning', 'idle', 'connected', 'error'
+
+// Connection handshake state
+let connectionReady = false;
+let lastSequenceReceived = 0;
 
 // Heartbeat state
 let lastPongTime = Date.now();
@@ -432,42 +437,31 @@ async function connectToServer(port, serverInfo = null) {
       ws.onopen = async () => {
         clearTimeout(timeout);
         currentConnection = ws;
-
-        // Reset pong time on new connection
         lastPongTime = Date.now();
-
-        // Reset reconnect attempts on successful connection
         reconnectAttempts = 0;
         console.log('[MCP Browser] Connection successful, reset reconnect attempts');
 
-        setupWebSocketHandlers(ws);
+        // Load last sequence from storage
+        const result = await chrome.storage.local.get(STORAGE_KEYS.LAST_SEQUENCE);
+        lastSequenceReceived = result[STORAGE_KEYS.LAST_SEQUENCE] || 0;
 
-        // Update connection status
-        connectionStatus.connected = true;
-        connectionStatus.port = port;
-        connectionStatus.connectionTime = Date.now();
-        connectionStatus.lastError = null;
+        // Send connection_init handshake
+        const initMessage = {
+          type: 'connection_init',
+          lastSequence: lastSequenceReceived,
+          extensionVersion: chrome.runtime.getManifest().version,
+          capabilities: ['console_capture', 'dom_interaction']
+        };
 
-        if (serverInfo) {
-          connectionStatus.projectName = serverInfo.projectName;
-          connectionStatus.projectPath = serverInfo.projectPath;
+        try {
+          currentConnection.send(JSON.stringify(initMessage));
+          console.log(`[MCP Browser] Sent connection_init with lastSequence: ${lastSequenceReceived}`);
+        } catch (e) {
+          console.error('[MCP Browser] Failed to send connection_init:', e);
         }
 
-        // Save connection state for faster reconnection
-        await saveConnectionState(port, connectionStatus.projectName || 'unknown');
-
-        // Clear reconnect alarm and start heartbeat
-        chrome.alarms.clear('reconnect');
-        startHeartbeat();
-
-        // Update state and badge - GREEN
-        extensionState = 'connected';
-        updateBadgeStatus();
-
-        console.log(`[MCP Browser] Connected to port ${port} (${connectionStatus.projectName})`);
-
-        // Send queued messages
-        flushMessageQueue();
+        setupWebSocketHandlers(ws);
+        // Don't call startHeartbeat or set connectionReady yet - wait for connection_ack
 
         resolve(true);
       };
@@ -495,19 +489,77 @@ async function connectToServer(port, serverInfo = null) {
 }
 
 /**
+ * Handle a replayed message from the server
+ */
+function handleReplayedMessage(message) {
+  console.log(`[MCP Browser] Processing replayed message: ${message.type}`);
+  // For now, just log - actual handling depends on message types
+  // In the future, this could trigger UI updates or other actions
+
+  // Update sequence if message has one
+  if (message.sequence !== undefined && message.sequence > lastSequenceReceived) {
+    lastSequenceReceived = message.sequence;
+  }
+}
+
+/**
  * Set up WebSocket event handlers
  * @param {WebSocket} ws - WebSocket connection
  */
 function setupWebSocketHandlers(ws) {
-  ws.onmessage = (event) => {
+  ws.onmessage = async (event) => {
     try {
       const data = JSON.parse(event.data);
+
+      // Handle connection_ack from server
+      if (data.type === 'connection_ack') {
+        console.log(`[MCP Browser] Connection acknowledged by server`);
+        connectionReady = true;
+
+        // Start heartbeat after handshake complete
+        startHeartbeat();
+
+        // Update connection status
+        connectionStatus.connected = true;
+        connectionStatus.port = ws.url.match(/:(\d+)/)?.[1] || connectionStatus.port;
+        connectionStatus.connectionTime = Date.now();
+        connectionStatus.lastError = null;
+        extensionState = 'connected';
+        updateBadgeStatus();
+
+        // Handle replayed messages if any
+        if (data.replay && Array.isArray(data.replay)) {
+          console.log(`[MCP Browser] Receiving ${data.replay.length} replayed messages`);
+          for (const msg of data.replay) {
+            // Process replayed message
+            handleReplayedMessage(msg);
+          }
+        }
+
+        // Update last sequence if provided
+        if (data.currentSequence !== undefined) {
+          lastSequenceReceived = data.currentSequence;
+          await chrome.storage.local.set({ [STORAGE_KEYS.LAST_SEQUENCE]: lastSequenceReceived });
+        }
+
+        // Now flush any queued messages
+        await flushMessageQueue();
+
+        return; // Don't process further
+      }
 
       // Handle pong response
       if (data.type === 'pong') {
         lastPongTime = Date.now();
         console.log('[MCP Browser] Pong received');
         return; // Don't process further
+      }
+
+      // Track sequence on incoming messages
+      if (data.sequence !== undefined && data.sequence > lastSequenceReceived) {
+        lastSequenceReceived = data.sequence;
+        // Persist periodically (not on every message to reduce writes)
+        // We'll persist on disconnect and periodically
       }
 
       handleServerMessage(data);
@@ -523,12 +575,18 @@ function setupWebSocketHandlers(ws) {
     updateBadgeStatus();
   };
 
-  ws.onclose = () => {
+  ws.onclose = async () => {
     console.log('[MCP Browser] Connection closed');
+
+    // Reset connection state
+    connectionReady = false;
     currentConnection = null;
     connectionStatus.connected = false;
     connectionStatus.port = null;
     connectionStatus.projectName = null;
+
+    // Save last sequence before reconnect
+    await chrome.storage.local.set({ [STORAGE_KEYS.LAST_SEQUENCE]: lastSequenceReceived });
 
     // Stop heartbeat when disconnected
     stopHeartbeat();
@@ -618,12 +676,13 @@ function handleServerMessage(data) {
  * @returns {Promise<boolean>} Success status
  */
 async function sendToServer(message) {
-  if (currentConnection && currentConnection.readyState === WebSocket.OPEN) {
+  if (currentConnection && currentConnection.readyState === WebSocket.OPEN && connectionReady) {
+    // Connection is open AND handshake is complete
     currentConnection.send(JSON.stringify(message));
     connectionStatus.messageCount++;
     return true;
   } else {
-    // Queue message if not connected
+    // Queue message if not connected or handshake not complete
     messageQueue.push(message);
     // Enforce max queue size
     if (messageQueue.length > MAX_QUEUE_SIZE) {
