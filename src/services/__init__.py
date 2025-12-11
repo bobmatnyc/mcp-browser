@@ -1,5 +1,7 @@
 """Services for mcp-browser."""
 
+# MCP installer bridge is available for installation commands
+from . import mcp_installer_bridge
 from .browser_service import BrowserService
 from .mcp_service import MCPService
 from .screenshot_service import ScreenshotService
@@ -15,4 +17,5 @@ __all__ = [
     "BrowserService",
     "MCPService",
     "ScreenshotService",
+    "mcp_installer_bridge",
 ]

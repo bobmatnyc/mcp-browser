@@ -33,6 +33,9 @@ dependencies = [
     "rich>=13.7.0",
 ]
 
+# Note: Install py-mcp-installer manually from submodule:
+# pip install -e ./lib/py-mcp-installer-service
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",

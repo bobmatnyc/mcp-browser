@@ -1,0 +1,6 @@
+[submodule "lib/py-mcp-installer-service"]
+	path = lib/py-mcp-installer-service
+	url = https://github.com/bobmatnyc/py-mcp-installer-service.git
+[submodule "lib/python-project-template"]
+	path = lib/python-project-template
+	url = https://github.com/bobmatnyc/python-project-template.git

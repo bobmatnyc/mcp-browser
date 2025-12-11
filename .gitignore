@@ -14,7 +14,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# lib/ - commented out to allow git submodules in lib/
 lib64/
 parts/
 sdist/
@@ -229,3 +229,7 @@ virtualenv/
 yarn-debug.log*
 yarn-error.log*
 docs/research/
+
+# Added by Claude MPM /mpm-init
+.claude.json
+.claude/
