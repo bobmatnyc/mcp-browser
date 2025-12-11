@@ -8,7 +8,7 @@
 
 // Configuration
 const PORT_RANGE = { start: 8875, end: 8895 };
-const SCAN_INTERVAL = 30000; // Scan for servers every 30 seconds
+const SCAN_INTERVAL_MINUTES = 0.5; // Scan for servers every 30 seconds (0.5 minutes)
 
 // Status colors
 const STATUS_COLORS = {
@@ -21,7 +21,6 @@ const STATUS_COLORS = {
 let activeServers = new Map(); // port -> server info
 let currentConnection = null;
 let messageQueue = [];
-let scanTimer = null;
 let extensionState = 'starting'; // 'starting', 'scanning', 'idle', 'connected', 'error'
 
 // Connection status
@@ -35,6 +34,57 @@ const connectionStatus = {
   connectionTime: null,
   availableServers: []
 };
+
+/**
+ * Chrome Alarms handler for persistent timers
+ * Handles reconnection, server scanning, and heartbeat
+ */
+chrome.alarms.onAlarm.addListener((alarm) => {
+  console.log(`[MCP Browser] Alarm triggered: ${alarm.name}`);
+  if (alarm.name === 'reconnect') {
+    autoConnect();
+  } else if (alarm.name === 'serverScan') {
+    scanForServers();
+  } else if (alarm.name === 'heartbeat') {
+    sendHeartbeat();
+  }
+});
+
+/**
+ * Start heartbeat alarm to keep service worker alive during active connections
+ */
+function startHeartbeat() {
+  console.log('[MCP Browser] Starting heartbeat alarm');
+  chrome.alarms.create('heartbeat', {
+    delayInMinutes: 0.25,  // Every 15 seconds
+    periodInMinutes: 0.25
+  });
+}
+
+/**
+ * Stop heartbeat alarm
+ */
+function stopHeartbeat() {
+  console.log('[MCP Browser] Stopping heartbeat alarm');
+  chrome.alarms.clear('heartbeat');
+}
+
+/**
+ * Send heartbeat ping to keep connection alive
+ */
+function sendHeartbeat() {
+  if (currentConnection && currentConnection.readyState === WebSocket.OPEN) {
+    try {
+      currentConnection.send(JSON.stringify({ type: 'ping' }));
+      console.log('[MCP Browser] Heartbeat sent');
+    } catch (e) {
+      console.warn('[MCP Browser] Heartbeat failed:', e);
+    }
+  } else {
+    // Stop heartbeat if connection is not open
+    stopHeartbeat();
+  }
+}
 
 /**
  * Update extension badge to reflect current status
@@ -216,6 +266,10 @@ async function connectToServer(port, serverInfo = null) {
           connectionStatus.projectPath = serverInfo.projectPath;
         }
 
+        // Clear reconnect alarm and start heartbeat
+        chrome.alarms.clear('reconnect');
+        startHeartbeat();
+
         // Update state and badge - GREEN
         extensionState = 'connected';
         updateBadgeStatus();
@@ -278,14 +332,15 @@ function setupWebSocketHandlers(ws) {
     connectionStatus.port = null;
     connectionStatus.projectName = null;
 
+    // Stop heartbeat when disconnected
+    stopHeartbeat();
+
     // Update state - back to YELLOW (listening but not connected)
     extensionState = connectionStatus.availableServers.length > 0 ? 'idle' : 'idle';
     updateBadgeStatus();
 
-    // Try to reconnect after a delay
-    setTimeout(() => {
-      autoConnect();
-    }, 5000);
+    // Try to reconnect after a delay using Chrome Alarms
+    chrome.alarms.create('reconnect', { delayInMinutes: 5 / 60 }); // 5 seconds
   };
 }
 
@@ -452,10 +507,11 @@ chrome.runtime.onInstalled.addListener(() => {
   // Start server scanning
   autoConnect();
 
-  // Set up periodic scanning
-  scanTimer = setInterval(() => {
-    scanForServers();
-  }, SCAN_INTERVAL);
+  // Set up periodic scanning with Chrome Alarms
+  chrome.alarms.create('serverScan', {
+    delayInMinutes: SCAN_INTERVAL_MINUTES,
+    periodInMinutes: SCAN_INTERVAL_MINUTES
+  });
 });
 
 // Handle browser startup
@@ -463,10 +519,11 @@ chrome.runtime.onStartup.addListener(() => {
   console.log('[MCP Browser] Browser started');
   autoConnect();
 
-  // Set up periodic scanning
-  scanTimer = setInterval(() => {
-    scanForServers();
-  }, SCAN_INTERVAL);
+  // Set up periodic scanning with Chrome Alarms
+  chrome.alarms.create('serverScan', {
+    delayInMinutes: SCAN_INTERVAL_MINUTES,
+    periodInMinutes: SCAN_INTERVAL_MINUTES
+  });
 });
 
 // Initialize on load
@@ -475,10 +532,7 @@ try {
   updateBadgeStatus();
 
   // Delay initial scan slightly to ensure extension is fully loaded
-  setTimeout(() => {
-    console.log('[MCP Browser] Starting initial auto-connect...');
-    autoConnect();
-  }, 100);
+  chrome.alarms.create('reconnect', { delayInMinutes: 100 / 60000 }); // ~100ms
 } catch (error) {
   console.error('[MCP Browser] Initialization error:', error);
   extensionState = 'error';
