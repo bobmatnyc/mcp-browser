@@ -10,6 +10,16 @@
 const PORT_RANGE = { start: 8875, end: 8895 };
 const SCAN_INTERVAL_MINUTES = 0.5; // Scan for servers every 30 seconds (0.5 minutes)
 
+// Storage keys for persistence
+const STORAGE_KEYS = {
+  MESSAGE_QUEUE: 'mcp_message_queue',
+  LAST_CONNECTED_PORT: 'mcp_last_connected_port',
+  LAST_CONNECTED_PROJECT: 'mcp_last_connected_project'
+};
+
+// Max queue size to prevent storage bloat
+const MAX_QUEUE_SIZE = 500;
+
 // Status colors
 const STATUS_COLORS = {
   RED: '#DC3545',    // Not functional / Error
@@ -83,6 +93,95 @@ function sendHeartbeat() {
   } else {
     // Stop heartbeat if connection is not open
     stopHeartbeat();
+  }
+}
+
+/**
+ * Save message queue to chrome.storage.local
+ */
+async function saveMessageQueue() {
+  try {
+    // Limit queue size before saving
+    const queueToSave = messageQueue.slice(-MAX_QUEUE_SIZE);
+    await chrome.storage.local.set({ [STORAGE_KEYS.MESSAGE_QUEUE]: queueToSave });
+    console.log(`[MCP Browser] Queue saved: ${queueToSave.length} messages`);
+  } catch (e) {
+    console.error('[MCP Browser] Failed to save queue:', e);
+  }
+}
+
+/**
+ * Load message queue from chrome.storage.local
+ */
+async function loadMessageQueue() {
+  try {
+    const result = await chrome.storage.local.get(STORAGE_KEYS.MESSAGE_QUEUE);
+    if (result[STORAGE_KEYS.MESSAGE_QUEUE]) {
+      messageQueue = result[STORAGE_KEYS.MESSAGE_QUEUE];
+      console.log(`[MCP Browser] Queue loaded: ${messageQueue.length} messages`);
+    }
+  } catch (e) {
+    console.error('[MCP Browser] Failed to load queue:', e);
+  }
+}
+
+/**
+ * Clear message queue from storage after successful flush
+ */
+async function clearStoredQueue() {
+  try {
+    await chrome.storage.local.remove(STORAGE_KEYS.MESSAGE_QUEUE);
+    console.log('[MCP Browser] Stored queue cleared');
+  } catch (e) {
+    console.error('[MCP Browser] Failed to clear stored queue:', e);
+  }
+}
+
+/**
+ * Save last connected server info for faster reconnection
+ */
+async function saveConnectionState(port, projectName) {
+  try {
+    await chrome.storage.local.set({
+      [STORAGE_KEYS.LAST_CONNECTED_PORT]: port,
+      [STORAGE_KEYS.LAST_CONNECTED_PROJECT]: projectName
+    });
+    console.log(`[MCP Browser] Connection state saved: port ${port}, project ${projectName}`);
+  } catch (e) {
+    console.error('[MCP Browser] Failed to save connection state:', e);
+  }
+}
+
+/**
+ * Load last connected server info
+ */
+async function loadConnectionState() {
+  try {
+    const result = await chrome.storage.local.get([
+      STORAGE_KEYS.LAST_CONNECTED_PORT,
+      STORAGE_KEYS.LAST_CONNECTED_PROJECT
+    ]);
+    return {
+      port: result[STORAGE_KEYS.LAST_CONNECTED_PORT] || null,
+      projectName: result[STORAGE_KEYS.LAST_CONNECTED_PROJECT] || null
+    };
+  } catch (e) {
+    console.error('[MCP Browser] Failed to load connection state:', e);
+    return { port: null, projectName: null };
+  }
+}
+
+/**
+ * Clear connection state (on intentional disconnect)
+ */
+async function clearConnectionState() {
+  try {
+    await chrome.storage.local.remove([
+      STORAGE_KEYS.LAST_CONNECTED_PORT,
+      STORAGE_KEYS.LAST_CONNECTED_PROJECT
+    ]);
+  } catch (e) {
+    console.error('[MCP Browser] Failed to clear connection state:', e);
   }
 }
 
@@ -250,7 +349,7 @@ async function connectToServer(port, serverInfo = null) {
         resolve(false);
       }, 3000);
 
-      ws.onopen = () => {
+      ws.onopen = async () => {
         clearTimeout(timeout);
         currentConnection = ws;
         setupWebSocketHandlers(ws);
@@ -265,6 +364,9 @@ async function connectToServer(port, serverInfo = null) {
           connectionStatus.projectName = serverInfo.projectName;
           connectionStatus.projectPath = serverInfo.projectPath;
         }
+
+        // Save connection state for faster reconnection
+        await saveConnectionState(port, connectionStatus.projectName || 'unknown');
 
         // Clear reconnect alarm and start heartbeat
         chrome.alarms.clear('reconnect');
@@ -350,6 +452,21 @@ function setupWebSocketHandlers(ws) {
 async function autoConnect() {
   try {
     console.log('[MCP Browser] Auto-connect starting...');
+
+    // First, try to reconnect to last known server
+    const { port: lastPort, projectName: lastProject } = await loadConnectionState();
+    if (lastPort) {
+      console.log(`[MCP Browser] Attempting reconnect to last server: port ${lastPort}`);
+      const serverInfo = await probePort(lastPort);
+      if (serverInfo) {
+        const connected = await connectToServer(lastPort, serverInfo);
+        if (connected) {
+          return;
+        }
+      }
+    }
+
+    // If no last connection or it failed, scan for servers
     const servers = await scanForServers();
 
     if (servers.length === 0) {
@@ -368,7 +485,6 @@ async function autoConnect() {
     }
 
     // If multiple servers, prefer the first one (could be enhanced with preferences)
-    // In the future, we could remember the last connected project
     console.log(`[MCP Browser] Found ${servers.length} servers, connecting to first one`);
     await connectToServer(servers[0].port, servers[0]);
   } catch (error) {
@@ -400,9 +516,9 @@ function handleServerMessage(data) {
 /**
  * Send message to server
  * @param {Object} message - Message to send
- * @returns {boolean} Success status
+ * @returns {Promise<boolean>} Success status
  */
-function sendToServer(message) {
+async function sendToServer(message) {
   if (currentConnection && currentConnection.readyState === WebSocket.OPEN) {
     currentConnection.send(JSON.stringify(message));
     connectionStatus.messageCount++;
@@ -410,9 +526,12 @@ function sendToServer(message) {
   } else {
     // Queue message if not connected
     messageQueue.push(message);
-    if (messageQueue.length > 1000) {
-      messageQueue.shift(); // Remove oldest message if queue is too large
+    // Enforce max queue size
+    if (messageQueue.length > MAX_QUEUE_SIZE) {
+      messageQueue.shift();
     }
+    // Persist queue to storage
+    await saveMessageQueue();
     return false;
   }
 }
@@ -420,14 +539,30 @@ function sendToServer(message) {
 /**
  * Flush queued messages
  */
-function flushMessageQueue() {
-  if (!currentConnection || currentConnection.readyState !== WebSocket.OPEN) return;
+async function flushMessageQueue() {
+  if (!currentConnection || currentConnection.readyState !== WebSocket.OPEN) {
+    return;
+  }
+
+  console.log(`[MCP Browser] Flushing ${messageQueue.length} queued messages`);
 
   while (messageQueue.length > 0) {
     const message = messageQueue.shift();
-    currentConnection.send(JSON.stringify(message));
-    connectionStatus.messageCount++;
+    try {
+      currentConnection.send(JSON.stringify(message));
+      connectionStatus.messageCount++;
+    } catch (e) {
+      console.error('[MCP Browser] Failed to send queued message:', e);
+      // Put message back and stop flushing
+      messageQueue.unshift(message);
+      await saveMessageQueue();
+      return;
+    }
   }
+
+  // Clear stored queue after successful flush
+  await clearStoredQueue();
+  console.log('[MCP Browser] Queue flush complete');
 }
 
 // Handle messages from popup and content scripts
@@ -480,17 +615,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       currentConnection.close();
       currentConnection = null;
     }
+    // Clear connection state on intentional disconnect
+    clearConnectionState();
     sendResponse({ received: true });
   }
 });
 
 // Handle extension installation
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener(async () => {
   console.log('[MCP Browser] Extension installed');
 
   // Set initial badge - YELLOW (starting state)
   extensionState = 'starting';
   updateBadgeStatus();
+
+  // Load persisted message queue
+  await loadMessageQueue();
 
   // Inject content script into all existing tabs
   chrome.tabs.query({}, (tabs) => {
@@ -515,8 +655,12 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 // Handle browser startup
-chrome.runtime.onStartup.addListener(() => {
+chrome.runtime.onStartup.addListener(async () => {
   console.log('[MCP Browser] Browser started');
+
+  // Load persisted message queue
+  await loadMessageQueue();
+
   autoConnect();
 
   // Set up periodic scanning with Chrome Alarms
