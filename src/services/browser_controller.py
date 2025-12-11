@@ -26,6 +26,7 @@ Extension Points: BrowserController interface allows adding new control
 methods by implementing same interface pattern.
 """
 
+import asyncio
 import logging
 from typing import Any, Dict, Optional
 
@@ -40,6 +41,17 @@ except ImportError:
     logger.debug("Playwright not available - CDP support disabled")
 
 
+# Custom Exceptions
+class ExtensionNotConnectedError(Exception):
+    """Raised when extension is not connected."""
+    pass
+
+
+class ExtensionTimeoutError(Exception):
+    """Raised when extension operation times out."""
+    pass
+
+
 class BrowserController:
     """Unified browser control with automatic fallback.
 
@@ -51,6 +63,7 @@ class BrowserController:
     - Configuration-driven mode selection ("auto", "extension", "cdp", "applescript")
     - Clear error messages when no control method available
     - Console log limitation communication (extension-only feature)
+    - Timeout-based fallback (extension timeout → CDP fallback)
 
     Performance:
     - Extension: ~10-50ms per operation (WebSocket)
@@ -58,11 +71,22 @@ class BrowserController:
     - AppleScript: ~100-500ms per operation (subprocess + interpreter)
     - Fallback check: ~10-50ms (WebSocket connection check)
 
+    Timeout Configuration:
+    - Extension timeout: 5.0 seconds
+    - CDP timeout: 10.0 seconds
+
     Usage:
         controller = BrowserController(websocket, browser, applescript, config)
         result = await controller.navigate("https://example.com", port=8875)
         # Automatically uses extension if available, falls back to CDP, then AppleScript
     """
+
+    # Timeout configuration (seconds)
+    EXTENSION_TIMEOUT = 5.0
+    CDP_TIMEOUT = 10.0
+
+    # Actions that require extension (no CDP/AppleScript fallback)
+    EXTENSION_ONLY_ACTIONS = ['get_console_logs', 'monitor_tabs', 'query_logs']
 
     def __init__(
         self,
@@ -227,8 +251,449 @@ class BrowserController:
         self.cdp_page = context.pages[0]
         return self.cdp_page
 
+    async def execute_action(self, action: str, port: Optional[int] = None, **kwargs) -> Dict[str, Any]:
+        """Execute action with automatic timeout-based fallback.
+
+        Tries extension first with timeout, automatically falls back to CDP on timeout or disconnection.
+
+        Args:
+            action: Action name ('navigate', 'click', 'fill', 'get_element', 'execute_javascript')
+            port: Optional port for extension
+            **kwargs: Action-specific arguments
+
+        Returns:
+            {"success": bool, "error": str, "method": str, "data": Any}
+
+        Example:
+            result = await controller.execute_action('navigate', port=8875, url='https://example.com')
+            # Tries extension first (5s timeout), falls back to CDP automatically
+        """
+        # Check if action requires extension-only features
+        if action in self.EXTENSION_ONLY_ACTIONS:
+            return await self._extension_only(action, port, **kwargs)
+
+        # Try extension first with timeout (if port provided)
+        if port and await self._has_extension_connection(port):
+            try:
+                result = await asyncio.wait_for(
+                    self._try_extension(action, port, **kwargs),
+                    timeout=self.EXTENSION_TIMEOUT
+                )
+                if result.get('success'):
+                    logger.info(f"Action '{action}' completed via extension")
+                    return result
+            except asyncio.TimeoutError:
+                logger.warning(f"Extension timeout ({self.EXTENSION_TIMEOUT}s) for '{action}', falling back to CDP")
+            except ExtensionNotConnectedError:
+                logger.info(f"Extension disconnected, using CDP for '{action}'")
+            except Exception as e:
+                logger.warning(f"Extension error for '{action}': {e}, falling back to CDP")
+
+        # Fallback to CDP
+        if self.cdp_enabled:
+            try:
+                result = await asyncio.wait_for(
+                    self._try_cdp(action, **kwargs),
+                    timeout=self.CDP_TIMEOUT
+                )
+                if result.get('success'):
+                    logger.info(f"Action '{action}' completed via CDP")
+                    return result
+            except asyncio.TimeoutError:
+                logger.error(f"CDP timeout ({self.CDP_TIMEOUT}s) for '{action}'")
+            except Exception as e:
+                logger.warning(f"CDP error for '{action}': {e}")
+
+        # Last resort: AppleScript
+        if self.fallback_enabled and self.applescript.is_macos:
+            try:
+                result = await self._try_applescript(action, **kwargs)
+                if result.get('success'):
+                    logger.info(f"Action '{action}' completed via AppleScript")
+                    return result
+            except Exception as e:
+                logger.warning(f"AppleScript error for '{action}': {e}")
+
+        return {
+            "success": False,
+            "error": f"All methods failed for action '{action}'",
+            "method": "none",
+            "data": None
+        }
+
+    async def _extension_only(self, action: str, port: Optional[int], **kwargs) -> Dict[str, Any]:
+        """Handle actions that ONLY work with extension.
+
+        Args:
+            action: Action name (must be in EXTENSION_ONLY_ACTIONS)
+            port: Port number for extension
+            **kwargs: Action-specific arguments
+
+        Returns:
+            Result dictionary with error if extension not connected
+        """
+        if not port:
+            return {
+                "success": False,
+                "error": f"Action '{action}' requires extension (port must be provided)",
+                "method": "extension",
+                "data": None
+            }
+
+        if not await self._has_extension_connection(port):
+            return {
+                "success": False,
+                "error": f"Action '{action}' requires extension but no connection found on port {port}",
+                "method": "extension",
+                "data": None
+            }
+
+        try:
+            result = await asyncio.wait_for(
+                self._try_extension(action, port, **kwargs),
+                timeout=self.EXTENSION_TIMEOUT
+            )
+            logger.info(f"Extension-only action '{action}' completed")
+            return result
+        except asyncio.TimeoutError:
+            return {
+                "success": False,
+                "error": f"Extension timeout ({self.EXTENSION_TIMEOUT}s) for '{action}'",
+                "method": "extension",
+                "data": None
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Extension error for '{action}': {str(e)}",
+                "method": "extension",
+                "data": None
+            }
+
+    async def _try_extension(self, action: str, port: int, **kwargs) -> Dict[str, Any]:
+        """Execute action via extension.
+
+        Args:
+            action: Action name
+            port: Port number
+            **kwargs: Action-specific arguments
+
+        Returns:
+            Result dictionary
+
+        Raises:
+            ExtensionNotConnectedError: If extension disconnected during operation
+        """
+        # Verify connection still active
+        if not await self._has_extension_connection(port):
+            raise ExtensionNotConnectedError(f"Extension not connected on port {port}")
+
+        # Map action to appropriate method
+        if action == 'navigate':
+            url = kwargs.get('url')
+            if not url:
+                return {"success": False, "error": "Missing 'url' argument", "method": "extension", "data": None}
+            success = await self.browser_service.navigate_browser(port, url)
+            return {
+                "success": success,
+                "error": None if success else "Navigation command failed",
+                "method": "extension",
+                "data": {"url": url, "port": port}
+            }
+
+        elif action in ['click', 'fill', 'get_element']:
+            # Use DOMInteractionService
+            from .dom_interaction_service import DOMInteractionService
+            dom_service = DOMInteractionService(browser_service=self.browser_service)
+
+            if action == 'click':
+                result = await dom_service.click(
+                    port=port,
+                    selector=kwargs.get('selector'),
+                    xpath=kwargs.get('xpath'),
+                    text=kwargs.get('text'),
+                    index=kwargs.get('index', 0),
+                    tab_id=kwargs.get('tab_id')
+                )
+            elif action == 'fill':
+                result = await dom_service.fill_field(
+                    port=port,
+                    value=kwargs.get('value', ''),
+                    selector=kwargs.get('selector'),
+                    xpath=kwargs.get('xpath'),
+                    index=kwargs.get('index', 0),
+                    tab_id=kwargs.get('tab_id')
+                )
+            else:  # get_element
+                result = await dom_service.get_element(
+                    port=port,
+                    selector=kwargs.get('selector'),
+                    xpath=kwargs.get('xpath'),
+                    text=kwargs.get('text'),
+                    index=kwargs.get('index', 0),
+                    tab_id=kwargs.get('tab_id')
+                )
+
+            return {
+                "success": result.get("success", False),
+                "error": result.get("error"),
+                "method": "extension",
+                "data": result
+            }
+
+        elif action == 'execute_javascript':
+            return {
+                "success": False,
+                "error": "JavaScript execution not yet supported via extension",
+                "method": "extension",
+                "data": None
+            }
+
+        return {
+            "success": False,
+            "error": f"Unknown action '{action}'",
+            "method": "extension",
+            "data": None
+        }
+
+    async def _try_cdp(self, action: str, **kwargs) -> Dict[str, Any]:
+        """Execute action via CDP.
+
+        Args:
+            action: Action name
+            **kwargs: Action-specific arguments
+
+        Returns:
+            Result dictionary
+        """
+        # Initialize CDP if not connected
+        if not await self._has_cdp_connection():
+            if not await self.init_cdp():
+                return {
+                    "success": False,
+                    "error": f"CDP connection not available for action '{action}'",
+                    "method": "cdp",
+                    "data": None
+                }
+
+        page = await self._get_cdp_page()
+
+        # Map action to appropriate Playwright method
+        if action == 'navigate':
+            url = kwargs.get('url')
+            if not url:
+                return {"success": False, "error": "Missing 'url' argument", "method": "cdp", "data": None}
+            await page.goto(url, wait_until="domcontentloaded")
+            return {
+                "success": True,
+                "error": None,
+                "method": "cdp",
+                "data": {"url": url, "cdp_port": self.cdp_port}
+            }
+
+        elif action == 'click':
+            selector = kwargs.get('selector')
+            xpath = kwargs.get('xpath')
+            text = kwargs.get('text')
+            index = kwargs.get('index', 0)
+
+            if selector:
+                await page.click(selector)
+            elif xpath:
+                await page.click(f"xpath={xpath}")
+            elif text:
+                await page.get_by_text(text).nth(index).click()
+            else:
+                return {
+                    "success": False,
+                    "error": "Must provide selector, xpath, or text",
+                    "method": "cdp",
+                    "data": None
+                }
+
+            return {
+                "success": True,
+                "error": None,
+                "method": "cdp",
+                "data": {"clicked": True}
+            }
+
+        elif action == 'fill':
+            selector = kwargs.get('selector')
+            xpath = kwargs.get('xpath')
+            value = kwargs.get('value', '')
+
+            if selector:
+                await page.fill(selector, value)
+            elif xpath:
+                await page.fill(f"xpath={xpath}", value)
+            else:
+                return {
+                    "success": False,
+                    "error": "Must provide selector or xpath",
+                    "method": "cdp",
+                    "data": None
+                }
+
+            return {
+                "success": True,
+                "error": None,
+                "method": "cdp",
+                "data": {"filled": True, "value": value}
+            }
+
+        elif action == 'get_element':
+            selector = kwargs.get('selector')
+            xpath = kwargs.get('xpath')
+            text = kwargs.get('text')
+            index = kwargs.get('index', 0)
+
+            element = None
+            if selector:
+                element = await page.query_selector(selector)
+            elif xpath:
+                element = await page.query_selector(f"xpath={xpath}")
+            elif text:
+                element = await page.get_by_text(text).nth(index).element_handle()
+            else:
+                return {
+                    "success": False,
+                    "error": "Must provide selector, xpath, or text",
+                    "method": "cdp",
+                    "data": None
+                }
+
+            if not element:
+                return {
+                    "success": False,
+                    "error": "Element not found",
+                    "method": "cdp",
+                    "data": None
+                }
+
+            text_content = await element.text_content()
+            return {
+                "success": True,
+                "error": None,
+                "method": "cdp",
+                "data": {"text": text_content or ""}
+            }
+
+        elif action == 'execute_javascript':
+            script = kwargs.get('script')
+            if not script:
+                return {"success": False, "error": "Missing 'script' argument", "method": "cdp", "data": None}
+            result = await page.evaluate(script)
+            return {
+                "success": True,
+                "error": None,
+                "method": "cdp",
+                "data": result
+            }
+
+        return {
+            "success": False,
+            "error": f"Unknown action '{action}'",
+            "method": "cdp",
+            "data": None
+        }
+
+    async def _try_applescript(self, action: str, **kwargs) -> Dict[str, Any]:
+        """Execute action via AppleScript.
+
+        Args:
+            action: Action name
+            **kwargs: Action-specific arguments
+
+        Returns:
+            Result dictionary
+        """
+        # Map action to appropriate AppleScript method
+        if action == 'navigate':
+            url = kwargs.get('url')
+            if not url:
+                return {"success": False, "error": "Missing 'url' argument", "method": "applescript", "data": None}
+            result = await self.applescript.navigate(url, browser=self.preferred_browser)
+            return {
+                "success": result["success"],
+                "error": result.get("error"),
+                "method": "applescript",
+                "data": result.get("data")
+            }
+
+        elif action == 'click':
+            selector = kwargs.get('selector')
+            if not selector:
+                return {
+                    "success": False,
+                    "error": "CSS selector required for AppleScript mode (xpath/text not supported)",
+                    "method": "applescript",
+                    "data": None
+                }
+            result = await self.applescript.click(selector, browser=self.preferred_browser)
+            return {
+                "success": result["success"],
+                "error": result.get("error"),
+                "method": "applescript",
+                "data": result.get("data")
+            }
+
+        elif action == 'fill':
+            selector = kwargs.get('selector')
+            value = kwargs.get('value', '')
+            if not selector:
+                return {
+                    "success": False,
+                    "error": "CSS selector required for AppleScript mode",
+                    "method": "applescript",
+                    "data": None
+                }
+            result = await self.applescript.fill_field(selector, value, browser=self.preferred_browser)
+            return {
+                "success": result["success"],
+                "error": result.get("error"),
+                "method": "applescript",
+                "data": result.get("data")
+            }
+
+        elif action == 'get_element':
+            selector = kwargs.get('selector')
+            if not selector:
+                return {
+                    "success": False,
+                    "error": "CSS selector required for AppleScript mode",
+                    "method": "applescript",
+                    "data": None
+                }
+            result = await self.applescript.get_element(selector, browser=self.preferred_browser)
+            return {
+                "success": result["success"],
+                "error": result.get("error"),
+                "method": "applescript",
+                "data": result.get("data")
+            }
+
+        elif action == 'execute_javascript':
+            script = kwargs.get('script')
+            if not script:
+                return {"success": False, "error": "Missing 'script' argument", "method": "applescript", "data": None}
+            result = await self.applescript.execute_javascript(script, browser=self.preferred_browser)
+            return {
+                "success": result["success"],
+                "error": result.get("error"),
+                "method": "applescript",
+                "data": result.get("data")
+            }
+
+        return {
+            "success": False,
+            "error": f"Unknown action '{action}'",
+            "method": "applescript",
+            "data": None
+        }
+
     async def navigate(self, url: str, port: Optional[int] = None) -> Dict[str, Any]:
-        """Navigate browser to URL with automatic fallback.
+        """Navigate browser to URL with automatic timeout-based fallback.
 
         Args:
             url: URL to navigate to
@@ -241,10 +706,10 @@ class BrowserController:
         1. If mode="extension": only try extension, fail if unavailable
         2. If mode="cdp": only try CDP, fail if unavailable
         3. If mode="applescript": only try AppleScript, fail if unavailable
-        4. If mode="auto" (default): try extension → CDP → AppleScript
+        4. If mode="auto" (default): try extension (5s timeout) → CDP (10s timeout) → AppleScript
 
         Error Handling:
-        - Extension unavailable → Falls back to CDP
+        - Extension timeout/unavailable → Falls back to CDP
         - CDP unavailable → Falls back to AppleScript (macOS)
         - All methods unavailable → Returns clear error
         """
@@ -324,51 +789,8 @@ class BrowserController:
                 "data": result.get("data"),
             }
 
-        # Mode: auto (try extension → CDP → AppleScript)
-        if port and await self._has_extension_connection(port):
-            # Use extension
-            success = await self.browser_service.navigate_browser(port, url)
-            return {
-                "success": success,
-                "error": None if success else "Navigation command failed",
-                "method": "extension",
-                "data": {"url": url, "port": port},
-            }
-
-        # Extension unavailable, try CDP
-        if self.cdp_enabled:
-            try:
-                if not await self._has_cdp_connection():
-                    await self.init_cdp()
-
-                if await self._has_cdp_connection():
-                    logger.info("Extension unavailable, using CDP")
-                    page = await self._get_cdp_page()
-                    await page.goto(url, wait_until="domcontentloaded")
-                    return {
-                        "success": True,
-                        "error": None,
-                        "method": "cdp",
-                        "data": {"url": url, "cdp_port": self.cdp_port},
-                    }
-            except Exception as e:
-                logger.debug(f"CDP navigation failed, trying AppleScript: {e}")
-
-        # CDP unavailable, try AppleScript fallback
-        if self.fallback_enabled and self.applescript.is_macos:
-            logger.info("Extension and CDP unavailable, falling back to AppleScript")
-            result = await self.applescript.navigate(
-                url, browser=self.preferred_browser
-            )
-            return {
-                "success": result["success"],
-                "error": result.get("error"),
-                "method": "applescript",
-                "data": result.get("data"),
-            }
-
-        # No control method available
-        return self._no_method_available_error()
+        # Mode: auto (try extension → CDP → AppleScript with timeouts)
+        return await self.execute_action('navigate', port=port, url=url)
 
     async def click(
         self,
@@ -379,7 +801,7 @@ class BrowserController:
         port: Optional[int] = None,
         tab_id: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Click element with automatic fallback.
+        """Click element with automatic timeout-based fallback.
 
         Args:
             selector: CSS selector
@@ -392,6 +814,19 @@ class BrowserController:
         Returns:
             {"success": bool, "error": str, "method": str, "data": dict}
         """
+        # Use execute_action for auto mode with timeouts
+        if self.mode == "auto":
+            return await self.execute_action(
+                'click',
+                port=port,
+                selector=selector,
+                xpath=xpath,
+                text=text,
+                index=index,
+                tab_id=tab_id
+            )
+
+        # For specific modes, use old logic
         method = self._select_browser_method(port)
 
         if method == "extension":
@@ -517,7 +952,7 @@ class BrowserController:
         port: Optional[int] = None,
         tab_id: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Fill form field with automatic fallback.
+        """Fill form field with automatic timeout-based fallback.
 
         Args:
             value: Value to fill
@@ -530,6 +965,19 @@ class BrowserController:
         Returns:
             {"success": bool, "error": str, "method": str, "data": dict}
         """
+        # Use execute_action for auto mode with timeouts
+        if self.mode == "auto":
+            return await self.execute_action(
+                'fill',
+                port=port,
+                value=value,
+                selector=selector,
+                xpath=xpath,
+                index=index,
+                tab_id=tab_id
+            )
+
+        # For specific modes, use old logic
         method = self._select_browser_method(port)
 
         if method == "extension":
@@ -649,7 +1097,7 @@ class BrowserController:
         port: Optional[int] = None,
         tab_id: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Get element information with automatic fallback.
+        """Get element information with automatic timeout-based fallback.
 
         Args:
             selector: CSS selector
@@ -662,6 +1110,19 @@ class BrowserController:
         Returns:
             {"success": bool, "error": str, "method": str, "data": dict}
         """
+        # Use execute_action for auto mode with timeouts
+        if self.mode == "auto":
+            return await self.execute_action(
+                'get_element',
+                port=port,
+                selector=selector,
+                xpath=xpath,
+                text=text,
+                index=index,
+                tab_id=tab_id
+            )
+
+        # For specific modes, use old logic
         method = self._select_browser_method(port)
 
         if method == "extension":
@@ -801,7 +1262,7 @@ class BrowserController:
     async def execute_javascript(
         self, script: str, port: Optional[int] = None
     ) -> Dict[str, Any]:
-        """Execute JavaScript with automatic fallback.
+        """Execute JavaScript with automatic timeout-based fallback.
 
         Args:
             script: JavaScript code to execute
@@ -810,6 +1271,15 @@ class BrowserController:
         Returns:
             {"success": bool, "error": str, "method": str, "data": Any}
         """
+        # Use execute_action for auto mode with timeouts
+        if self.mode == "auto":
+            return await self.execute_action(
+                'execute_javascript',
+                port=port,
+                script=script
+            )
+
+        # For specific modes, use old logic
         method = self._select_browser_method(port)
 
         if method == "extension":
