@@ -8,7 +8,8 @@
     "tabs",
     "storage",
     "scripting",
-    "alarms"
+    "alarms",
+    "webNavigation"
   ],
   "host_permissions": [
     "http://localhost/*",
