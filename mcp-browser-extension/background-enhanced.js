@@ -19,7 +19,9 @@ const STORAGE_KEYS = {
   LAST_CONNECTED_PORT: 'mcp_last_connected_port',
   LAST_CONNECTED_PROJECT: 'mcp_last_connected_project',
   LAST_SEQUENCE: 'mcp_last_sequence',
-  PORT_PROJECT_MAP: 'mcp_port_project_map'
+  PORT_PROJECT_MAP: 'mcp_port_project_map',
+  DOMAIN_PORT_MAP: 'mcp_domain_port_map',     // domain → port mapping
+  URL_PATTERN_RULES: 'mcp_url_pattern_rules'  // URL patterns → port rules
 };
 
 // Max queue size to prevent storage bloat
@@ -88,6 +90,10 @@ class ConnectionManager {
     this.connections = new Map(); // port -> connection object
     this.tabConnections = new Map(); // tabId -> port
     this.primaryPort = null; // Currently active/primary connection for badge display
+    this.pendingTabs = new Map(); // tabId → { url, awaitingAssignment }
+    this.unroutedMessages = []; // Messages without a backend
+    this.domainPortMap = {}; // domain → port (cached associations)
+    this.urlPatternRules = []; // { pattern: RegExp, port: number }[]
   }
 
   /**
@@ -196,6 +202,9 @@ class ConnectionManager {
       if (!this.primaryPort) {
         this.primaryPort = port;
       }
+
+      // Process any pending tabs waiting for assignment
+      await this.processPendingTabs(port);
 
       console.log(`[ConnectionManager] Successfully connected to port ${port} (${connection.projectName})`);
       return connection;
@@ -365,6 +374,267 @@ class ConnectionManager {
       ready: conn.connectionReady,
       isPrimary: conn.port === this.primaryPort
     }));
+  }
+
+  /**
+   * Register a tab and find the appropriate backend for it
+   * @param {number} tabId - Tab ID
+   * @param {string} url - Tab URL
+   * @returns {Promise<boolean>} True if tab was assigned, false if pending
+   */
+  async registerTab(tabId, url) {
+    console.log(`[ConnectionManager] Registering tab ${tabId} with URL: ${url}`);
+
+    // Strategy 1: Check URL pattern rules
+    const patternPort = this.findBackendForUrl(url);
+    if (patternPort && this.connections.has(patternPort)) {
+      this.assignTabToConnection(tabId, patternPort);
+      await this.flushUnroutedMessages(tabId);
+      this._updatePendingBadge();
+      return true;
+    }
+
+    // Strategy 2: Check domain cache
+    const hostname = this._extractHostname(url);
+    if (hostname) {
+      const cachedPort = await this.getCachedPortForDomain(hostname);
+      if (cachedPort && this.connections.has(cachedPort)) {
+        this.assignTabToConnection(tabId, cachedPort);
+        await this.flushUnroutedMessages(tabId);
+        this._updatePendingBadge();
+        return true;
+      }
+    }
+
+    // Strategy 3: If only one connection exists, use it
+    if (this.connections.size === 1) {
+      const onlyPort = Array.from(this.connections.keys())[0];
+      this.assignTabToConnection(tabId, onlyPort);
+      // Cache this domain → port association
+      if (hostname) {
+        await this.cacheDomainPort(hostname, onlyPort);
+      }
+      await this.flushUnroutedMessages(tabId);
+      this._updatePendingBadge();
+      return true;
+    }
+
+    // Strategy 4: Mark as pending
+    console.log(`[ConnectionManager] Tab ${tabId} marked as pending assignment`);
+    this.pendingTabs.set(tabId, { url, awaitingAssignment: true });
+    this._updatePendingBadge();
+    return false;
+  }
+
+  /**
+   * Find backend port for a given URL using pattern rules
+   * @param {string} url - URL to match
+   * @returns {number|null} Port number or null
+   */
+  findBackendForUrl(url) {
+    for (const rule of this.urlPatternRules) {
+      if (rule.pattern.test(url)) {
+        console.log(`[ConnectionManager] URL ${url} matched pattern rule -> port ${rule.port}`);
+        return rule.port;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Get cached port for a domain
+   * @param {string} domain - Domain name
+   * @returns {Promise<number|null>} Port number or null
+   */
+  async getCachedPortForDomain(domain) {
+    // Check in-memory cache first
+    if (this.domainPortMap[domain]) {
+      console.log(`[ConnectionManager] Domain ${domain} found in cache -> port ${this.domainPortMap[domain]}`);
+      return this.domainPortMap[domain];
+    }
+
+    // Load from storage
+    try {
+      const result = await chrome.storage.local.get(STORAGE_KEYS.DOMAIN_PORT_MAP);
+      const storedMap = result[STORAGE_KEYS.DOMAIN_PORT_MAP] || {};
+      this.domainPortMap = storedMap;
+      return storedMap[domain] || null;
+    } catch (e) {
+      console.error('[ConnectionManager] Failed to load domain-port map:', e);
+      return null;
+    }
+  }
+
+  /**
+   * Cache domain → port mapping
+   * @param {string} domain - Domain name
+   * @param {number} port - Port number
+   * @returns {Promise<void>}
+   */
+  async cacheDomainPort(domain, port) {
+    console.log(`[ConnectionManager] Caching domain ${domain} -> port ${port}`);
+    this.domainPortMap[domain] = port;
+
+    try {
+      await chrome.storage.local.set({
+        [STORAGE_KEYS.DOMAIN_PORT_MAP]: this.domainPortMap
+      });
+    } catch (e) {
+      console.error('[ConnectionManager] Failed to save domain-port map:', e);
+    }
+  }
+
+  /**
+   * Route a message to the appropriate backend for a tab
+   * @param {number} tabId - Tab ID
+   * @param {Object} message - Message to route
+   * @returns {Promise<boolean>} Success status
+   */
+  async routeMessage(tabId, message) {
+    const connection = this.getConnectionForTab(tabId);
+
+    if (!connection) {
+      console.warn(`[ConnectionManager] No connection for tab ${tabId}, queueing message`);
+      this.unroutedMessages.push({ tabId, message, timestamp: Date.now() });
+      return false;
+    }
+
+    // Add routing metadata
+    const enrichedMessage = {
+      ...message,
+      tabId: tabId,
+      routedAt: Date.now()
+    };
+
+    return this._sendToConnection(connection, enrichedMessage);
+  }
+
+  /**
+   * Process pending tabs once a connection is established
+   * @param {number} port - Port that was just connected
+   * @returns {Promise<void>}
+   */
+  async processPendingTabs(port) {
+    if (this.pendingTabs.size === 0) {
+      return;
+    }
+
+    console.log(`[ConnectionManager] Processing ${this.pendingTabs.size} pending tabs for port ${port}`);
+
+    for (const [tabId, { url }] of this.pendingTabs.entries()) {
+      // Try to register this tab again
+      const assigned = await this.registerTab(tabId, url);
+      if (assigned) {
+        this.pendingTabs.delete(tabId);
+      }
+    }
+
+    this._updatePendingBadge();
+  }
+
+  /**
+   * Flush unrouted messages for a specific tab
+   * @param {number} tabId - Tab ID
+   * @returns {Promise<void>}
+   */
+  async flushUnroutedMessages(tabId) {
+    const connection = this.getConnectionForTab(tabId);
+    if (!connection) {
+      return;
+    }
+
+    const messagesToFlush = this.unroutedMessages.filter(item => item.tabId === tabId);
+    if (messagesToFlush.length === 0) {
+      return;
+    }
+
+    console.log(`[ConnectionManager] Flushing ${messagesToFlush.length} unrouted messages for tab ${tabId}`);
+
+    for (const { message } of messagesToFlush) {
+      await this._sendToConnection(connection, message);
+    }
+
+    // Remove flushed messages
+    this.unroutedMessages = this.unroutedMessages.filter(item => item.tabId !== tabId);
+  }
+
+  /**
+   * Load URL pattern rules from storage
+   * @returns {Promise<void>}
+   */
+  async loadUrlPatternRules() {
+    try {
+      const result = await chrome.storage.local.get(STORAGE_KEYS.URL_PATTERN_RULES);
+      const rules = result[STORAGE_KEYS.URL_PATTERN_RULES] || [];
+
+      // Convert stored patterns to RegExp objects
+      this.urlPatternRules = rules.map(rule => ({
+        pattern: new RegExp(rule.pattern),
+        port: rule.port
+      }));
+
+      console.log(`[ConnectionManager] Loaded ${this.urlPatternRules.length} URL pattern rules`);
+    } catch (e) {
+      console.error('[ConnectionManager] Failed to load URL pattern rules:', e);
+    }
+  }
+
+  /**
+   * Save URL pattern rules to storage
+   * @param {Array} rules - Array of { pattern: string, port: number }
+   * @returns {Promise<void>}
+   */
+  async saveUrlPatternRules(rules) {
+    try {
+      // Store patterns as strings
+      const storableRules = rules.map(rule => ({
+        pattern: rule.pattern instanceof RegExp ? rule.pattern.source : rule.pattern,
+        port: rule.port
+      }));
+
+      await chrome.storage.local.set({
+        [STORAGE_KEYS.URL_PATTERN_RULES]: storableRules
+      });
+
+      // Update in-memory rules
+      this.urlPatternRules = storableRules.map(rule => ({
+        pattern: new RegExp(rule.pattern),
+        port: rule.port
+      }));
+
+      console.log(`[ConnectionManager] Saved ${rules.length} URL pattern rules`);
+    } catch (e) {
+      console.error('[ConnectionManager] Failed to save URL pattern rules:', e);
+    }
+  }
+
+  /**
+   * Internal: Extract hostname from URL
+   * @private
+   */
+  _extractHostname(url) {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname;
+    } catch (e) {
+      console.warn(`[ConnectionManager] Failed to extract hostname from ${url}:`, e);
+      return null;
+    }
+  }
+
+  /**
+   * Internal: Update badge to show pending tabs
+   * @private
+   */
+  _updatePendingBadge() {
+    if (this.pendingTabs.size > 0) {
+      chrome.action.setBadgeBackgroundColor({ color: STATUS_COLORS.YELLOW });
+      chrome.action.setBadgeText({ text: '?' });
+      chrome.action.setTitle({ title: `MCP Browser: ${this.pendingTabs.size} tab(s) awaiting assignment` });
+    } else {
+      // Restore normal badge
+      this._updateGlobalStatus();
+    }
   }
 
   /**
@@ -1652,6 +1922,34 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
   // Remove tab from ConnectionManager
   connectionManager.removeTab(tabId);
+
+  // Remove from pending tabs
+  if (connectionManager.pendingTabs.has(tabId)) {
+    connectionManager.pendingTabs.delete(tabId);
+    connectionManager._updatePendingBadge();
+  }
+});
+
+/**
+ * Register tabs when they complete loading
+ */
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && tab.url) {
+    connectionManager.registerTab(tabId, tab.url).catch(err => {
+      console.error(`[MCP Browser] Failed to register tab ${tabId}:`, err);
+    });
+  }
+});
+
+/**
+ * Register tabs on SPA navigation (history state changes)
+ */
+chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
+  if (details.frameId === 0) { // Main frame only
+    connectionManager.registerTab(details.tabId, details.url).catch(err => {
+      console.error(`[MCP Browser] Failed to register tab ${details.tabId} on navigation:`, err);
+    });
+  }
 });
 
 // Handle messages from popup and content scripts
@@ -1669,22 +1967,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           messages: request.messages,
           url: request.url,
           timestamp: request.timestamp,
-          tabId: sender.tab.id,
           frameId: sender.frameId
         };
 
-        // Try ConnectionManager first (multi-connection mode)
-        const tabConnection = connectionManager.getConnectionForTab(sender.tab.id);
-        if (tabConnection) {
-          const sent = await connectionManager.sendMessage(sender.tab.id, batchMessage);
-          if (!sent) {
-            console.log(`[MCP Browser] Message queued for tab ${sender.tab.id}`);
-          }
-        } else {
-          // Fallback to legacy single-connection mode
-          if (!sendToServer(batchMessage)) {
-            console.log('[MCP Browser] WebSocket not connected, message queued');
-          }
+        // Use ConnectionManager's routeMessage for intelligent routing
+        const sent = await connectionManager.routeMessage(sender.tab.id, batchMessage);
+        if (!sent) {
+          console.log(`[MCP Browser] Message queued for tab ${sender.tab.id} (no backend assigned)`);
         }
       } else {
         // Silently ignore messages from inactive tabs
@@ -1759,6 +2048,39 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Get list of all active connections
     const connections = connectionManager.getActiveConnections();
     sendResponse({ connections: connections });
+  } else if (request.type === 'set_url_pattern_rules') {
+    // Set URL pattern rules for routing
+    const { rules } = request;
+    connectionManager.saveUrlPatternRules(rules).then(() => {
+      sendResponse({ success: true });
+    }).catch(error => {
+      sendResponse({ success: false, error: error.message });
+    });
+    return true; // Keep channel open for async response
+  } else if (request.type === 'get_url_pattern_rules') {
+    // Get current URL pattern rules
+    sendResponse({
+      rules: connectionManager.urlPatternRules.map(rule => ({
+        pattern: rule.pattern.source,
+        port: rule.port
+      }))
+    });
+  } else if (request.type === 'clear_domain_cache') {
+    // Clear domain → port cache
+    connectionManager.domainPortMap = {};
+    chrome.storage.local.remove(STORAGE_KEYS.DOMAIN_PORT_MAP).then(() => {
+      sendResponse({ success: true });
+    }).catch(error => {
+      sendResponse({ success: false, error: error.message });
+    });
+    return true; // Keep channel open for async response
+  } else if (request.type === 'get_pending_tabs') {
+    // Get list of pending tabs
+    const pending = Array.from(connectionManager.pendingTabs.entries()).map(([tabId, info]) => ({
+      tabId,
+      ...info
+    }));
+    sendResponse({ pendingTabs: pending });
   }
 });
 
@@ -1775,6 +2097,9 @@ chrome.runtime.onInstalled.addListener(async () => {
 
   // Load port-project mappings
   await loadPortProjectMap();
+
+  // Load URL pattern rules for routing
+  await connectionManager.loadUrlPatternRules();
 
   // Inject content script into all existing tabs
   chrome.tabs.query({}, (tabs) => {
@@ -1807,6 +2132,9 @@ chrome.runtime.onStartup.addListener(async () => {
 
   // Load port-project mappings
   await loadPortProjectMap();
+
+  // Load URL pattern rules for routing
+  await connectionManager.loadUrlPatternRules();
 
   autoConnect();
 
