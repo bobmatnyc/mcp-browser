@@ -38,6 +38,11 @@ let lastPongTime = Date.now();
 const HEARTBEAT_INTERVAL = 15000; // 15 seconds
 const PONG_TIMEOUT = 10000; // 10 seconds (25s total before timeout)
 
+// Exponential backoff configuration
+let reconnectAttempts = 0;
+const BASE_RECONNECT_DELAY = 1000;  // 1 second
+const MAX_RECONNECT_DELAY = 30000;  // 30 seconds max
+
 // Active ports to content scripts for keepalive
 const activePorts = new Map(); // tabId -> port
 
@@ -52,6 +57,24 @@ const connectionStatus = {
   connectionTime: null,
   availableServers: []
 };
+
+/**
+ * Calculate reconnection delay with exponential backoff and jitter
+ * @returns {number} Delay in milliseconds
+ */
+function calculateReconnectDelay() {
+  // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (capped)
+  const exponentialDelay = Math.min(
+    BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempts),
+    MAX_RECONNECT_DELAY
+  );
+
+  // Add jitter (±25%) to prevent thundering herd
+  const jitter = exponentialDelay * 0.25 * (Math.random() - 0.5);
+  const delay = Math.max(exponentialDelay + jitter, BASE_RECONNECT_DELAY);
+
+  return delay;
+}
 
 /**
  * Handle keepalive port connections from content scripts.
@@ -128,7 +151,12 @@ function sendHeartbeat() {
       // Close connection and trigger reconnect
       currentConnection.close();
       stopHeartbeat();
-      chrome.alarms.create('reconnect', { delayInMinutes: 1 / 60 }); // 1 second
+
+      // Calculate delay with backoff
+      const delay = calculateReconnectDelay();
+      reconnectAttempts++;
+      console.log(`[MCP Browser] Scheduling reconnect in ${delay}ms (attempt ${reconnectAttempts})`);
+      chrome.alarms.create('reconnect', { delayInMinutes: delay / 60000 });
       return;
     }
 
@@ -408,6 +436,10 @@ async function connectToServer(port, serverInfo = null) {
         // Reset pong time on new connection
         lastPongTime = Date.now();
 
+        // Reset reconnect attempts on successful connection
+        reconnectAttempts = 0;
+        console.log('[MCP Browser] Connection successful, reset reconnect attempts');
+
         setupWebSocketHandlers(ws);
 
         // Update connection status
@@ -505,8 +537,11 @@ function setupWebSocketHandlers(ws) {
     extensionState = connectionStatus.availableServers.length > 0 ? 'idle' : 'idle';
     updateBadgeStatus();
 
-    // Try to reconnect after a delay using Chrome Alarms
-    chrome.alarms.create('reconnect', { delayInMinutes: 5 / 60 }); // 5 seconds
+    // Try to reconnect after a delay with exponential backoff
+    const delay = calculateReconnectDelay();
+    reconnectAttempts++;
+    console.log(`[MCP Browser] Scheduling reconnect in ${delay}ms (attempt ${reconnectAttempts})`);
+    chrome.alarms.create('reconnect', { delayInMinutes: delay / 60000 });
   };
 }
 
@@ -691,6 +726,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     // Clear connection state on intentional disconnect
     clearConnectionState();
+    // Reset reconnect attempts on manual disconnect
+    reconnectAttempts = 0;
     sendResponse({ received: true });
   }
 });
