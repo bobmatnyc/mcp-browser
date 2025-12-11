@@ -1,8 +1,10 @@
 """WebSocket service for browser communication."""
 
 import asyncio
+import hashlib
 import json
 import logging
+import os
 from collections import deque
 from typing import Any, Callable, Dict, List, Optional, Set
 
@@ -37,6 +39,35 @@ class WebSocketService:
         # State recovery components
         self.message_buffer: deque = deque(maxlen=1000)  # Keep last 1000 messages
         self.current_sequence: int = 0
+
+        # Generate project identity
+        self.project_identity = self._generate_project_identity()
+        logger.info(f"Project identity: {self.project_identity['project_id']} ({self.project_identity['project_name']})")
+
+    def _generate_project_identity(self) -> dict:
+        """Generate stable identity for this project.
+
+        Identity is based on the working directory, making it stable across
+        restarts but unique per project.
+        """
+        project_path = os.getcwd()
+        # Generate stable 8-char ID from path hash
+        project_id = hashlib.md5(project_path.encode()).hexdigest()[:8]
+        project_name = os.path.basename(project_path)
+
+        return {
+            'project_id': project_id,
+            'project_name': project_name,
+            'project_path': project_path
+        }
+
+    def _get_version(self) -> str:
+        """Get the current version string."""
+        try:
+            from .._version import __version__
+            return __version__
+        except ImportError:
+            return 'unknown'
 
     async def start(self) -> int:
         """Start WebSocket server with port auto-discovery.
@@ -116,17 +147,12 @@ class WebSocketService:
         # Find messages the client missed
         replay_messages = self._get_messages_after_sequence(last_sequence)
 
-        # Import version info
-        try:
-            from .._version import __version__
-            server_version = __version__
-        except ImportError:
-            server_version = "2.1.1"  # Fallback
-
         # Send connection acknowledgment with replay
         ack_message = {
             'type': 'connection_ack',
-            'serverVersion': server_version,
+            'serverVersion': self._get_version(),
+            'project_id': self.project_identity['project_id'],
+            'project_name': self.project_identity['project_name'],
             'currentSequence': self.current_sequence,
             'replay': replay_messages[:100]  # Limit replay to 100 messages
         }
@@ -298,14 +324,14 @@ class WebSocketService:
 
             # Handle server info request
             if message_type == "server_info":
-                import os
-
                 server_info = {
                     "type": "server_info_response",
+                    "project_id": self.project_identity['project_id'],
+                    "project_name": self.project_identity['project_name'],
+                    "project_path": self.project_identity['project_path'],
                     "port": self.port,
-                    "project_path": os.getcwd(),
-                    "project_name": os.path.basename(os.getcwd()),
-                    "version": "1.0.3",
+                    "version": self._get_version(),
+                    "capabilities": ['console_capture', 'dom_interaction', 'screenshots']
                 }
                 await self.send_message(websocket, server_info)
                 return
