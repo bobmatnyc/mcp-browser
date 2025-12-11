@@ -661,4 +661,50 @@
     });
   })();
 
+  // ============================================
+  // KEEPALIVE PORT CONNECTION
+  // ============================================
+
+  let keepalivePort = null;
+  let keepaliveReconnectAttempts = 0;
+  const MAX_KEEPALIVE_RECONNECT_ATTEMPTS = 5;
+
+  /**
+   * Establish keepalive port connection to service worker
+   */
+  function connectKeepalivePort() {
+    try {
+      keepalivePort = chrome.runtime.connect({ name: 'keepalive' });
+      keepaliveReconnectAttempts = 0;
+
+      console.log('[MCP Browser Content] Keepalive port connected');
+
+      keepalivePort.onMessage.addListener((message) => {
+        if (message.type === 'keepalive_ack') {
+          console.log('[MCP Browser Content] Keepalive acknowledged');
+        }
+      });
+
+      keepalivePort.onDisconnect.addListener(() => {
+        console.log('[MCP Browser Content] Keepalive port disconnected');
+        keepalivePort = null;
+
+        // Attempt reconnection with exponential backoff
+        if (keepaliveReconnectAttempts < MAX_KEEPALIVE_RECONNECT_ATTEMPTS) {
+          const delay = Math.min(1000 * Math.pow(2, keepaliveReconnectAttempts), 30000);
+          keepaliveReconnectAttempts++;
+          console.log(`[MCP Browser Content] Reconnecting keepalive in ${delay}ms (attempt ${keepaliveReconnectAttempts})`);
+          setTimeout(connectKeepalivePort, delay);
+        } else {
+          console.warn('[MCP Browser Content] Max keepalive reconnect attempts reached');
+        }
+      });
+    } catch (e) {
+      console.error('[MCP Browser Content] Failed to connect keepalive port:', e);
+    }
+  }
+
+  // Initialize keepalive port on script load
+  connectKeepalivePort();
+
 })();
