@@ -358,6 +358,38 @@ The Chrome extension provides comprehensive browser integration:
 - **Event handling**: Manages click, input, and selection events
 - **Wait mechanics**: Handles dynamic content and AJAX loading
 
+### Safari Extension (macOS)
+
+Full Safari support with native macOS app wrapper:
+
+#### Installation
+```bash
+# Automated conversion from Chrome extension
+cd /Users/masa/Projects/mcp-browser
+bash scripts/create-safari-extension.sh
+```
+
+#### Features
+- **Safari 17+ Support**: Full Manifest V3 compatibility with service workers
+- **Cross-browser API**: Uses both `chrome.*` and `browser.*` namespaces
+- **Native App Wrapper**: Packaged as macOS application for App Store distribution
+- **Code Signing Ready**: Configured for both development and distribution signing
+- **Xcode Project**: Automatically generated with proper capabilities
+
+#### Key Differences from Chrome
+- Requires macOS app wrapper (automatically created)
+- Uses Apple's `safari-web-extension-converter` tool
+- Needs App Sandbox capabilities for WebSocket connections
+- Distribution requires Apple Developer account for signing
+
+📚 **Complete Guide**: See [docs/SAFARI_EXTENSION.md](docs/SAFARI_EXTENSION.md) for:
+- Step-by-step setup instructions
+- Xcode project configuration
+- Code signing and notarization
+- App Store and direct distribution
+- Testing and debugging guides
+- Common issues and solutions
+
 ## 🗂️ File Structure
 
 ### Project Structure
@@ -379,7 +411,16 @@ mcp-browser/
 │   │   ├── screenshot_service.py
 │   │   └── dom_interaction_service.py
 │   └── models/              # Data models
-├── extension/               # Chrome extension
+├── mcp-browser-extension/   # Chrome/Firefox extension
+├── mcp-browser-extension-safari-resources/  # Safari extension resources
+│   ├── manifest.json        # Safari-compatible manifest
+│   ├── background.js        # Cross-browser service worker
+│   ├── popup.html           # Safari-optimized popup
+│   └── popup.js             # Safari-compatible popup logic
+├── scripts/
+│   └── create-safari-extension.sh  # Safari extension converter
+├── docs/
+│   └── SAFARI_EXTENSION.md  # Complete Safari setup guide
 ├── tmp/
 │   └── demo_dom_interaction.html  # Test page for DOM features
 └── requirements.txt
