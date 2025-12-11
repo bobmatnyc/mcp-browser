@@ -82,6 +82,241 @@ const connectionStatus = {
 };
 
 /**
+ * PortSelector - Intelligent port selection with priority-based strategy
+ * Handles smart backend selection for tabs using multiple heuristics
+ */
+class PortSelector {
+  constructor(connectionManager) {
+    this.connectionManager = connectionManager;
+    this.mruPort = null;  // Most recently used port
+    this.mruTimestamp = null;
+  }
+
+  /**
+   * Select port for a tab using priority-based strategy
+   * @param {number} tabId - Tab ID
+   * @param {string} url - Tab URL
+   * @returns {Promise<number|null>} Port number or null
+   */
+  async selectPort(tabId, url) {
+    console.log(`[PortSelector] Selecting port for tab ${tabId}, URL: ${url}`);
+
+    // Priority 1: Exact URL rule match (user-defined patterns)
+    const ruleMatch = await this.matchUrlRules(url);
+    if (ruleMatch && await this.isBackendAlive(ruleMatch)) {
+      console.log(`[PortSelector] P1: URL rule match -> port ${ruleMatch}`);
+      return ruleMatch;
+    }
+
+    // Priority 2: Domain → backend cache
+    const domainMatch = await this.matchDomainCache(url);
+    if (domainMatch && await this.isBackendAlive(domainMatch)) {
+      console.log(`[PortSelector] P2: Domain cache match -> port ${domainMatch}`);
+      return domainMatch;
+    }
+
+    // Priority 3: Project path heuristic (URL contains project name)
+    const projectMatch = await this.matchProjectName(url);
+    if (projectMatch && await this.isBackendAlive(projectMatch)) {
+      console.log(`[PortSelector] P3: Project name match -> port ${projectMatch}`);
+      return projectMatch;
+    }
+
+    // Priority 4: Most recently used backend
+    if (this.mruPort && await this.isBackendAlive(this.mruPort)) {
+      console.log(`[PortSelector] P4: MRU -> port ${this.mruPort}`);
+      return this.mruPort;
+    }
+
+    // Priority 5: First available backend (from active connections)
+    const firstActive = this.connectionManager.getFirstActivePort();
+    if (firstActive) {
+      console.log(`[PortSelector] P5: First active -> port ${firstActive}`);
+      return firstActive;
+    }
+
+    // Priority 6: Full port scan as last resort
+    const scanned = await this.scanForFirstAvailable();
+    if (scanned) {
+      console.log(`[PortSelector] P6: Scan result -> port ${scanned}`);
+      return scanned;
+    }
+
+    console.log(`[PortSelector] No port found for tab ${tabId}`);
+    return null;
+  }
+
+  /**
+   * Match URL against pattern rules
+   * @param {string} url - URL to match
+   * @returns {Promise<number|null>} Port number or null
+   */
+  async matchUrlRules(url) {
+    for (const rule of this.connectionManager.urlPatternRules) {
+      if (rule.pattern.test(url)) {
+        console.log(`[PortSelector] URL ${url} matched pattern rule -> port ${rule.port}`);
+        return rule.port;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Match URL against domain cache
+   * @param {string} url - URL to match
+   * @returns {Promise<number|null>} Port number or null
+   */
+  async matchDomainCache(url) {
+    const hostname = this._extractHostname(url);
+    if (!hostname) {
+      return null;
+    }
+
+    // Check in-memory cache first
+    if (this.connectionManager.domainPortMap[hostname]) {
+      console.log(`[PortSelector] Domain ${hostname} found in cache -> port ${this.connectionManager.domainPortMap[hostname]}`);
+      return this.connectionManager.domainPortMap[hostname];
+    }
+
+    // Load from storage
+    try {
+      const result = await chrome.storage.local.get(STORAGE_KEYS.DOMAIN_PORT_MAP);
+      const storedMap = result[STORAGE_KEYS.DOMAIN_PORT_MAP] || {};
+      this.connectionManager.domainPortMap = storedMap;
+      return storedMap[hostname] || null;
+    } catch (e) {
+      console.error('[PortSelector] Failed to load domain-port map:', e);
+      return null;
+    }
+  }
+
+  /**
+   * Match URL against project names (URL contains project name)
+   * @param {string} url - URL to match
+   * @returns {Promise<number|null>} Port number or null
+   */
+  async matchProjectName(url) {
+    try {
+      // Load port-project map from storage
+      const result = await chrome.storage.local.get(STORAGE_KEYS.PORT_PROJECT_MAP);
+      const projectMap = result[STORAGE_KEYS.PORT_PROJECT_MAP] || {};
+
+      // Check if URL contains any project name
+      for (const [port, projectInfo] of Object.entries(projectMap)) {
+        const projectName = projectInfo.project_name || '';
+        const projectPath = projectInfo.project_path || '';
+
+        // Check if URL contains project name or path segment
+        if (projectName && url.toLowerCase().includes(projectName.toLowerCase())) {
+          console.log(`[PortSelector] URL contains project name "${projectName}" -> port ${port}`);
+          return parseInt(port);
+        }
+
+        // Check if URL contains project path segment (last directory name)
+        if (projectPath) {
+          const pathSegment = projectPath.split('/').filter(s => s).pop();
+          if (pathSegment && url.toLowerCase().includes(pathSegment.toLowerCase())) {
+            console.log(`[PortSelector] URL contains project path segment "${pathSegment}" -> port ${port}`);
+            return parseInt(port);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[PortSelector] Failed to match project name:', e);
+    }
+
+    return null;
+  }
+
+  /**
+   * Check if backend is alive and responsive
+   * @param {number} port - Port to check
+   * @returns {Promise<boolean>} True if alive
+   */
+  async isBackendAlive(port) {
+    // First check if we already have an active connection
+    const connection = this.connectionManager.connections.get(port);
+    if (connection && connection.ws && connection.ws.readyState === WebSocket.OPEN) {
+      return true;
+    }
+
+    // Quick WebSocket check with timeout
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        if (ws && ws.readyState !== WebSocket.CLOSED) {
+          ws.close();
+        }
+        resolve(false);
+      }, 1000); // 1 second timeout
+
+      let ws = null;
+      try {
+        ws = new WebSocket(`ws://localhost:${port}`);
+
+        ws.onopen = () => {
+          clearTimeout(timeout);
+          ws.close();
+          resolve(true);
+        };
+
+        ws.onerror = () => {
+          clearTimeout(timeout);
+          resolve(false);
+        };
+
+        ws.onclose = () => {
+          clearTimeout(timeout);
+        };
+      } catch (e) {
+        clearTimeout(timeout);
+        resolve(false);
+      }
+    });
+  }
+
+  /**
+   * Scan port range for first available backend
+   * @returns {Promise<number|null>} Port number or null
+   */
+  async scanForFirstAvailable() {
+    console.log(`[PortSelector] Scanning ports ${PORT_RANGE.start}-${PORT_RANGE.end}...`);
+
+    for (let port = PORT_RANGE.start; port <= PORT_RANGE.end; port++) {
+      if (await this.isBackendAlive(port)) {
+        console.log(`[PortSelector] Found available backend at port ${port}`);
+        return port;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Update most recently used port
+   * @param {number} port - Port that was used
+   */
+  updateMRU(port) {
+    this.mruPort = port;
+    this.mruTimestamp = Date.now();
+    console.log(`[PortSelector] Updated MRU to port ${port}`);
+  }
+
+  /**
+   * Extract hostname from URL
+   * @private
+   */
+  _extractHostname(url) {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname;
+    } catch (e) {
+      console.warn(`[PortSelector] Failed to extract hostname from ${url}:`, e);
+      return null;
+    }
+  }
+}
+
+/**
  * ConnectionManager - Manages multiple simultaneous WebSocket connections
  * Supports N connections with per-connection state, heartbeat, and message queuing
  */
@@ -94,6 +329,7 @@ class ConnectionManager {
     this.unroutedMessages = []; // Messages without a backend
     this.domainPortMap = {}; // domain → port (cached associations)
     this.urlPatternRules = []; // { pattern: RegExp, port: number }[]
+    this.portSelector = new PortSelector(this); // Smart port selection
   }
 
   /**
@@ -377,7 +613,22 @@ class ConnectionManager {
   }
 
   /**
+   * Get first active port from connections
+   * Used as fallback in port selection
+   * @returns {number|null} Port number or null
+   */
+  getFirstActivePort() {
+    for (const [port, conn] of this.connections) {
+      if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
+        return port;
+      }
+    }
+    return null;
+  }
+
+  /**
    * Register a tab and find the appropriate backend for it
+   * Uses PortSelector for intelligent port selection
    * @param {number} tabId - Tab ID
    * @param {string} url - Tab URL
    * @returns {Promise<boolean>} True if tab was assigned, false if pending
@@ -385,42 +636,44 @@ class ConnectionManager {
   async registerTab(tabId, url) {
     console.log(`[ConnectionManager] Registering tab ${tabId} with URL: ${url}`);
 
-    // Strategy 1: Check URL pattern rules
-    const patternPort = this.findBackendForUrl(url);
-    if (patternPort && this.connections.has(patternPort)) {
-      this.assignTabToConnection(tabId, patternPort);
-      await this.flushUnroutedMessages(tabId);
-      this._updatePendingBadge();
-      return true;
-    }
+    // Use PortSelector for intelligent port selection
+    const selectedPort = await this.portSelector.selectPort(tabId, url);
 
-    // Strategy 2: Check domain cache
-    const hostname = this._extractHostname(url);
-    if (hostname) {
-      const cachedPort = await this.getCachedPortForDomain(hostname);
-      if (cachedPort && this.connections.has(cachedPort)) {
-        this.assignTabToConnection(tabId, cachedPort);
-        await this.flushUnroutedMessages(tabId);
-        this._updatePendingBadge();
-        return true;
+    if (selectedPort) {
+      // Ensure connection exists
+      if (!this.connections.has(selectedPort)) {
+        try {
+          await this.connectToBackend(selectedPort);
+        } catch (error) {
+          console.error(`[ConnectionManager] Failed to connect to selected port ${selectedPort}:`, error);
+          // Mark as pending if connection fails
+          this.pendingTabs.set(tabId, { url, awaitingAssignment: true });
+          this._updatePendingBadge();
+          return false;
+        }
       }
-    }
 
-    // Strategy 3: If only one connection exists, use it
-    if (this.connections.size === 1) {
-      const onlyPort = Array.from(this.connections.keys())[0];
-      this.assignTabToConnection(tabId, onlyPort);
-      // Cache this domain → port association
+      // Assign tab to connection
+      this.assignTabToConnection(tabId, selectedPort);
+
+      // Cache domain → port association
+      const hostname = this._extractHostname(url);
       if (hostname) {
-        await this.cacheDomainPort(hostname, onlyPort);
+        await this.cacheDomainPort(hostname, selectedPort);
       }
+
+      // Update MRU
+      this.portSelector.updateMRU(selectedPort);
+
+      // Flush any unrouted messages
       await this.flushUnroutedMessages(tabId);
+
       this._updatePendingBadge();
       return true;
     }
 
-    // Strategy 4: Mark as pending
-    console.log(`[ConnectionManager] Tab ${tabId} marked as pending assignment`);
+    // No port found - mark as pending
+    console.log(`[ConnectionManager] Tab ${tabId} marked as pending assignment (no port available)`);
     this.pendingTabs.set(tabId, { url, awaitingAssignment: true });
     this._updatePendingBadge();
     return false;
