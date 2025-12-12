@@ -16,9 +16,10 @@ from typing import Dict, List, Optional, Tuple
 class ExtensionBuilder:
     """Chrome extension build and version management."""
 
-    def __init__(self):
+    def __init__(self, browser: str = "chrome"):
         self.project_root = Path(__file__).parent.parent
-        self.extension_dir = self.project_root / "src" / "extension"
+        self.browser = browser
+        self.extension_dir = self.project_root / "src" / "extensions" / browser
         self.dist_dir = self.project_root / "dist"
         self.manifest_path = self.extension_dir / "manifest.json"
         self.pyproject_path = self.project_root / "pyproject.toml"
@@ -206,7 +207,7 @@ class ExtensionBuilder:
         files = [f for f in files if not self.should_exclude(f)]
 
         # Create zip file
-        zip_name = f"mcp-browser-extension-v{version}.zip"
+        zip_name = f"mcp-browser-extension-{self.browser}-v{version}.zip"
         zip_path = self.dist_dir / zip_name
 
         print(f"\n📦 Building extension package: {zip_name}")
@@ -249,7 +250,7 @@ class ExtensionBuilder:
         """Check if extension directory has uncommitted changes."""
         try:
             result = subprocess.run(
-                ['git', 'status', '--porcelain', 'src/extension/'],
+                ['git', 'status', '--porcelain', f'src/extensions/{self.browser}/'],
                 capture_output=True,
                 text=True,
                 cwd=self.project_root
@@ -352,10 +353,12 @@ def main():
     """Main entry point for build script."""
     import argparse
 
-    parser = argparse.ArgumentParser(description='Chrome Extension Build Tool')
+    parser = argparse.ArgumentParser(description='Browser Extension Build Tool')
     parser.add_argument('command', nargs='?', default='build',
                         choices=['build', 'release', 'version', 'sync', 'clean', 'info'],
                         help='Command to execute')
+    parser.add_argument('--browser', choices=['chrome', 'firefox', 'safari'], default='chrome',
+                        help='Browser target (default: chrome)')
     parser.add_argument('--auto-version', action='store_true',
                         help='Auto-increment patch version if changes detected')
     parser.add_argument('--bump', choices=['patch', 'minor', 'major'], default='patch',
@@ -368,7 +371,7 @@ def main():
     else:
         args = parser.parse_args()
 
-    builder = ExtensionBuilder()
+    builder = ExtensionBuilder(browser=args.browser)
 
     try:
         if args.command == 'build':

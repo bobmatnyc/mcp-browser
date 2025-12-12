@@ -18,13 +18,13 @@ class WebSocketService:
     """WebSocket server with port auto-discovery."""
 
     def __init__(
-        self, start_port: int = 8875, end_port: int = 8895, host: str = "localhost"
+        self, start_port: int = 8851, end_port: int = 8899, host: str = "localhost"
     ):
         """Initialize WebSocket service.
 
         Args:
-            start_port: Starting port for auto-discovery
-            end_port: Ending port for auto-discovery
+            start_port: Starting port for auto-discovery (default: 8851)
+            end_port: Ending port for auto-discovery (default: 8899)
             host: Host to bind to
         """
         self.start_port = start_port

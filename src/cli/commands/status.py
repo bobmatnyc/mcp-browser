@@ -80,7 +80,7 @@ def status(ctx, format):
         if status_info["server_running"]:
             server_status = f"[green]✓ Running on port {status_info.get('server_port', 'unknown')}[/green]"
         else:
-            server_status = "[dim]○ Not running[/dim]"
+            server_status = "[dim]○ Not running (will auto-start on first command)[/dim]"
         table.add_row("Server", server_status)
 
         # Data directories

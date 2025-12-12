@@ -64,7 +64,7 @@ class BrowserMCPServer:
                 "max_file_size_mb": 50,
                 "retention_days": 7,
             },
-            "websocket": {"port_range": [8875, 8895], "host": "localhost"},
+            "websocket": {"port_range": [8851, 8899], "host": "localhost"},
             "logging": {
                 "level": "INFO",
                 "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -294,6 +294,11 @@ class BrowserMCPServer:
         if not self.mcp_mode:
             logger.info("MCP Browser Server started successfully")
 
+        # Write service info to registry (for daemon tracking)
+        if self.websocket_port and not self.mcp_mode:
+            from .daemon import write_service_info
+            write_service_info(os.getpid(), self.websocket_port)
+
         # Show status
         await self.show_status()
 
@@ -301,6 +306,11 @@ class BrowserMCPServer:
         """Stop all services gracefully."""
         if not self.mcp_mode:
             logger.info("Stopping MCP Browser Server...")
+
+        # Clear service info from registry
+        if not self.mcp_mode:
+            from .daemon import clear_service_info
+            clear_service_info()
 
         if self.start_time and not self.mcp_mode:
             uptime = datetime.now() - self.start_time
@@ -357,7 +367,7 @@ class BrowserMCPServer:
         ws_info = websocket.get_server_info()
         print(f"  Server: {ws_info['host']}:{ws_info['port']}")
         print(f"  Active Connections: {ws_info['connection_count']}")
-        print("  Port Range: 8875-8895")
+        print(f"  Port Range: {ws_info['port_range']}")
 
         # Browser stats
         print("\n🌍 Browser Service:")

@@ -23,6 +23,7 @@ from .commands import (
     init,
     install,
     quickstart,
+    setup,
     start,
     status,
     tutorial,
@@ -176,6 +177,7 @@ def reference():
 
 [bold]Essential Commands:[/bold]
   [cyan]quickstart[/cyan]  - Interactive setup wizard
+  [cyan]setup[/cyan]       - Complete installation (config + MCP + extension)
   [cyan]init[/cyan]        - Initialize extension
   [cyan]start[/cyan]       - Start server + dashboard
   [cyan]status[/cyan]      - Check installation status
@@ -345,6 +347,7 @@ complete -c mcp-browser -n "__fish_use_subcommand" -a completion -d "Generate co
 
 # Register command modules
 cli.add_command(quickstart)
+cli.add_command(setup)
 cli.add_command(init)
 cli.add_command(start)
 cli.add_command(status)

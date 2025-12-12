@@ -1,8 +1,10 @@
 """Browser interaction commands for testing and development."""
 
 import asyncio
+import functools
 import sys
-from typing import Any, Dict, Optional
+from pathlib import Path
+from typing import Any, Callable, Dict, Optional
 
 import click
 from rich.console import Console
@@ -11,8 +13,56 @@ from rich.prompt import Prompt
 from rich.table import Table
 
 from ..utils.browser_client import BrowserClient, find_active_port
+from ..utils.daemon import ensure_server_running, get_server_status
 
 console = Console()
+
+
+def requires_server(f: Callable) -> Callable:
+    """Decorator that ensures server is running before command executes.
+
+    This decorator will:
+    1. Check if server is already running
+    2. Auto-start server if not running
+    3. Show brief status messages
+    4. Handle failure gracefully with helpful error messages
+
+    Usage:
+        @requires_server
+        async def my_command():
+            # Server is now guaranteed to be running
+            ...
+    """
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        # Check current status first
+        is_running, _, existing_port = get_server_status()
+
+        if not is_running:
+            console.print("[cyan]⚡ Starting server...[/cyan]", end=" ")
+            success, port = ensure_server_running()
+
+            if not success:
+                console.print("[red]✗ Failed[/red]")
+                console.print(
+                    Panel(
+                        "[red]✗ Failed to start server automatically[/red]\n\n"
+                        "Please try starting manually:\n"
+                        "  [cyan]mcp-browser start[/cyan]\n\n"
+                        "Or check for errors:\n"
+                        "  [cyan]mcp-browser doctor[/cyan]",
+                        title="Auto-Start Failed",
+                        border_style="red",
+                    )
+                )
+                return
+
+            console.print(f"[green]✓ Started on port {port}[/green]")
+
+        # Server is now running, proceed with command
+        return f(*args, **kwargs)
+
+    return wrapper
 
 
 @click.group()
@@ -21,12 +71,11 @@ def browser():
 
     \b
     These commands provide direct browser control for testing and development.
-    The server must be running before using these commands.
+    The server will auto-start if not already running.
 
     \b
     Prerequisites:
-      • Start the server: mcp-browser start
-      • Install and connect Chrome extension
+      • Install and connect Chrome extension (mcp-browser setup)
       • Navigate to a website in the browser
 
     \b
@@ -74,6 +123,7 @@ def control():
     type=int,
     help="WebSocket port (auto-detect if not specified)",
 )
+@requires_server
 def navigate_to_url(url: str, wait: float, port: int):
     """Navigate browser to a URL.
 
@@ -153,6 +203,7 @@ async def _navigate_command(url: str, wait: float, port: Optional[int]):
     help="WebSocket port (auto-detect if not specified)",
 )
 @click.option("--json", "json_output", is_flag=True, help="Output as JSON")
+@requires_server
 def logs(limit: int, level: str, port: int, json_output: bool):
     """Query captured console logs.
 
@@ -215,6 +266,7 @@ async def _logs_command(limit: int, level: str, port: Optional[int], json_output
     type=int,
     help="WebSocket port (auto-detect if not specified)",
 )
+@requires_server
 def fill_field(selector: str, value: str, port: int):
     """Fill a form field.
 
@@ -280,6 +332,7 @@ async def _fill_command(selector: str, value: str, port: Optional[int]):
     type=int,
     help="WebSocket port (auto-detect if not specified)",
 )
+@requires_server
 def click_element(selector: str, port: int):
     """Click an element.
 
@@ -340,6 +393,7 @@ async def _click_command(selector: str, port: Optional[int]):
 @click.option("--down", "direction", flag_value="down", default=True, help="Scroll down")
 @click.option("--amount", default=500, type=int, help="Pixels to scroll")
 @click.option("--port", default=None, type=int, help="WebSocket port")
+@requires_server
 def scroll_page(direction: str, amount: int, port: int):
     """Scroll the page up or down.
 
@@ -400,6 +454,7 @@ async def _scroll_command(direction: str, amount: int, port: Optional[int]):
 @control.command(name="submit")
 @click.argument("selector")
 @click.option("--port", default=None, type=int, help="WebSocket port")
+@requires_server
 def submit_form(selector: str, port: int):
     """Submit a form.
 
@@ -478,6 +533,7 @@ def extract():
 @extract.command(name="content")
 @click.option("--port", default=None, type=int, help="WebSocket port")
 @click.option("--json", "json_output", is_flag=True, help="Output as JSON")
+@requires_server
 def extract_content(port: int, json_output: bool):
     """Extract readable content using Readability.js.
 
@@ -546,6 +602,7 @@ async def _extract_content_command(port: Optional[int], json_output: bool):
 @click.option("--links/--no-links", default=True, help="Include links")
 @click.option("--forms/--no-forms", default=True, help="Include forms")
 @click.option("--json", "json_output", is_flag=True, help="Output as JSON")
+@requires_server
 def extract_semantic(port: int, headings: bool, landmarks: bool, links: bool, forms: bool, json_output: bool):
     """Extract semantic DOM structure.
 
@@ -675,6 +732,7 @@ def _display_semantic_dom(dom: Dict[str, Any], show_headings: bool, show_landmar
 @click.argument("selector")
 @click.option("--port", default=None, type=int, help="WebSocket port")
 @click.option("--json", "json_output", is_flag=True, help="Output as JSON")
+@requires_server
 def extract_selector(selector: str, port: int, json_output: bool):
     """Extract content from specific CSS selector.
 
@@ -740,6 +798,7 @@ async def _extract_selector_command(selector: str, port: Optional[int], json_out
     type=int,
     help="WebSocket port (auto-detect if not specified)",
 )
+@requires_server
 def screenshot(output: str, port: int):
     """Take a screenshot of the current browser tab.
 
@@ -785,6 +844,7 @@ async def _screenshot_command(output: str, port: Optional[int]):
     type=int,
     help="WebSocket port (auto-detect if not specified)",
 )
+@requires_server
 def test(demo: bool, port: int):
     """Run interactive browser test session.
 

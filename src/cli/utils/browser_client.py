@@ -10,6 +10,8 @@ from typing import Any, Dict, Optional
 import websockets
 from rich.console import Console
 
+from .daemon import PORT_RANGE_START, PORT_RANGE_END, read_service_info
+
 console = Console()
 logger = logging.getLogger(__name__)
 
@@ -17,12 +19,12 @@ logger = logging.getLogger(__name__)
 class BrowserClient:
     """Client for interacting with mcp-browser WebSocket server."""
 
-    def __init__(self, host: str = "localhost", port: int = 8875):
+    def __init__(self, host: str = "localhost", port: int = PORT_RANGE_START):
         """Initialize browser client.
 
         Args:
             host: WebSocket server host
-            port: WebSocket server port
+            port: WebSocket server port (default: PORT_RANGE_START)
         """
         self.host = host
         self.port = port
@@ -390,9 +392,11 @@ class BrowserClient:
 
 
 async def find_active_port(
-    start_port: int = 8875, end_port: int = 8895
+    start_port: int = PORT_RANGE_START, end_port: int = PORT_RANGE_END
 ) -> Optional[int]:
     """Find the active WebSocket server port.
+
+    First checks service registry, then scans port range.
 
     Args:
         start_port: Starting port to scan
@@ -401,6 +405,18 @@ async def find_active_port(
     Returns:
         Active port number or None if not found
     """
+    # Check service registry first
+    info = read_service_info()
+    if info and info.get("port"):
+        port = info["port"]
+        try:
+            uri = f"ws://localhost:{port}"
+            async with websockets.connect(uri, open_timeout=0.5):
+                return port
+        except Exception:
+            pass
+
+    # Fallback to port scanning
     for port in range(start_port, end_port + 1):
         try:
             uri = f"ws://localhost:{port}"

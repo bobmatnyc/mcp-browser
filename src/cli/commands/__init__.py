@@ -8,6 +8,7 @@ from .extension import extension
 from .init import init
 from .install import install, uninstall
 from .quickstart import quickstart
+from .setup import setup
 from .start import start
 from .status import status
 from .tutorial import tutorial
@@ -20,6 +21,7 @@ __all__ = [
     "dashboard",
     "tutorial",
     "quickstart",
+    "setup",
     "install",
     "uninstall",
     "extension",

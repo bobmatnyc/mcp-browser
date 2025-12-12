@@ -70,8 +70,10 @@ async def check_system_requirements() -> List[Tuple[str, bool, str]]:
     checks.append(("Playwright", playwright_ok, "For screenshots"))
 
     # Port availability
+    from .daemon import PORT_RANGE_START, PORT_RANGE_END
+
     port_available = False
-    for port in range(8875, 8896):
+    for port in range(PORT_RANGE_START, PORT_RANGE_END + 1):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             try:
                 s.bind(("", port))
@@ -79,13 +81,15 @@ async def check_system_requirements() -> List[Tuple[str, bool, str]]:
                 break
             except Exception:
                 pass
-    checks.append(("Port availability", port_available, "Ports 8875-8895"))
+    checks.append(("Port availability", port_available, f"Ports {PORT_RANGE_START}-{PORT_RANGE_END}"))
 
     return checks
 
 
 async def check_installation_status() -> Dict[str, Any]:
     """Check the installation status of mcp-browser."""
+    from .daemon import get_server_status
+
     status = {
         "package_installed": True,  # We're running, so it's installed
         "config_exists": CONFIG_FILE.exists(),
@@ -100,13 +104,10 @@ async def check_installation_status() -> Dict[str, Any]:
     local_ext = Path.cwd() / ".mcp-browser" / "extension"
     status["extension_initialized"] = local_ext.exists()
 
-    # Check if server is running (by checking port)
-    for port in range(8875, 8896):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(0.1)
-            if s.connect_ex(("localhost", port)) == 0:
-                status["server_running"] = True
-                status["server_port"] = port
-                break
+    # Check if server is running using daemon module's status function
+    is_running, pid, port = get_server_status()
+    status["server_running"] = is_running
+    if port:
+        status["server_port"] = port
 
     return status
