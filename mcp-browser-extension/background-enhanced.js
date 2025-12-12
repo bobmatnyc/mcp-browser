@@ -11,7 +11,8 @@
 
 // Configuration
 const PORT_RANGE = { start: 8875, end: 8895 };
-const SCAN_INTERVAL_MINUTES = 0.5; // Scan for servers every 30 seconds (0.5 minutes)
+// REMOVED: Automatic scanning disabled - scan only on user request
+// const SCAN_INTERVAL_MINUTES = 0.5;
 
 // Storage keys for persistence
 const STORAGE_KEYS = {
@@ -135,14 +136,15 @@ class PortSelector {
       return firstActive;
     }
 
-    // Priority 6: Full port scan as last resort
-    const scanned = await this.scanForFirstAvailable();
-    if (scanned) {
-      console.log(`[PortSelector] P6: Scan result -> port ${scanned}`);
-      return scanned;
-    }
+    // Priority 6: Full port scan REMOVED - user must manually scan
+    // Only scan when user explicitly clicks "Scan for Backends"
+    // const scanned = await this.scanForFirstAvailable();
+    // if (scanned) {
+    //   console.log(`[PortSelector] P6: Scan result -> port ${scanned}`);
+    //   return scanned;
+    // }
 
-    console.log(`[PortSelector] No port found for tab ${tabId}`);
+    console.log(`[PortSelector] No port found for tab ${tabId} - user must scan manually`);
     return null;
   }
 
@@ -1454,17 +1456,18 @@ function getActivePortCount() {
 
 /**
  * Chrome Alarms handler for persistent timers
- * Handles reconnection, server scanning, and heartbeat
+ * Handles reconnection and heartbeat (automatic scanning REMOVED)
  */
 chrome.alarms.onAlarm.addListener((alarm) => {
   console.log(`[MCP Browser] Alarm triggered: ${alarm.name}`);
   if (alarm.name === 'reconnect') {
     autoConnect();
-  } else if (alarm.name === 'serverScan') {
-    scanForServers();
   } else if (alarm.name === 'heartbeat') {
     sendHeartbeat();
   }
+  // REMOVED: Automatic server scanning
+  // } else if (alarm.name === 'serverScan') {
+  //   scanForServers();
 });
 
 /**
@@ -2065,10 +2068,12 @@ async function tryConnectToPort(port) {
 
 /**
  * Auto-connect to the best available server
+ * MODIFIED: Only tries known ports, NO automatic full port scan
+ * User must click "Scan for Backends" button for full scan
  */
 async function autoConnect() {
   try {
-    console.log('[MCP Browser] Auto-connect starting...');
+    console.log('[MCP Browser] Auto-connect starting (known ports only)...');
 
     // Load port mappings if not already loaded
     if (Object.keys(portProjectMap).length === 0) {
@@ -2097,28 +2102,12 @@ async function autoConnect() {
       }
     }
 
-    // Fall back to full port scan
-    console.log('[MCP Browser] Known ports failed, scanning...');
-    const servers = await scanForServers();
-
-    if (servers.length === 0) {
-      console.log('[MCP Browser] No servers found');
-      connectionStatus.lastError = 'No MCP Browser servers found';
-      extensionState = 'idle';
-      updateBadgeStatus();
-      return;
-    }
-
-    // If only one server, connect to it
-    if (servers.length === 1) {
-      console.log(`[MCP Browser] Connecting to single server on port ${servers[0].port}`);
-      await connectToServer(servers[0].port, servers[0]);
-      return;
-    }
-
-    // If multiple servers, prefer the first one (could be enhanced with preferences)
-    console.log(`[MCP Browser] Found ${servers.length} servers, connecting to first one`);
-    await connectToServer(servers[0].port, servers[0]);
+    // REMOVED: Automatic full port scan
+    // User must explicitly click "Scan for Backends" button in popup
+    console.log('[MCP Browser] No known servers available. Click "Scan for Backends" in popup to search.');
+    connectionStatus.lastError = 'No known servers - click "Scan for Backends" to search';
+    extensionState = 'idle';
+    updateBadgeStatus();
   } catch (error) {
     console.error('[MCP Browser] Auto-connect failed:', error);
     extensionState = 'error';
@@ -2441,14 +2430,15 @@ chrome.runtime.onInstalled.addListener(async () => {
     });
   });
 
-  // Start server scanning
+  // Start server scanning (one-time on installation)
   autoConnect();
 
-  // Set up periodic scanning with Chrome Alarms
-  chrome.alarms.create('serverScan', {
-    delayInMinutes: SCAN_INTERVAL_MINUTES,
-    periodInMinutes: SCAN_INTERVAL_MINUTES
-  });
+  // REMOVED: Automatic periodic scanning
+  // User must click "Scan for Backends" button in popup to scan
+  // chrome.alarms.create('serverScan', {
+  //   delayInMinutes: SCAN_INTERVAL_MINUTES,
+  //   periodInMinutes: SCAN_INTERVAL_MINUTES
+  // });
 });
 
 // Handle browser startup
@@ -2466,11 +2456,12 @@ chrome.runtime.onStartup.addListener(async () => {
 
   autoConnect();
 
-  // Set up periodic scanning with Chrome Alarms
-  chrome.alarms.create('serverScan', {
-    delayInMinutes: SCAN_INTERVAL_MINUTES,
-    periodInMinutes: SCAN_INTERVAL_MINUTES
-  });
+  // REMOVED: Automatic periodic scanning
+  // User must click "Scan for Backends" button in popup to scan
+  // chrome.alarms.create('serverScan', {
+  //   delayInMinutes: SCAN_INTERVAL_MINUTES,
+  //   periodInMinutes: SCAN_INTERVAL_MINUTES
+  // });
 });
 
 // Initialize on load
