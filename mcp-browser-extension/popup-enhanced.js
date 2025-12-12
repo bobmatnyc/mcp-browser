@@ -294,6 +294,29 @@ function stopAutoRefresh() {
   }
 }
 
+/**
+ * Handle scan for backends button click
+ */
+async function handleScanBackends() {
+  const button = document.getElementById('scan-button');
+  const originalText = button.textContent;
+
+  button.textContent = 'Scanning...';
+  button.disabled = true;
+
+  try {
+    await sendMessage({ type: 'scan_backends' });
+    // Refresh dashboard to show new backends
+    await loadDashboard();
+  } catch (error) {
+    console.error('[Popup] Scan failed:', error);
+    showError('Scan failed: ' + error.message);
+  } finally {
+    button.textContent = originalText;
+    button.disabled = false;
+  }
+}
+
 // Event Listeners
 document.getElementById('scan-button').addEventListener('click', handleScanBackends);
 
