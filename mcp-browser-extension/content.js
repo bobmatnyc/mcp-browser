@@ -276,7 +276,9 @@
   };
 
   // Listen for commands from background
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // Wrap in try-catch to handle extension context invalidation
+  try {
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     (async () => {
       try {
         switch (request.type) {
@@ -619,73 +621,100 @@
 
     // Return true to indicate async response
     return true;
-  })
+  });
+  } catch (e) {
+    // Extension context invalidated - ignore
+    console.debug('[MCP Browser] Could not add message listener - context invalidated');
+  }
 
   // Initial console message to confirm injection
   console.log('[mcp-browser] Console capture initialized');
 
+  // Safe helper to get extension version
+  function safeGetVersion() {
+    try {
+      return chrome.runtime.getManifest ? chrome.runtime.getManifest().version : '1.0.0';
+    } catch (e) {
+      return '1.0.0';
+    }
+  }
+
+  // Safe helper to get extension id
+  function safeGetId() {
+    try {
+      return chrome.runtime.id || 'unknown';
+    } catch (e) {
+      return 'unknown';
+    }
+  }
+
   // Extension detection helpers
   (function setupDetection() {
-    // Inject detection marker
-    const marker = document.createElement('div');
-    marker.setAttribute('data-mcp-browser-extension', 'true');
-    marker.dataset.version = chrome.runtime.getManifest ? chrome.runtime.getManifest().version : '1.0.0';
-    marker.style.display = 'none';
-    marker.id = 'mcp-browser-extension-marker';
-    document.documentElement.appendChild(marker);
+    try {
+      // Inject detection marker
+      const marker = document.createElement('div');
+      marker.setAttribute('data-mcp-browser-extension', 'true');
+      marker.dataset.version = safeGetVersion();
+      marker.style.display = 'none';
+      marker.id = 'mcp-browser-extension-marker';
+      document.documentElement.appendChild(marker);
 
-    // Add class to HTML element
-    document.documentElement.classList.add('mcp-browser-extension-active');
+      // Add class to HTML element
+      document.documentElement.classList.add('mcp-browser-extension-active');
 
-    // Expose global flag
-    window.__MCP_BROWSER_EXTENSION__ = {
-      installed: true,
-      version: chrome.runtime.getManifest ? chrome.runtime.getManifest().version : '1.0.0',
-      timestamp: Date.now()
-    };
+      // Expose global flag
+      window.__MCP_BROWSER_EXTENSION__ = {
+        installed: true,
+        version: safeGetVersion(),
+        timestamp: Date.now()
+      };
 
-    // Listen for detection pings
-    window.addEventListener('message', function(event) {
-      if (event.data && event.data.type === 'MCP_BROWSER_PING') {
-        // Respond with pong
-        window.postMessage({
-          type: 'MCP_BROWSER_PONG',
-          status: 'connected',
-          version: chrome.runtime.getManifest ? chrome.runtime.getManifest().version : '1.0.0',
-          id: chrome.runtime.id,
-          info: 'MCP Browser Extension Active'
-        }, '*');
-      }
+      // Listen for detection pings
+      window.addEventListener('message', function(event) {
+        if (event.data && event.data.type === 'MCP_BROWSER_PING') {
+          // Respond with pong
+          window.postMessage({
+            type: 'MCP_BROWSER_PONG',
+            status: 'connected',
+            version: safeGetVersion(),
+            id: safeGetId(),
+            info: 'MCP Browser Extension Active'
+          }, '*');
+        }
 
-      // Handle test requests
-      if (event.data && event.data.type === 'MCP_BROWSER_TEST') {
-        window.postMessage({
-          type: 'MCP_BROWSER_TEST_RESPONSE',
-          success: true,
-          timestamp: Date.now()
-        }, '*');
-      }
-    });
-
-    // Dispatch ready event
-    const readyEvent = new CustomEvent('mcp-browser-extension-ready', {
-      detail: {
-        version: chrome.runtime.getManifest ? chrome.runtime.getManifest().version : '1.0.0',
-        id: chrome.runtime.id
-      }
-    });
-    document.dispatchEvent(readyEvent);
-
-    // Listen for test pings via custom events
-    document.addEventListener('mcp-browser-test-ping', function(event) {
-      const responseEvent = new CustomEvent('mcp-browser-test-pong', {
-        detail: {
-          timestamp: event.detail.timestamp,
-          version: chrome.runtime.getManifest ? chrome.runtime.getManifest().version : '1.0.0'
+        // Handle test requests
+        if (event.data && event.data.type === 'MCP_BROWSER_TEST') {
+          window.postMessage({
+            type: 'MCP_BROWSER_TEST_RESPONSE',
+            success: true,
+            timestamp: Date.now()
+          }, '*');
         }
       });
-      document.dispatchEvent(responseEvent);
-    });
+
+      // Dispatch ready event
+      const readyEvent = new CustomEvent('mcp-browser-extension-ready', {
+        detail: {
+          version: safeGetVersion(),
+          id: safeGetId()
+        }
+      });
+      document.dispatchEvent(readyEvent);
+
+      // Listen for test pings via custom events
+      document.addEventListener('mcp-browser-test-ping', function(event) {
+        const responseEvent = new CustomEvent('mcp-browser-test-pong', {
+          detail: {
+            timestamp: event.detail.timestamp,
+            version: safeGetVersion()
+          }
+        });
+        document.dispatchEvent(responseEvent);
+      });
+    } catch (e) {
+      // Extension context invalidated - ignore
+      console.debug('[MCP Browser] Detection setup failed - context invalidated');
+    }
   })();
 
   // ============================================
@@ -727,6 +756,11 @@
         }
       });
     } catch (e) {
+      // Check if context was invalidated - stop retrying
+      if (e.message && e.message.includes('Extension context invalidated')) {
+        console.debug('[MCP Browser Content] Extension context invalidated - stopping keepalive');
+        return;
+      }
       console.error('[MCP Browser Content] Failed to connect keepalive port:', e);
     }
   }
