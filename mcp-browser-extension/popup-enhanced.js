@@ -169,6 +169,8 @@ async function updateBackendList(status) {
  * Handle connecting current tab to a specific backend
  */
 async function handleConnectToBackend(port, tabId) {
+  const connectBtn = document.querySelector(`.backend-connect-btn[data-port="${port}"]`);
+
   try {
     console.log(`[Popup] Connecting tab ${tabId} to backend on port ${port}`);
 
@@ -179,11 +181,11 @@ async function handleConnectToBackend(port, tabId) {
       throw new Error('No port provided');
     }
 
-    // Disable all connect buttons
-    document.querySelectorAll('.backend-connect-btn').forEach(btn => {
-      btn.disabled = true;
-      btn.textContent = 'Connecting...';
-    });
+    // Update button state
+    if (connectBtn) {
+      connectBtn.disabled = true;
+      connectBtn.textContent = 'Connecting...';
+    }
 
     // Assign tab to the selected port
     const response = await sendMessage({
@@ -192,24 +194,40 @@ async function handleConnectToBackend(port, tabId) {
       port: port
     });
 
+    console.log(`[Popup] assign_tab_to_port response:`, response);
+
     if (response && response.success) {
       console.log(`[Popup] Successfully connected tab ${tabId} to port ${port}`);
 
-      // Refresh dashboard to update UI
+      // Hide the backend list immediately
+      const backendListContainer = document.getElementById('backend-list-container');
+      if (backendListContainer) {
+        backendListContainer.style.display = 'none';
+      }
+
+      // Update current tab status immediately
+      const tabStatusIndicator = document.getElementById('tab-status-indicator');
+      const tabStatusText = document.getElementById('tab-status-text');
+      if (tabStatusIndicator && tabStatusText) {
+        tabStatusIndicator.className = 'status-indicator connected';
+        tabStatusText.textContent = `Connected to port ${port}`;
+      }
+
+      // Refresh dashboard to get full status
       await loadDashboard();
     } else {
-      throw new Error(response?.error || 'Failed to assign tab to port');
+      throw new Error(response?.error || 'Failed to connect');
     }
 
   } catch (error) {
     console.error('[Popup] Failed to connect to backend:', error);
     showError(`Failed to connect: ${error.message}`);
 
-    // Re-enable buttons
-    document.querySelectorAll('.backend-connect-btn').forEach(btn => {
-      btn.disabled = false;
-      btn.textContent = 'Connect';
-    });
+    // Re-enable button
+    if (connectBtn) {
+      connectBtn.disabled = false;
+      connectBtn.textContent = 'Connect';
+    }
   }
 }
 
