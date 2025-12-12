@@ -171,6 +171,15 @@
       cursor: not-allowed;
     }
 
+    .tab-info {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 12px;
+      opacity: 0.9;
+      word-break: break-word;
+    }
+
   </style>
 </head>
 <body>
@@ -201,6 +210,7 @@
         <span id="tab-status-text">Not connected</span>
       </span>
     </div>
+    <div id="tab-info" class="tab-info" style="display: none;"></div>
   </div>
 
   <!-- Backend Selection List (shown when backends available but not connected) -->

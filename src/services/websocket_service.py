@@ -336,6 +336,47 @@ class WebSocketService:
                 await self.send_message(websocket, server_info)
                 return
 
+            # Handle response messages from extension - broadcast back to other connections (CLI/MCP clients)
+            response_messages = ['content_extracted', 'dom_response', 'page_content']
+            if message_type in response_messages:
+                logger.info(f"Broadcasting response message: {message_type}")
+                other_connections = [c for c in self._connections if c != websocket]
+                for conn in other_connections:
+                    try:
+                        await conn.send(json.dumps(data))
+                        logger.debug(f"Sent {message_type} response to client")
+                    except Exception as e:
+                        logger.error(f"Failed to send response to client: {e}")
+                # Also call handler if registered (for MCP tool Future resolution)
+                handler = self._message_handlers.get(message_type)
+                if handler:
+                    await handler(data)
+                return
+
+            # Handle browser control commands - broadcast to all connections (including browser extension)
+            browser_commands = ['navigate', 'click', 'fill_field', 'scroll', 'get_page_content', 'dom_command', 'extract_content']
+            if message_type in browser_commands:
+                logger.info(f"Broadcasting browser command: {message_type}")
+                # Check if there are other connections besides the sender
+                other_connections = [c for c in self._connections if c != websocket]
+                if not other_connections:
+                    logger.warning(f"No browser extension connected to receive command: {message_type}")
+                    # Send error back to sender
+                    await self.send_message(websocket, {
+                        "type": "error",
+                        "message": "No browser extension connected. Please ensure the extension is installed and connected.",
+                        "command": message_type
+                    })
+                    return
+                # Broadcast to all other connections (browser extensions)
+                for conn in other_connections:
+                    try:
+                        await conn.send(json.dumps(data))
+                        logger.debug(f"Sent {message_type} command to browser extension")
+                    except Exception as e:
+                        logger.error(f"Failed to send command to browser: {e}")
+                return
+
             # Add connection info to data
             data["_websocket"] = websocket
             data["_remote_address"] = websocket.remote_address

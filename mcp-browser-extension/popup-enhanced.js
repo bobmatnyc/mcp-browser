@@ -83,8 +83,13 @@ function updateOverallStatus(status) {
 async function updateCurrentTabStatus(tabId) {
   const tabStatusIndicator = document.getElementById('tab-status-indicator');
   const tabStatusText = document.getElementById('tab-status-text');
+  const tabInfoElement = document.getElementById('tab-info');
 
   try {
+    // Get current tab info
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const currentTab = tabs[0];
+
     // Get tab connections
     const tabConnectionsResponse = await sendMessage({ type: 'get_tab_connections' });
     const tabConnections = tabConnectionsResponse?.tabConnections || [];
@@ -97,15 +102,32 @@ async function updateCurrentTabStatus(tabId) {
       tabStatusIndicator.className = 'status-indicator connected';
       const projectName = currentTabConnection.backendName || `Port ${currentTabConnection.assignedPort}`;
       tabStatusText.textContent = `Connected to ${projectName} (port ${currentTabConnection.assignedPort})`;
+
+      // Show tab title/URL
+      if (tabInfoElement && currentTab) {
+        const tabTitle = currentTab.title || currentTab.url || 'Unknown';
+        tabInfoElement.textContent = `Tab: ${tabTitle}`;
+        tabInfoElement.style.display = 'block';
+      }
     } else {
       // Tab is not connected
       tabStatusIndicator.className = 'status-indicator disconnected';
       tabStatusText.textContent = 'Not connected';
+
+      // Hide tab info when not connected
+      if (tabInfoElement) {
+        tabInfoElement.style.display = 'none';
+      }
     }
   } catch (error) {
     console.error('[Popup] Failed to get current tab status:', error);
     tabStatusIndicator.className = 'status-indicator disconnected';
     tabStatusText.textContent = 'Error';
+
+    // Hide tab info on error
+    if (tabInfoElement) {
+      tabInfoElement.style.display = 'none';
+    }
   }
 }
 
@@ -137,10 +159,14 @@ async function updateBackendList(status) {
   if (availableServers.length > 0 && !isCurrentTabConnected) {
     backendListContainer.style.display = 'block';
 
+    // Clear any error message since we found servers
+    document.getElementById('error-container').innerHTML = '';
+
     // Clear existing list
     backendList.innerHTML = '';
 
     // Render each backend
+    console.log(`[Popup] Rendering ${availableServers.length} backends, currentTab:`, currentTab);
     availableServers.forEach(server => {
       const item = document.createElement('div');
       item.className = 'backend-item';
@@ -155,7 +181,19 @@ async function updateBackendList(status) {
 
       // Add click handler to connect button
       const connectBtn = item.querySelector('.backend-connect-btn');
-      connectBtn.addEventListener('click', () => handleConnectToBackend(server.port, currentTab.id));
+      const tabIdToUse = currentTab?.id;
+      console.log(`[Popup] Adding click handler for port ${server.port}, tabId: ${tabIdToUse}`);
+
+      connectBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        console.log(`[Popup] Connect button clicked for port ${server.port}, tabId: ${tabIdToUse}`);
+        if (!tabIdToUse) {
+          console.error('[Popup] No tab ID available!');
+          showError('No active tab found');
+          return;
+        }
+        await handleConnectToBackend(server.port, tabIdToUse);
+      });
 
       backendList.appendChild(item);
     });
@@ -244,14 +282,23 @@ async function handleScanBackends() {
     scanButton.classList.add('scanning');
     scanButton.textContent = '🔄 Scanning...';
 
+    console.log('[Popup] Starting server scan...');
     const response = await sendMessage({ type: 'scan_servers' });
 
     if (response && response.servers) {
-      console.log(`[Popup] Found ${response.servers.length} servers`);
+      console.log(`[Popup] Found ${response.servers.length} servers:`, response.servers);
+      if (response.servers.length > 0) {
+        // Clear error container immediately
+        document.getElementById('error-container').innerHTML = '';
+      }
+    } else {
+      console.log('[Popup] Scan response:', response);
     }
 
     // Refresh dashboard after scan
+    console.log('[Popup] Refreshing dashboard...');
     await loadDashboard();
+    console.log('[Popup] Dashboard refreshed');
 
   } catch (error) {
     console.error('[Popup] Scan failed:', error);

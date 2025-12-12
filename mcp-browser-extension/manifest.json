@@ -12,6 +12,7 @@
     "webNavigation"
   ],
   "host_permissions": [
+    "<all_urls>",
     "http://localhost/*",
     "ws://localhost/*",
     "http://127.0.0.1/*",
@@ -37,14 +38,16 @@
   "action": {
     "default_popup": "popup-enhanced.html",
     "default_icon": {
-      "16": "icon-16.png",
-      "48": "icon-48.png",
-      "128": "icon-128.png"
+      "16": "icons/icon16-yellow.png",
+      "32": "icons/icon32-yellow.png",
+      "48": "icons/icon48-yellow.png",
+      "128": "icons/icon128-yellow.png"
     }
   },
   "icons": {
-    "16": "icon-16.png",
-    "48": "icon-48.png",
-    "128": "icon-128.png"
+    "16": "icons/icon16-yellow.png",
+    "32": "icons/icon32-yellow.png",
+    "48": "icons/icon48-yellow.png",
+    "128": "icons/icon128-yellow.png"
   }
 }

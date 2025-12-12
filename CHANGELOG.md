@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2025-12-12
+
+### Added
+- Icon-based connection status system with colored icons (yellow/green/red) replacing badge-based status
+- Backend server selection UI in extension popup with scan functionality
+- Tab information display in popup when connected
+- Package.json configuration for extension development
+- Icon assets directory with status-specific icons (16px, 32px, 48px, 128px)
+
+### Changed
+- WebSocket message routing with broadcasting system for response messages
+- Browser command routing to ensure proper extension communication
+- Connection manager to prevent unwanted reconnects on intentional close
+- Auto-registration disabled - tabs must be explicitly connected via popup UI
+
+### Fixed
+- Race condition in WebSocket message handler setup by establishing handler before sending messages
+- Error handling for missing browser extension connections
+- Backend discovery and connection flow in popup UI
+- Content extraction message routing with proper requestId handling
+
 ## [2.1.1] - 2025-12-11
 
 

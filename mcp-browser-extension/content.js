@@ -297,6 +297,42 @@
     }
   };
 
+  // ============================================
+  // MCP BROWSER CONTROL BORDER
+  // ============================================
+
+  /**
+   * Show visual green border when tab is being controlled by MCP Browser
+   */
+  function showControlBorder() {
+    if (!document.getElementById('mcp-browser-control-border')) {
+      const border = document.createElement('div');
+      border.id = 'mcp-browser-control-border';
+      border.style.cssText = `
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        border: 4px solid #4CAF50;
+        box-shadow: inset 0 0 10px rgba(76, 175, 80, 0.5);
+        pointer-events: none;
+        z-index: 2147483647;
+        box-sizing: border-box;
+      `;
+      document.body.appendChild(border);
+      console.log('[MCP Browser] Control border shown');
+    }
+  }
+
+  /**
+   * Hide visual border when tab is no longer controlled
+   */
+  function hideControlBorder() {
+    const border = document.getElementById('mcp-browser-control-border');
+    if (border) {
+      border.remove();
+      console.log('[MCP Browser] Control border hidden');
+    }
+  }
+
   // Listen for commands from background
   // Wrap in try-catch to handle extension context invalidation
   try {
@@ -304,6 +340,16 @@
     (async () => {
       try {
         switch (request.type) {
+          case 'show_control_border':
+            showControlBorder();
+            sendResponse({ success: true });
+            break;
+
+          case 'hide_control_border':
+            hideControlBorder();
+            sendResponse({ success: true });
+            break;
+
           case 'navigate':
             window.location.href = request.url;
             sendResponse({ success: true });
