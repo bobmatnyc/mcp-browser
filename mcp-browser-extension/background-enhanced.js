@@ -1298,8 +1298,8 @@ class ConnectionManager {
       chrome.action.setTitle({ title: `MCP Browser: Error - ${connectionStatus.lastError || 'Connection failed'}` });
     } else if (connectionStatus.availableServers.length > 0) {
       chrome.action.setBadgeBackgroundColor({ color: STATUS_COLORS.YELLOW });
-      chrome.action.setBadgeText({ text: String(connectionStatus.availableServers.length) });
-      chrome.action.setTitle({ title: `MCP Browser: ${connectionStatus.availableServers.length} server${connectionStatus.availableServers.length > 1 ? 's' : ''} available` });
+      chrome.action.setBadgeText({ text: '○' });
+      chrome.action.setTitle({ title: `MCP Browser: Server available, connecting...` });
     } else {
       chrome.action.setBadgeBackgroundColor({ color: STATUS_COLORS.YELLOW });
       chrome.action.setBadgeText({ text: '...' });
@@ -1677,7 +1677,7 @@ function updateBadgeStatus() {
   } else if (connectionStatus.availableServers.length > 0) {
     // YELLOW: Servers available but not connected
     chrome.action.setBadgeBackgroundColor({ color: STATUS_COLORS.YELLOW });
-    chrome.action.setBadgeText({ text: String(connectionStatus.availableServers.length) });
+    chrome.action.setBadgeText({ text: '○' });
   } else {
     // YELLOW: Listening/scanning for servers
     chrome.action.setBadgeBackgroundColor({ color: STATUS_COLORS.YELLOW });
