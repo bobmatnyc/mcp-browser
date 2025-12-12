@@ -891,6 +891,20 @@ class ConnectionManager {
   }
 
   /**
+   * Get total connection count for badge display
+   * @returns {number} Number of active connections
+   */
+  getConnectionCount() {
+    let activeCount = 0;
+    for (const conn of this.connections.values()) {
+      if (conn.ws && conn.ws.readyState === WebSocket.OPEN && conn.connectionReady) {
+        activeCount++;
+      }
+    }
+    return activeCount;
+  }
+
+  /**
    * Internal: Send message to a specific connection
    * @private
    */
@@ -1247,6 +1261,9 @@ class ConnectionManager {
     // Update legacy connectionStatus for backward compatibility
     const primaryConn = this.primaryPort ? this.connections.get(this.primaryPort) : null;
 
+    // Count active connections for badge
+    const activeConnections = this.getConnectionCount();
+
     if (primaryConn && primaryConn.connectionReady) {
       connectionStatus.connected = true;
       connectionStatus.port = primaryConn.port;
@@ -1270,7 +1287,24 @@ class ConnectionManager {
       extensionState = activeServers.size > 0 ? 'idle' : 'idle';
     }
 
-    updateBadgeStatus();
+    // Update badge with connection status - green glow when connected
+    if (activeConnections > 0) {
+      chrome.action.setBadgeBackgroundColor({ color: STATUS_COLORS.GREEN });
+      chrome.action.setBadgeText({ text: '●' });
+      chrome.action.setTitle({ title: `MCP Browser: Connected (${activeConnections} connection${activeConnections > 1 ? 's' : ''})` });
+    } else if (extensionState === 'error' || connectionStatus.lastError) {
+      chrome.action.setBadgeBackgroundColor({ color: STATUS_COLORS.RED });
+      chrome.action.setBadgeText({ text: '!' });
+      chrome.action.setTitle({ title: `MCP Browser: Error - ${connectionStatus.lastError || 'Connection failed'}` });
+    } else if (connectionStatus.availableServers.length > 0) {
+      chrome.action.setBadgeBackgroundColor({ color: STATUS_COLORS.YELLOW });
+      chrome.action.setBadgeText({ text: String(connectionStatus.availableServers.length) });
+      chrome.action.setTitle({ title: `MCP Browser: ${connectionStatus.availableServers.length} server${connectionStatus.availableServers.length > 1 ? 's' : ''} available` });
+    } else {
+      chrome.action.setBadgeBackgroundColor({ color: STATUS_COLORS.YELLOW });
+      chrome.action.setBadgeText({ text: '...' });
+      chrome.action.setTitle({ title: 'MCP Browser: Scanning for servers...' });
+    }
   }
 }
 
@@ -1629,7 +1663,7 @@ async function updatePortProjectMapping(port, serverInfo) {
  * States:
  * - RED: Not functional or error state
  * - YELLOW: Scanning/ready but not connected
- * - GREEN: Connected to server
+ * - GREEN: Connected to server (green glow indicator)
  */
 function updateBadgeStatus() {
   if (extensionState === 'error' || (!connectionStatus.connected && connectionStatus.lastError)) {
@@ -1637,9 +1671,9 @@ function updateBadgeStatus() {
     chrome.action.setBadgeBackgroundColor({ color: STATUS_COLORS.RED });
     chrome.action.setBadgeText({ text: '!' });
   } else if (connectionStatus.connected && currentConnection) {
-    // GREEN: Connected to server
+    // GREEN: Connected to server - show green indicator (dot) instead of count
     chrome.action.setBadgeBackgroundColor({ color: STATUS_COLORS.GREEN });
-    chrome.action.setBadgeText({ text: String(connectionStatus.port) });
+    chrome.action.setBadgeText({ text: '●' });
   } else if (connectionStatus.availableServers.length > 0) {
     // YELLOW: Servers available but not connected
     chrome.action.setBadgeBackgroundColor({ color: STATUS_COLORS.YELLOW });

@@ -46,28 +46,29 @@ async function loadDashboard() {
 function updateOverallStatus(status) {
   const statusIndicator = document.getElementById('status-indicator');
   const statusText = document.getElementById('status-text');
-  const connectionCount = document.getElementById('connection-count');
   const messageCount = document.getElementById('message-count');
 
   if (!status) {
     statusIndicator.className = 'status-indicator disconnected';
     statusText.textContent = 'Error';
-    connectionCount.textContent = '0';
     messageCount.textContent = '0';
     return;
   }
 
-  // Update connection count
+  // Update connection status - simplified display
   const activeCount = status.totalConnections || 0;
-  connectionCount.textContent = activeCount;
 
-  // Update status indicator
+  // Update status indicator with green glow when connected
   if (activeCount > 0) {
     statusIndicator.className = 'status-indicator connected';
-    statusText.textContent = `Connected (${activeCount})`;
+    if (activeCount === 1) {
+      statusText.textContent = 'Connected';
+    } else {
+      statusText.textContent = `Connected (${activeCount} backends)`;
+    }
   } else {
     statusIndicator.className = 'status-indicator disconnected';
-    statusText.textContent = 'No Connections';
+    statusText.textContent = 'Disconnected';
   }
 
   // Update message count
