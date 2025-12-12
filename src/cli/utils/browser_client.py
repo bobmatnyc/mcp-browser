@@ -3,6 +3,8 @@
 import asyncio
 import json
 import logging
+import uuid
+from datetime import datetime
 from typing import Any, Dict, Optional
 
 import websockets
@@ -26,6 +28,7 @@ class BrowserClient:
         self.port = port
         self.websocket = None
         self._connected = False
+        self._pending_requests: Dict[str, asyncio.Future] = {}
 
     async def connect(self) -> bool:
         """Connect to WebSocket server.
@@ -52,6 +55,61 @@ class BrowserClient:
         if self.websocket:
             await self.websocket.close()
             self._connected = False
+
+    async def _send_and_wait(
+        self, message: Dict[str, Any], timeout: float = 10.0
+    ) -> Dict[str, Any]:
+        """Send message and wait for response with matching requestId."""
+        if not self._connected or not self.websocket:
+            return {"success": False, "error": "Not connected to server"}
+
+        request_id = message.get("requestId") or str(uuid.uuid4())
+        message["requestId"] = request_id
+
+        # Create future for response
+        response_future: asyncio.Future = asyncio.Future()
+        self._pending_requests[request_id] = response_future
+
+        try:
+            await self.websocket.send(json.dumps(message))
+
+            # Start listener task if not running
+            listen_task = asyncio.create_task(self._listen_for_response(request_id))
+
+            try:
+                result = await asyncio.wait_for(response_future, timeout=timeout)
+                return result
+            except asyncio.TimeoutError:
+                return {"success": False, "error": f"Timeout after {timeout}s"}
+            finally:
+                listen_task.cancel()
+                self._pending_requests.pop(request_id, None)
+
+        except Exception as e:
+            self._pending_requests.pop(request_id, None)
+            return {"success": False, "error": str(e)}
+
+    async def _listen_for_response(self, request_id: str) -> None:
+        """Listen for response matching request_id."""
+        try:
+            while request_id in self._pending_requests:
+                try:
+                    msg = await asyncio.wait_for(self.websocket.recv(), timeout=1.0)
+                    data = json.loads(msg)
+
+                    # Check if this response matches our request
+                    resp_id = data.get("requestId")
+                    if resp_id and resp_id in self._pending_requests:
+                        future = self._pending_requests.get(resp_id)
+                        if future and not future.done():
+                            future.set_result(data)
+                            break
+                except asyncio.TimeoutError:
+                    continue
+                except Exception:
+                    break
+        except asyncio.CancelledError:
+            pass
 
     async def navigate(self, url: str, wait: float = 0) -> Dict[str, Any]:
         """Navigate browser to URL.
@@ -231,6 +289,51 @@ class BrowserClient:
 
         except Exception as e:
             return {"success": False, "status": "not_running", "error": str(e)}
+
+    async def extract_readable_content(self, timeout: float = 10.0) -> Dict[str, Any]:
+        """Extract readable content using Readability.js."""
+        message = {
+            "type": "extract_content",
+            "requestId": str(uuid.uuid4()),
+            "timestamp": datetime.now().isoformat(),
+        }
+        return await self._send_and_wait(message, timeout)
+
+    async def extract_semantic_dom(
+        self,
+        include_headings: bool = True,
+        include_landmarks: bool = True,
+        include_links: bool = True,
+        include_forms: bool = True,
+        max_text_length: int = 100,
+        timeout: float = 10.0,
+    ) -> Dict[str, Any]:
+        """Extract semantic DOM structure."""
+        message = {
+            "type": "extract_semantic_dom",
+            "requestId": str(uuid.uuid4()),
+            "options": {
+                "include_headings": include_headings,
+                "include_landmarks": include_landmarks,
+                "include_links": include_links,
+                "include_forms": include_forms,
+                "max_text_length": max_text_length,
+            },
+            "timestamp": datetime.now().isoformat(),
+        }
+        return await self._send_and_wait(message, timeout)
+
+    async def extract_element(self, selector: str, timeout: float = 10.0) -> Dict[str, Any]:
+        """Extract content from specific element."""
+        message = {
+            "type": "dom_command",
+            "requestId": str(uuid.uuid4()),
+            "command": {
+                "type": "get_element",
+                "params": {"selector": selector, "index": 0},
+            },
+        }
+        return await self._send_and_wait(message, timeout)
 
 
 async def find_active_port(

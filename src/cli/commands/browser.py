@@ -2,7 +2,7 @@
 
 import asyncio
 import sys
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import click
 from rich.console import Console
@@ -312,65 +312,279 @@ async def _click_command(selector: str, port: Optional[int]):
         await client.disconnect()
 
 
-@browser.command()
-@click.argument("selector")
-@click.option(
-    "--port",
-    default=None,
-    type=int,
-    help="WebSocket port (auto-detect if not specified)",
-)
-def extract(selector: str, port: int):
-    """Extract content from an element.
+@browser.group()
+def extract():
+    """📄 Extract content from browser pages.
+
+    \b
+    Extraction strategies:
+      content   - Readable article content (Readability.js)
+      semantic  - Page structure (headings, landmarks, links, forms)
+      selector  - Specific element by CSS selector
 
     \b
     Examples:
-      mcp-browser browser extract "h1"
-      mcp-browser browser extract ".article-content"
-      mcp-browser browser extract "#main-title"
+      mcp-browser browser extract content
+      mcp-browser browser extract semantic
+      mcp-browser browser extract semantic --no-links
+      mcp-browser browser extract selector "h1"
+      mcp-browser browser extract selector ".article-body"
     """
-    asyncio.run(_extract_command(selector, port))
+    pass
 
 
-async def _extract_command(selector: str, port: Optional[int]):
-    """Execute extract command."""
-    # Find active port if not specified
+@extract.command(name="content")
+@click.option("--port", default=None, type=int, help="WebSocket port")
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON")
+def extract_content(port: int, json_output: bool):
+    """Extract readable content using Readability.js.
+
+    Best for articles, documentation, and text-heavy pages.
+
+    \b
+    Examples:
+      mcp-browser browser extract content
+      mcp-browser browser extract content --json
+    """
+    asyncio.run(_extract_content_command(port, json_output))
+
+
+async def _extract_content_command(port: Optional[int], json_output: bool):
+    """Execute content extraction."""
     if port is None:
         console.print("[cyan]🔍 Searching for active server...[/cyan]")
         port = await find_active_port()
         if port is None:
-            console.print(
-                "[red]✗ No active server found. Start with: mcp-browser start[/red]"
-            )
+            console.print("[red]✗ No active server found. Start with: mcp-browser start[/red]")
             sys.exit(1)
         console.print(f"[green]✓ Found server on port {port}[/green]\n")
 
-    # Connect to server
+    client = BrowserClient(port=port)
+    if not await client.connect():
+        sys.exit(1)
+
+    try:
+        console.print("[cyan]→ Extracting readable content...[/cyan]")
+        result = await client.extract_readable_content(timeout=15.0)
+
+        if json_output:
+            import json as json_module
+            print(json_module.dumps(result, indent=2))
+            return
+
+        if result.get("success") or result.get("response", {}).get("success"):
+            response = result.get("response", result)
+            content = response.get("content", {})
+
+            # Display formatted output
+            console.print(Panel(
+                f"[bold]{content.get('title', 'Untitled')}[/bold]\n\n"
+                f"[dim]By: {content.get('byline', 'Unknown')}[/dim]\n"
+                f"[dim]Words: {content.get('wordCount', 'N/A')}[/dim]\n\n"
+                f"{(content.get('excerpt', '') or content.get('textContent', ''))[:500]}...",
+                title="📄 Extracted Content",
+                border_style="green",
+            ))
+        else:
+            error = result.get("error") or result.get("response", {}).get("error", "Unknown error")
+            console.print(Panel(
+                f"[red]✗ Extraction failed:[/red]\n{error}",
+                title="Extract Error",
+                border_style="red",
+            ))
+            sys.exit(1)
+    finally:
+        await client.disconnect()
+
+
+@extract.command(name="semantic")
+@click.option("--port", default=None, type=int, help="WebSocket port")
+@click.option("--headings/--no-headings", default=True, help="Include headings")
+@click.option("--landmarks/--no-landmarks", default=True, help="Include landmarks")
+@click.option("--links/--no-links", default=True, help="Include links")
+@click.option("--forms/--no-forms", default=True, help="Include forms")
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON")
+def extract_semantic(port: int, headings: bool, landmarks: bool, links: bool, forms: bool, json_output: bool):
+    """Extract semantic DOM structure.
+
+    Provides quick page understanding without screenshots:
+    - Headings (h1-h6) with hierarchy
+    - ARIA landmarks and HTML5 sections
+    - Links with text
+    - Forms with fields
+
+    \b
+    Examples:
+      mcp-browser browser extract semantic
+      mcp-browser browser extract semantic --no-links
+      mcp-browser browser extract semantic --json
+    """
+    asyncio.run(_extract_semantic_command(port, headings, landmarks, links, forms, json_output))
+
+
+async def _extract_semantic_command(
+    port: Optional[int],
+    headings: bool,
+    landmarks: bool,
+    links: bool,
+    forms: bool,
+    json_output: bool,
+):
+    """Execute semantic DOM extraction."""
+    if port is None:
+        console.print("[cyan]🔍 Searching for active server...[/cyan]")
+        port = await find_active_port()
+        if port is None:
+            console.print("[red]✗ No active server found. Start with: mcp-browser start[/red]")
+            sys.exit(1)
+        console.print(f"[green]✓ Found server on port {port}[/green]\n")
+
+    client = BrowserClient(port=port)
+    if not await client.connect():
+        sys.exit(1)
+
+    try:
+        console.print("[cyan]→ Extracting semantic DOM...[/cyan]")
+        result = await client.extract_semantic_dom(
+            include_headings=headings,
+            include_landmarks=landmarks,
+            include_links=links,
+            include_forms=forms,
+            timeout=15.0,
+        )
+
+        if json_output:
+            import json as json_module
+            print(json_module.dumps(result, indent=2))
+            return
+
+        response = result.get("response", result)
+        if response.get("success"):
+            dom = response.get("dom", {})
+            _display_semantic_dom(dom, headings, landmarks, links, forms)
+        else:
+            error = response.get("error", "Unknown error")
+            console.print(Panel(
+                f"[red]✗ Extraction failed:[/red]\n{error}",
+                title="Extract Error",
+                border_style="red",
+            ))
+            sys.exit(1)
+    finally:
+        await client.disconnect()
+
+
+def _display_semantic_dom(dom: Dict[str, Any], show_headings: bool, show_landmarks: bool, show_links: bool, show_forms: bool):
+    """Display semantic DOM in rich format."""
+    console.print(Panel(
+        f"[bold]{dom.get('title', 'Untitled')}[/bold]\n"
+        f"[dim]{dom.get('url', '')}[/dim]",
+        title="🔍 Semantic Structure",
+        border_style="cyan",
+    ))
+
+    # Headings
+    if show_headings and dom.get("headings"):
+        console.print("\n[bold cyan]📑 Document Outline[/bold cyan]")
+        for h in dom["headings"]:
+            indent = "  " * (h.get("level", 1) - 1)
+            console.print(f"{indent}[yellow]H{h.get('level')}[/yellow] {h.get('text', '')[:80]}")
+
+    # Landmarks
+    if show_landmarks and dom.get("landmarks"):
+        console.print("\n[bold cyan]🏛️ Page Sections[/bold cyan]")
+        for lm in dom["landmarks"]:
+            label = lm.get("label") or lm.get("tag", "")
+            role = lm.get("role", "unknown")
+            if label:
+                console.print(f"  [{role}] {label}")
+            else:
+                console.print(f"  [{role}]")
+
+    # Links
+    if show_links and dom.get("links"):
+        links_list = dom["links"]
+        console.print(f"\n[bold cyan]🔗 Links ({len(links_list)} total)[/bold cyan]")
+        for link in links_list[:20]:
+            text = link.get("text", "")[:60] or link.get("ariaLabel", "") or "[no text]"
+            console.print(f"  • {text}")
+        if len(links_list) > 20:
+            console.print(f"  [dim]... and {len(links_list) - 20} more[/dim]")
+
+    # Forms
+    if show_forms and dom.get("forms"):
+        console.print(f"\n[bold cyan]📝 Forms ({len(dom['forms'])} total)[/bold cyan]")
+        for form in dom["forms"]:
+            name = form.get("name") or form.get("id") or form.get("ariaLabel") or "[unnamed]"
+            method = (form.get("method") or "GET").upper()
+            fields = form.get("fields", [])
+            console.print(f"  [bold]{name}[/bold] ({method}, {len(fields)} fields)")
+            for field in fields[:5]:
+                field_name = field.get("name") or field.get("id") or "[unnamed]"
+                field_type = field.get("type", "text")
+                label = field.get("label") or field.get("placeholder") or ""
+                req = " *" if field.get("required") else ""
+                console.print(f"    - {field_name} ({field_type}){req}: {label[:30]}")
+            if len(fields) > 5:
+                console.print(f"    [dim]... and {len(fields) - 5} more fields[/dim]")
+
+
+@extract.command(name="selector")
+@click.argument("selector")
+@click.option("--port", default=None, type=int, help="WebSocket port")
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON")
+def extract_selector(selector: str, port: int, json_output: bool):
+    """Extract content from specific CSS selector.
+
+    \b
+    Examples:
+      mcp-browser browser extract selector "h1"
+      mcp-browser browser extract selector ".article-content"
+      mcp-browser browser extract selector "#main" --json
+    """
+    asyncio.run(_extract_selector_command(selector, port, json_output))
+
+
+async def _extract_selector_command(selector: str, port: Optional[int], json_output: bool):
+    """Execute selector extraction."""
+    if port is None:
+        console.print("[cyan]🔍 Searching for active server...[/cyan]")
+        port = await find_active_port()
+        if port is None:
+            console.print("[red]✗ No active server found. Start with: mcp-browser start[/red]")
+            sys.exit(1)
+        console.print(f"[green]✓ Found server on port {port}[/green]\n")
+
     client = BrowserClient(port=port)
     if not await client.connect():
         sys.exit(1)
 
     try:
         console.print(f"[cyan]→ Extracting content from '{selector}'...[/cyan]")
-        result = await client.extract_content(selector)
+        result = await client.extract_element(selector, timeout=10.0)
 
-        if result["success"]:
-            console.print(
-                Panel(
-                    f"[green]✓ Successfully extracted content from:[/green]\n{selector}\n\n"
-                    "[dim]Content will be available in the response[/dim]",
-                    title="Extract Complete",
-                    border_style="green",
-                )
-            )
+        if json_output:
+            import json as json_module
+            print(json_module.dumps(result, indent=2))
+            return
+
+        response = result.get("response", result)
+        if response.get("success") or result.get("success"):
+            element = response.get("element", response)
+            console.print(Panel(
+                f"[bold]Selector:[/bold] {selector}\n\n"
+                f"[bold]Tag:[/bold] {element.get('tagName', 'unknown')}\n"
+                f"[bold]Text:[/bold] {(element.get('textContent', '') or element.get('innerText', ''))[:500]}",
+                title="📌 Element Content",
+                border_style="green",
+            ))
         else:
-            console.print(
-                Panel(
-                    f"[red]✗ Extract failed:[/red]\n{result.get('error', 'Unknown error')}",
-                    title="Extract Error",
-                    border_style="red",
-                )
-            )
+            error = response.get("error", "Element not found or extraction failed")
+            console.print(Panel(
+                f"[red]✗ Extraction failed:[/red]\n{error}",
+                title="Extract Error",
+                border_style="red",
+            ))
             sys.exit(1)
     finally:
         await client.disconnect()
