@@ -10,7 +10,7 @@
  */
 
 // Configuration
-const PORT_RANGE = { start: 8875, end: 8895 };
+const PORT_RANGE = { start: 8851, end: 8899 };
 // REMOVED: Automatic scanning disabled - scan only on user request
 // const SCAN_INTERVAL_MINUTES = 0.5;
 

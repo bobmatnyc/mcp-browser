@@ -7,7 +7,7 @@
  */
 
 // Configuration
-const PORT_RANGE = { start: 8875, end: 8895 };
+const PORT_RANGE = { start: 8851, end: 8899 };
 const SCAN_INTERVAL = 30000; // Scan for servers every 30 seconds
 
 // Status colors

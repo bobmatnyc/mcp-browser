@@ -4,8 +4,8 @@
 
 // WebSocket connection state
 let ws = null;
-let port = 8875;
-const MAX_PORT = 8895;
+let port = 8851;
+const MAX_PORT = 8899;
 let reconnectTimer = null;
 let messageQueue = [];
 let isConnected = false;
@@ -21,7 +21,7 @@ const connectionStatus = {
 
 // Find available port and connect
 async function findAndConnect() {
-  const startPort = 8875; // Always start from beginning of range
+  const startPort = 8851; // Always start from beginning of range
   console.log(`Starting port scan from ${startPort} to ${MAX_PORT}`);
   for (let p = startPort; p <= MAX_PORT; p++) {
     console.log(`Scanning port ${p}...`);
@@ -33,7 +33,7 @@ async function findAndConnect() {
     }
   }
   console.error(`Failed to find WebSocket server in port range ${startPort}-${MAX_PORT}`);
-  connectionStatus.lastError = 'No WebSocket server found in ports 8875-8895';
+  connectionStatus.lastError = 'No WebSocket server found in ports 8851-8899';
   return false;
 }
 
@@ -366,7 +366,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
       isConnected = false;
       connectionStatus.connected = false;
-      port = 8875; // Reset to start of range
+      port = 8851; // Reset to start of range
       setTimeout(() => findAndConnect(), 100); // Small delay to ensure clean state
     }
     sendResponse({ received: true });
