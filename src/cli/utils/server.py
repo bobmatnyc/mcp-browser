@@ -274,6 +274,9 @@ class BrowserMCPServer:
         websocket.register_message_handler(
             "content_extracted", browser.handle_content_extracted
         )
+        websocket.register_message_handler(
+            "semantic_dom_extracted", browser.handle_semantic_dom_extracted
+        )
 
         # Start WebSocket server
         self.websocket_port = await websocket.start()

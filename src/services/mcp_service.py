@@ -318,6 +318,44 @@ class MCPService:
                     },
                 ),
                 Tool(
+                    name="browser_extract_semantic_dom",
+                    description="Extract semantic DOM structure (headings, landmarks, links, forms) for quick page understanding",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "port": {
+                                "type": "integer",
+                                "description": "Browser port number",
+                            },
+                            "tab_id": {
+                                "type": "integer",
+                                "description": "Optional specific tab ID",
+                            },
+                            "include_headings": {
+                                "type": "boolean",
+                                "description": "Extract h1-h6 headings (default: true)",
+                            },
+                            "include_landmarks": {
+                                "type": "boolean",
+                                "description": "Extract ARIA landmarks and HTML5 sectioning (default: true)",
+                            },
+                            "include_links": {
+                                "type": "boolean",
+                                "description": "Extract links with text (default: true)",
+                            },
+                            "include_forms": {
+                                "type": "boolean",
+                                "description": "Extract forms and fields (default: true)",
+                            },
+                            "max_text_length": {
+                                "type": "integer",
+                                "description": "Max characters per text field (default: 100)",
+                            },
+                        },
+                        "required": ["port"],
+                    },
+                ),
+                Tool(
                     name="get_capabilities",
                     description="Get current browser control capabilities and available methods",
                     inputSchema={
@@ -356,6 +394,8 @@ class MCPService:
                 return await self._handle_select_option(arguments)
             elif name == "browser_extract_content":
                 return await self._handle_extract_content(arguments)
+            elif name == "browser_extract_semantic_dom":
+                return await self._handle_extract_semantic_dom(arguments)
             elif name == "get_capabilities":
                 return await self._handle_get_capabilities(arguments)
             else:
@@ -854,6 +894,104 @@ class MCPService:
                     text=f"Failed to extract content: {result.get('error', 'Unknown error')}",
                 )
             ]
+
+    async def _handle_extract_semantic_dom(
+        self, arguments: Dict[str, Any]
+    ) -> List[TextContent]:
+        """Handle semantic DOM extraction."""
+        if not self.browser_service:
+            return [TextContent(type="text", text="Browser service not available")]
+
+        port = arguments.get("port")
+        tab_id = arguments.get("tab_id")
+        options = {
+            "include_headings": arguments.get("include_headings", True),
+            "include_landmarks": arguments.get("include_landmarks", True),
+            "include_links": arguments.get("include_links", True),
+            "include_forms": arguments.get("include_forms", True),
+            "max_text_length": arguments.get("max_text_length", 100),
+        }
+
+        result = await self.browser_service.extract_semantic_dom(port, tab_id, options)
+
+        if result.get("success"):
+            dom = result.get("dom", {})
+            output = self._format_semantic_dom(dom, options)
+            return [TextContent(type="text", text=output)]
+        else:
+            error = result.get("error", "Unknown error")
+            return [TextContent(type="text", text=f"Semantic DOM extraction failed: {error}")]
+
+    def _format_semantic_dom(self, dom: Dict[str, Any], options: Dict[str, Any]) -> str:
+        """Format semantic DOM as readable text output."""
+        lines = []
+        lines.append(f"# Semantic Structure: {dom.get('title', 'Untitled')}")
+        lines.append(f"URL: {dom.get('url', 'unknown')}")
+        lines.append("")
+
+        # Headings
+        headings = dom.get("headings", [])
+        if headings and options.get("include_headings", True):
+            lines.append("## Document Outline")
+            for h in headings:
+                indent = "  " * (h.get("level", 1) - 1)
+                text = h.get("text", "")[:100]
+                lines.append(f"{indent}- H{h.get('level')}: {text}")
+            lines.append("")
+
+        # Landmarks
+        landmarks = dom.get("landmarks", [])
+        if landmarks and options.get("include_landmarks", True):
+            lines.append("## Page Sections")
+            for lm in landmarks:
+                role = lm.get("role", "unknown")
+                label = lm.get("label") or lm.get("tag", "")
+                if label:
+                    lines.append(f"- [{role}] {label}")
+                else:
+                    lines.append(f"- [{role}]")
+            lines.append("")
+
+        # Links
+        links = dom.get("links", [])
+        if links and options.get("include_links", True):
+            lines.append(f"## Links ({len(links)} total)")
+            # Show first 50 links to avoid overwhelming output
+            for link in links[:50]:
+                text = link.get("text", "").strip()[:80] or link.get("ariaLabel", "") or "[no text]"
+                href = link.get("href", "")
+                lines.append(f"- {text}")
+                if href and not href.startswith("javascript:"):
+                    lines.append(f"  → {href[:100]}")
+            if len(links) > 50:
+                lines.append(f"  ... and {len(links) - 50} more links")
+            lines.append("")
+
+        # Forms
+        forms = dom.get("forms", [])
+        if forms and options.get("include_forms", True):
+            lines.append(f"## Forms ({len(forms)} total)")
+            for form in forms:
+                form_name = form.get("name") or form.get("id") or form.get("ariaLabel") or "[unnamed form]"
+                lines.append(f"### {form_name}")
+                if form.get("action"):
+                    lines.append(f"  Action: {form.get('action')}")
+                lines.append(f"  Method: {form.get('method', 'GET').upper()}")
+                fields = form.get("fields", [])
+                if fields:
+                    lines.append("  Fields:")
+                    for field in fields:
+                        field_type = field.get("type", "text")
+                        name = field.get("name") or field.get("id") or "[unnamed]"
+                        label = field.get("label") or field.get("ariaLabel") or field.get("placeholder") or ""
+                        required = " (required)" if field.get("required") else ""
+                        if label:
+                            lines.append(f"    - {name} ({field_type}): {label}{required}")
+                        else:
+                            lines.append(f"    - {name} ({field_type}){required}")
+            lines.append("")
+
+        return "\n".join(lines)
 
     async def _handle_get_capabilities(
         self, arguments: Dict[str, Any]

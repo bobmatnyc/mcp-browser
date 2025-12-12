@@ -2476,6 +2476,170 @@ async function executeCommandOnTab(tabId, data, connection = null) {
         }
         break;
 
+      case 'extract_semantic_dom':
+        console.log(`[MCP Browser] Extracting semantic DOM for request ${data.requestId}`);
+        try {
+          const options = data.options || {};
+          const maxTextLength = options.max_text_length || 100;
+
+          const semanticResults = await chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            func: (opts) => {
+              const maxLen = opts.max_text_length || 100;
+              const result = {
+                url: window.location.href,
+                title: document.title,
+                headings: [],
+                landmarks: [],
+                links: [],
+                forms: [],
+              };
+
+              // Extract headings (h1-h6)
+              if (opts.include_headings !== false) {
+                document.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(heading => {
+                  const text = heading.textContent?.trim() || '';
+                  if (text) {
+                    result.headings.push({
+                      level: parseInt(heading.tagName[1]),
+                      text: text.substring(0, maxLen),
+                      id: heading.id || null,
+                    });
+                  }
+                });
+              }
+
+              // Extract ARIA landmarks and HTML5 sectioning elements
+              if (opts.include_landmarks !== false) {
+                const landmarkRoles = ['banner', 'navigation', 'main', 'complementary', 'contentinfo', 'search', 'region', 'form'];
+                const seen = new Set();
+
+                // ARIA role landmarks
+                landmarkRoles.forEach(role => {
+                  document.querySelectorAll(`[role="${role}"]`).forEach(el => {
+                    const key = `${role}-${el.id || el.getAttribute('aria-label') || ''}`;
+                    if (!seen.has(key)) {
+                      seen.add(key);
+                      result.landmarks.push({
+                        role: role,
+                        label: el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') || null,
+                        id: el.id || null,
+                      });
+                    }
+                  });
+                });
+
+                // Native HTML5 landmarks (only if no role attribute)
+                const nativeMapping = {
+                  'header': 'banner',
+                  'nav': 'navigation',
+                  'main': 'main',
+                  'aside': 'complementary',
+                  'footer': 'contentinfo',
+                };
+
+                Object.entries(nativeMapping).forEach(([tag, role]) => {
+                  document.querySelectorAll(tag).forEach(el => {
+                    if (!el.getAttribute('role')) {
+                      const key = `${role}-${el.id || el.getAttribute('aria-label') || tag}`;
+                      if (!seen.has(key)) {
+                        seen.add(key);
+                        result.landmarks.push({
+                          role: role,
+                          label: el.getAttribute('aria-label') || null,
+                          id: el.id || null,
+                          tag: tag,
+                        });
+                      }
+                    }
+                  });
+                });
+              }
+
+              // Extract links
+              if (opts.include_links !== false) {
+                document.querySelectorAll('a[href]').forEach(link => {
+                  const text = link.textContent?.trim() || '';
+                  const ariaLabel = link.getAttribute('aria-label') || '';
+                  // Skip empty links and javascript: links
+                  if ((text || ariaLabel) && !link.href.startsWith('javascript:')) {
+                    result.links.push({
+                      href: link.href,
+                      text: text.substring(0, maxLen),
+                      ariaLabel: ariaLabel || null,
+                    });
+                  }
+                });
+              }
+
+              // Extract forms
+              if (opts.include_forms !== false) {
+                document.querySelectorAll('form').forEach(form => {
+                  const fields = [];
+                  form.querySelectorAll('input, textarea, select, button[type="submit"]').forEach(field => {
+                    // Skip hidden fields
+                    if (field.type === 'hidden') return;
+
+                    // Get label text
+                    let labelText = null;
+                    if (field.labels && field.labels.length > 0) {
+                      labelText = field.labels[0].textContent?.trim().substring(0, maxLen);
+                    }
+
+                    fields.push({
+                      type: field.type || field.tagName.toLowerCase(),
+                      name: field.name || null,
+                      id: field.id || null,
+                      label: labelText,
+                      ariaLabel: field.getAttribute('aria-label') || null,
+                      placeholder: field.placeholder || null,
+                      required: field.required || false,
+                    });
+                  });
+
+                  if (fields.length > 0) {
+                    result.forms.push({
+                      id: form.id || null,
+                      name: form.name || null,
+                      action: form.action || null,
+                      method: form.method || 'get',
+                      ariaLabel: form.getAttribute('aria-label') || null,
+                      fields: fields,
+                    });
+                  }
+                });
+              }
+
+              return { success: true, dom: result };
+            },
+            args: [options]
+          });
+
+          const extractionResult = semanticResults[0]?.result || { success: false, error: 'No result from page' };
+
+          const response = {
+            type: 'semantic_dom_extracted',
+            requestId: data.requestId,
+            response: extractionResult
+          };
+
+          if (connection && connection.ws && connection.ws.readyState === WebSocket.OPEN) {
+            connection.ws.send(JSON.stringify(response));
+            console.log(`[MCP Browser] Sent semantic_dom_extracted response`);
+          }
+        } catch (e) {
+          console.error('[MCP Browser] Semantic DOM extraction failed:', e);
+          const errorResponse = {
+            type: 'semantic_dom_extracted',
+            requestId: data.requestId,
+            response: { success: false, error: e.message }
+          };
+          if (connection && connection.ws && connection.ws.readyState === WebSocket.OPEN) {
+            connection.ws.send(JSON.stringify(errorResponse));
+          }
+        }
+        break;
+
       case 'query_logs':
         // Query console logs - this would need to be implemented in content script
         console.log(`[MCP Browser] Query logs requested`);

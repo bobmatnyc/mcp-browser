@@ -352,6 +352,54 @@ class BrowserService:
             logger.error(f"Failed to send content extraction command: {e}")
             return {"success": False, "error": str(e)}
 
+    async def extract_semantic_dom(
+        self,
+        port: int,
+        tab_id: Optional[int] = None,
+        options: Optional[Dict[str, Any]] = None,
+        timeout: float = 10.0,
+    ) -> Dict[str, Any]:
+        """Extract semantic DOM structure from browser tab."""
+        connection = await self.browser_state.get_connection(port)
+
+        if not connection or not connection.websocket:
+            return {"success": False, "error": "No active browser connection"}
+
+        try:
+            import uuid
+
+            request_id = str(uuid.uuid4())
+
+            response_future: asyncio.Future[Dict[str, Any]] = asyncio.Future()
+            self._pending_requests[request_id] = {
+                "future": response_future,
+                "created_at": datetime.now(),
+            }
+
+            message = {
+                "type": "extract_semantic_dom",
+                "requestId": request_id,
+                "tabId": tab_id,
+                "options": options or {},
+                "timestamp": datetime.now().isoformat(),
+            }
+
+            await connection.websocket.send(json.dumps(message))
+            logger.info(f"Sent semantic DOM extraction request to port {port}")
+
+            try:
+                result = await asyncio.wait_for(response_future, timeout=timeout)
+                return result
+            except asyncio.TimeoutError:
+                logger.warning(f"Semantic DOM extraction timed out after {timeout}s")
+                return {"success": False, "error": f"Timeout after {timeout}s"}
+            finally:
+                self._pending_requests.pop(request_id, None)
+
+        except Exception as e:
+            logger.error(f"Failed to extract semantic DOM: {e}")
+            return {"success": False, "error": str(e)}
+
     async def handle_content_extracted(self, data: Dict[str, Any]) -> None:
         """Handle content extraction response from browser.
 
@@ -372,6 +420,17 @@ class BrowserService:
             logger.warning(
                 f"Received content extraction response for unknown request: {request_id}"
             )
+
+    async def handle_semantic_dom_extracted(self, data: Dict[str, Any]) -> None:
+        """Handle semantic DOM extraction response from browser."""
+        request_id = data.get("requestId")
+        if request_id and request_id in self._pending_requests:
+            request_data = self._pending_requests[request_id]
+            future = request_data["future"]
+            if not future.done():
+                response = data.get("response", {})
+                future.set_result(response)
+                logger.info(f"Received semantic DOM for request {request_id}")
 
     async def _cleanup_pending_requests(self) -> None:
         """Clean up orphaned or expired pending requests.
