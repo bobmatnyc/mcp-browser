@@ -2242,12 +2242,9 @@ chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
 // Handle messages from popup and content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'console_messages') {
-    // Only process messages from the active tab
-    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-      const activeTab = tabs[0];
-
-      // Check if this message is from the active tab
-      if (sender.tab && activeTab && sender.tab.id === activeTab.id) {
+    // Process messages from ALL tabs (not just active tab)
+    (async () => {
+      if (sender.tab) {
         // Batch console messages
         const batchMessage = {
           type: 'batch',
@@ -2262,11 +2259,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (!sent) {
           console.log(`[MCP Browser] Message queued for tab ${sender.tab.id} (no backend assigned)`);
         }
-      } else {
-        // Silently ignore messages from inactive tabs
-        console.log(`[MCP Browser] Ignoring console messages from inactive tab ${sender.tab?.id}`);
       }
-    });
+    })();
 
     sendResponse({ received: true });
   } else if (request.type === 'get_status') {
@@ -2368,6 +2362,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       ...info
     }));
     sendResponse({ pendingTabs: pending });
+  } else if (request.type === 'get_tab_connections') {
+    // Get all tabs with their backend assignments
+    chrome.tabs.query({}, async (tabs) => {
+      const tabConnections = tabs
+        .filter(tab => tab.url && !tab.url.startsWith('chrome://'))
+        .map(tab => {
+          const assignedPort = connectionManager.tabConnections.get(tab.id);
+          const connection = assignedPort ? connectionManager.connections.get(assignedPort) : null;
+
+          return {
+            tabId: tab.id,
+            title: tab.title || 'Untitled',
+            url: tab.url,
+            assignedPort: assignedPort || null,
+            backendName: connection?.projectName || null,
+            backendPath: connection?.projectPath || null,
+            isConnected: connection?.connectionReady || false
+          };
+        });
+
+      sendResponse({ tabConnections });
+    });
+    return true; // Keep channel open for async response
   }
 });
 

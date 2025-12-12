@@ -354,24 +354,28 @@
 
     /* Scrollbar styling */
     .connections-container::-webkit-scrollbar,
-    .unassigned-container::-webkit-scrollbar {
+    .unassigned-container::-webkit-scrollbar,
+    .tab-connections-container::-webkit-scrollbar {
       width: 6px;
     }
 
     .connections-container::-webkit-scrollbar-track,
-    .unassigned-container::-webkit-scrollbar-track {
+    .unassigned-container::-webkit-scrollbar-track,
+    .tab-connections-container::-webkit-scrollbar-track {
       background: rgba(255, 255, 255, 0.1);
       border-radius: 3px;
     }
 
     .connections-container::-webkit-scrollbar-thumb,
-    .unassigned-container::-webkit-scrollbar-thumb {
+    .unassigned-container::-webkit-scrollbar-thumb,
+    .tab-connections-container::-webkit-scrollbar-thumb {
       background: rgba(255, 255, 255, 0.3);
       border-radius: 3px;
     }
 
     .connections-container::-webkit-scrollbar-thumb:hover,
-    .unassigned-container::-webkit-scrollbar-thumb:hover {
+    .unassigned-container::-webkit-scrollbar-thumb:hover,
+    .tab-connections-container::-webkit-scrollbar-thumb:hover {
       background: rgba(255, 255, 255, 0.4);
     }
 
@@ -383,6 +387,102 @@
 
     .expand-indicator.expanded {
       transform: rotate(90deg);
+    }
+
+    /* Per-Tab Connections Section */
+    .tab-connections-container {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      backdrop-filter: blur(10px);
+      max-height: 350px;
+      overflow-y: auto;
+    }
+
+    .tab-connection-card {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      transition: all 0.2s ease;
+    }
+
+    .tab-connection-card:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .tab-connection-card.connected {
+      border-color: rgba(76, 175, 80, 0.5);
+    }
+
+    .tab-connection-card.not-connected {
+      border-color: rgba(255, 193, 7, 0.5);
+    }
+
+    .tab-status-dot-small {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .tab-status-dot-small.connected {
+      background-color: #4CAF50;
+      box-shadow: 0 0 6px rgba(76, 175, 80, 0.6);
+    }
+
+    .tab-status-dot-small.not-connected {
+      background-color: #FFC107;
+      box-shadow: 0 0 6px rgba(255, 193, 7, 0.6);
+    }
+
+    .tab-info-section {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .tab-title-line {
+      font-size: 12px;
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin-bottom: 2px;
+    }
+
+    .tab-url-line {
+      font-size: 10px;
+      opacity: 0.7;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tab-backend-select {
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+      min-width: 120px;
+      max-width: 150px;
+    }
+
+    .tab-backend-select option {
+      background: #764ba2;
+      color: white;
+    }
+
+    .tab-backend-select:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
   </style>
 </head>
@@ -409,6 +509,14 @@
     <div class="section-title">Active Connections</div>
     <div id="connections-list">
       <!-- Dynamically populated connection cards -->
+    </div>
+  </div>
+
+  <!-- Per-Tab Connections -->
+  <div id="tab-connections-container" class="tab-connections-container" style="display: none;">
+    <div class="section-title">Browser Tabs (<span id="tab-connections-count">0</span>)</div>
+    <div id="tab-connections-list">
+      <!-- Per-tab connection cards -->
     </div>
   </div>
 

@@ -11,6 +11,7 @@
 
 let currentConnections = [];
 let pendingTabs = [];
+let tabConnections = [];
 let refreshInterval = null;
 
 /**
@@ -25,6 +26,10 @@ async function loadDashboard() {
     const connectionsResponse = await sendMessage({ type: 'get_connections' });
     currentConnections = connectionsResponse?.connections || [];
 
+    // Get per-tab connections
+    const tabConnectionsResponse = await sendMessage({ type: 'get_tab_connections' });
+    tabConnections = tabConnectionsResponse?.tabConnections || [];
+
     // Get pending/unassigned tabs
     const pendingResponse = await sendMessage({ type: 'get_pending_tabs' });
     pendingTabs = pendingResponse?.pendingTabs || [];
@@ -32,6 +37,7 @@ async function loadDashboard() {
     // Update all UI sections
     updateOverallStatus(status);
     renderConnections(currentConnections);
+    renderTabConnections(tabConnections);
     renderUnassignedTabs(pendingTabs);
 
   } catch (error) {
@@ -210,6 +216,99 @@ function createConnectionCard(connection) {
     details.classList.toggle('expanded');
     expandIndicator.classList.toggle('expanded');
   };
+
+  return card;
+}
+
+/**
+ * Render per-tab connections
+ */
+function renderTabConnections(tabs) {
+  const container = document.getElementById('tab-connections-container');
+  const list = document.getElementById('tab-connections-list');
+  const count = document.getElementById('tab-connections-count');
+
+  count.textContent = tabs.length;
+
+  if (!tabs || tabs.length === 0) {
+    container.style.display = 'none';
+    return;
+  }
+
+  container.style.display = 'block';
+  list.innerHTML = '';
+
+  tabs.forEach(tab => {
+    const card = createTabConnectionCard(tab);
+    list.appendChild(card);
+  });
+}
+
+/**
+ * Create tab connection card
+ */
+function createTabConnectionCard(tab) {
+  const card = document.createElement('div');
+  card.className = `tab-connection-card ${tab.assignedPort ? 'connected' : 'not-connected'}`;
+
+  // Status dot
+  const statusDot = document.createElement('span');
+  statusDot.className = `tab-status-dot-small ${tab.assignedPort ? 'connected' : 'not-connected'}`;
+  card.appendChild(statusDot);
+
+  // Tab info
+  const infoSection = document.createElement('div');
+  infoSection.className = 'tab-info-section';
+
+  const titleLine = document.createElement('div');
+  titleLine.className = 'tab-title-line';
+  titleLine.textContent = truncate(tab.title, 35);
+  titleLine.title = tab.title;
+  infoSection.appendChild(titleLine);
+
+  const urlLine = document.createElement('div');
+  urlLine.className = 'tab-url-line';
+  urlLine.textContent = truncate(tab.url, 45);
+  urlLine.title = tab.url;
+  infoSection.appendChild(urlLine);
+
+  card.appendChild(infoSection);
+
+  // Backend selection dropdown
+  const select = document.createElement('select');
+  select.className = 'tab-backend-select';
+
+  // Add "Not connected" option
+  const notConnectedOption = document.createElement('option');
+  notConnectedOption.value = '';
+  notConnectedOption.textContent = 'Not connected';
+  select.appendChild(notConnectedOption);
+
+  // Add available backends
+  currentConnections.forEach(conn => {
+    const option = document.createElement('option');
+    option.value = conn.port;
+    option.textContent = `${conn.projectName}`;
+    if (tab.assignedPort === conn.port) {
+      option.selected = true;
+    }
+    select.appendChild(option);
+  });
+
+  // Handle backend change
+  select.onchange = async () => {
+    const newPort = select.value ? parseInt(select.value) : null;
+
+    if (newPort) {
+      // Assign to new backend
+      await handleAssignTab(tab.tabId, newPort);
+    } else {
+      // Unassign from backend (not implemented in ConnectionManager yet)
+      console.log(`[Popup] Unassigning tab ${tab.tabId} not yet implemented`);
+    }
+  };
+
+  card.appendChild(select);
 
   return card;
 }
