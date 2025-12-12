@@ -176,6 +176,7 @@ class BrowserMCPServer:
             browser_controller = await c.get("browser_controller")
             # Import here to avoid circular dependency
             from ...services.browser_controller import CapabilityDetector
+
             return CapabilityDetector(browser_controller)
 
         self.container.register("capability_detector", create_capability_detector)
@@ -297,6 +298,7 @@ class BrowserMCPServer:
         # Write service info to registry (for daemon tracking)
         if self.websocket_port and not self.mcp_mode:
             from .daemon import write_service_info
+
             write_service_info(os.getpid(), self.websocket_port)
 
         # Show status
@@ -310,6 +312,7 @@ class BrowserMCPServer:
         # Clear service info from registry
         if not self.mcp_mode:
             from .daemon import clear_service_info
+
             clear_service_info()
 
         if self.start_time and not self.mcp_mode:
@@ -467,6 +470,7 @@ class BrowserMCPServer:
         capability_detector = None
         if browser_controller:
             from ...services.browser_controller import CapabilityDetector
+
             capability_detector = CapabilityDetector(browser_controller)
 
         # Create MCP service with dependencies

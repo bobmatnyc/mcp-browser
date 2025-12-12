@@ -920,7 +920,11 @@ class MCPService:
             return [TextContent(type="text", text=output)]
         else:
             error = result.get("error", "Unknown error")
-            return [TextContent(type="text", text=f"Semantic DOM extraction failed: {error}")]
+            return [
+                TextContent(
+                    type="text", text=f"Semantic DOM extraction failed: {error}"
+                )
+            ]
 
     def _format_semantic_dom(self, dom: Dict[str, Any], options: Dict[str, Any]) -> str:
         """Format semantic DOM as readable text output."""
@@ -958,7 +962,11 @@ class MCPService:
             lines.append(f"## Links ({len(links)} total)")
             # Show first 50 links to avoid overwhelming output
             for link in links[:50]:
-                text = link.get("text", "").strip()[:80] or link.get("ariaLabel", "") or "[no text]"
+                text = (
+                    link.get("text", "").strip()[:80]
+                    or link.get("ariaLabel", "")
+                    or "[no text]"
+                )
                 href = link.get("href", "")
                 lines.append(f"- {text}")
                 if href and not href.startswith("javascript:"):
@@ -972,7 +980,12 @@ class MCPService:
         if forms and options.get("include_forms", True):
             lines.append(f"## Forms ({len(forms)} total)")
             for form in forms:
-                form_name = form.get("name") or form.get("id") or form.get("ariaLabel") or "[unnamed form]"
+                form_name = (
+                    form.get("name")
+                    or form.get("id")
+                    or form.get("ariaLabel")
+                    or "[unnamed form]"
+                )
                 lines.append(f"### {form_name}")
                 if form.get("action"):
                     lines.append(f"  Action: {form.get('action')}")
@@ -983,10 +996,17 @@ class MCPService:
                     for field in fields:
                         field_type = field.get("type", "text")
                         name = field.get("name") or field.get("id") or "[unnamed]"
-                        label = field.get("label") or field.get("ariaLabel") or field.get("placeholder") or ""
+                        label = (
+                            field.get("label")
+                            or field.get("ariaLabel")
+                            or field.get("placeholder")
+                            or ""
+                        )
                         required = " (required)" if field.get("required") else ""
                         if label:
-                            lines.append(f"    - {name} ({field_type}): {label}{required}")
+                            lines.append(
+                                f"    - {name} ({field_type}): {label}{required}"
+                            )
                         else:
                             lines.append(f"    - {name} ({field_type}){required}")
             lines.append("")
@@ -1008,7 +1028,7 @@ class MCPService:
             return [
                 TextContent(
                     type="text",
-                    text="Capability detection not available (detector not initialized)"
+                    text="Capability detection not available (detector not initialized)",
                 )
             ]
 
@@ -1022,24 +1042,24 @@ class MCPService:
                 f"**Summary:** {report['summary']}",
                 "",
                 "## Available Capabilities",
-                ""
+                "",
             ]
 
-            if report['capabilities']:
-                for cap in report['capabilities']:
+            if report["capabilities"]:
+                for cap in report["capabilities"]:
                     output_lines.append(f"- {cap}")
             else:
                 output_lines.append("- None")
 
             output_lines.extend(["", "## Control Methods", ""])
 
-            for method_name, method_info in report['methods'].items():
-                status = "✓ Available" if method_info['available'] else "✗ Unavailable"
+            for method_name, method_info in report["methods"].items():
+                status = "✓ Available" if method_info["available"] else "✗ Unavailable"
                 output_lines.append(f"### {method_name.title()} {status}")
                 output_lines.append(f"*{method_info['description']}*")
                 output_lines.append("")
                 output_lines.append("**Capabilities:**")
-                for cap in method_info['capabilities']:
+                for cap in method_info["capabilities"]:
                     output_lines.append(f"- {cap}")
                 output_lines.append("")
 
@@ -1049,8 +1069,7 @@ class MCPService:
             logger.exception("Failed to get capabilities")
             return [
                 TextContent(
-                    type="text",
-                    text=f"Failed to detect capabilities: {str(e)}"
+                    type="text", text=f"Failed to detect capabilities: {str(e)}"
                 )
             ]
 

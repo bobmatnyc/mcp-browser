@@ -17,6 +17,7 @@ try:
         BrowserController,
         BrowserNotAvailableError,
     )
+
     CDP_IMPORTS_AVAILABLE = True
 except ImportError:
     CDP_IMPORTS_AVAILABLE = False
@@ -158,7 +159,7 @@ async def _connect_command(cdp_port: int):
                     + str(cdp_port)
                     + "\n"
                     f"  Linux:   google-chrome --remote-debugging-port={cdp_port}\n"
-                    f'  Windows: chrome.exe --remote-debugging-port={cdp_port}',
+                    f"  Windows: chrome.exe --remote-debugging-port={cdp_port}",
                     title="Connection Failed",
                     border_style="red",
                 )
@@ -172,7 +173,7 @@ async def _connect_command(cdp_port: int):
                 f"{str(e)}\n\n"
                 "[bold]How to start Chrome with CDP:[/bold]\n\n"
                 "[bold cyan]macOS:[/bold cyan]\n"
-                f'  /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port={cdp_port}\n\n'
+                f"  /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port={cdp_port}\n\n"
                 "[bold cyan]Linux:[/bold cyan]\n"
                 f"  google-chrome --remote-debugging-port={cdp_port}\n\n"
                 "[bold cyan]Windows:[/bold cyan]\n"

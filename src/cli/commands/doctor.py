@@ -2,8 +2,6 @@
 
 import asyncio
 import json
-import subprocess
-import sys
 from pathlib import Path
 
 import click
@@ -13,7 +11,6 @@ from rich.table import Table
 from ..utils import (
     CONFIG_FILE,
     DATA_DIR,
-    check_installation_status,
     check_system_requirements,
     console,
 )
@@ -24,7 +21,6 @@ from ..utils.daemon import (
     get_server_status,
     is_port_available,
 )
-from .init import init_project_extension
 
 
 def create_default_config():
@@ -158,9 +154,7 @@ async def _doctor_command(fix: bool, verbose: bool):
     if failed > 0:
         console.print("[yellow]Run 'mcp-browser setup' to fix issues[/yellow]")
         if not fix:
-            console.print(
-                "[dim]Or run 'mcp-browser doctor --fix' to auto-fix[/dim]"
-            )
+            console.print("[dim]Or run 'mcp-browser doctor --fix' to auto-fix[/dim]")
     elif warnings > 0:
         console.print(
             "[yellow]Some warnings present - system should still work[/yellow]"
@@ -238,15 +232,15 @@ def _check_dependencies() -> dict:
 
 def _check_mcp_installer() -> dict:
     """Check if py-mcp-installer is available."""
-    try:
-        import py_mcp_installer
+    import importlib.util
 
+    if importlib.util.find_spec("py_mcp_installer") is not None:
         return {
             "name": "MCP Installer",
             "status": "pass",
             "message": "py-mcp-installer is available",
         }
-    except ImportError:
+    else:
         return {
             "name": "MCP Installer",
             "status": "warning",
@@ -303,7 +297,9 @@ def _check_extension_package() -> dict:
     # Try to find extension in common locations
     possible_paths = [
         Path.cwd() / "dist" / "mcp-browser-extension.zip",
-        Path(__file__).parent.parent.parent.parent / "dist" / "mcp-browser-extension.zip",
+        Path(__file__).parent.parent.parent.parent
+        / "dist"
+        / "mcp-browser-extension.zip",
         Path.home() / ".mcp-browser" / "mcp-browser-extension.zip",
     ]
 
@@ -333,9 +329,7 @@ def _check_mcp_config() -> dict:
         try:
             with open(claude_config) as f:
                 config = json.load(f)
-            if "mcpServers" in config and "mcp-browser" in config.get(
-                "mcpServers", {}
-            ):
+            if "mcpServers" in config and "mcp-browser" in config.get("mcpServers", {}):
                 return {
                     "name": "MCP Configuration",
                     "status": "pass",
@@ -368,7 +362,7 @@ async def _check_websocket_connectivity() -> dict:
 
         async def test_connection():
             uri = f"ws://localhost:{port}"
-            async with websockets.connect(uri, open_timeout=2.0) as ws:
+            async with websockets.connect(uri, open_timeout=2.0) as _:
                 return True
 
         await test_connection()
@@ -450,6 +444,10 @@ def _auto_fix_issues(results: list):
                 console.print(f"[red]✗ Failed to fix {r['name']}: {e}[/red]")
 
     if fixes_applied > 0:
-        console.print(f"\n[green]Applied {fixes_applied} fixes. Re-run doctor to verify.[/green]")
+        console.print(
+            f"\n[green]Applied {fixes_applied} fixes. Re-run doctor to verify.[/green]"
+        )
     else:
-        console.print("\n[yellow]No auto-fixes available. Manual intervention required.[/yellow]")
+        console.print(
+            "\n[yellow]No auto-fixes available. Manual intervention required.[/yellow]"
+        )

@@ -3,13 +3,13 @@
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Tuple
-import socket
 
 # Port range for server
 PORT_RANGE_START = 8851
@@ -42,12 +42,8 @@ def read_service_info() -> Optional[dict]:
 
 def write_service_info(pid: int, port: int) -> None:
     """Write service info to PID file."""
-    info = {
-        "pid": pid,
-        "port": port,
-        "started_at": datetime.now().isoformat()
-    }
-    with open(get_pid_file(), 'w') as f:
+    info = {"pid": pid, "port": port, "started_at": datetime.now().isoformat()}
+    with open(get_pid_file(), "w") as f:
         json.dump(info, f)
 
 
@@ -71,7 +67,7 @@ def is_port_available(port: int) -> bool:
     """Check if port is available."""
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.bind(('localhost', port))
+            s.bind(("localhost", port))
             return True
     except OSError:
         return False
@@ -103,7 +99,9 @@ def get_server_status() -> Tuple[bool, Optional[int], Optional[int]]:
     return False, None, None
 
 
-def start_daemon(port: Optional[int] = None) -> Tuple[bool, Optional[int], Optional[int]]:
+def start_daemon(
+    port: Optional[int] = None,
+) -> Tuple[bool, Optional[int], Optional[int]]:
     """
     Start server as background daemon.
 
@@ -126,25 +124,21 @@ def start_daemon(port: Optional[int] = None) -> Tuple[bool, Optional[int], Optio
 
     # Start server as daemon
     # Use the CLI executable instead of python -m
-    mcp_browser_path = shutil.which('mcp-browser')
+    mcp_browser_path = shutil.which("mcp-browser")
     if not mcp_browser_path:
         # Fallback: try relative to Python executable
-        mcp_browser_path = os.path.join(os.path.dirname(sys.executable), 'mcp-browser')
+        mcp_browser_path = os.path.join(os.path.dirname(sys.executable), "mcp-browser")
         if not os.path.exists(mcp_browser_path):
             return False, None, None
 
-    cmd = [
-        mcp_browser_path, "start",
-        "--port", str(port),
-        "--daemon"
-    ]
+    cmd = [mcp_browser_path, "start", "--port", str(port), "--daemon"]
 
     try:
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            start_new_session=True
+            start_new_session=True,
         )
 
         # Wait briefly for startup

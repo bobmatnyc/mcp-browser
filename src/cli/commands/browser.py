@@ -3,7 +3,6 @@
 import asyncio
 import functools
 import sys
-from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 import click
@@ -33,6 +32,7 @@ def requires_server(f: Callable) -> Callable:
             # Server is now guaranteed to be running
             ...
     """
+
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
         # Check current status first
@@ -390,7 +390,9 @@ async def _click_command(selector: str, port: Optional[int]):
 
 @control.command(name="scroll")
 @click.option("--up", "direction", flag_value="up", help="Scroll up")
-@click.option("--down", "direction", flag_value="down", default=True, help="Scroll down")
+@click.option(
+    "--down", "direction", flag_value="down", default=True, help="Scroll down"
+)
 @click.option("--amount", default=500, type=int, help="Pixels to scroll")
 @click.option("--port", default=None, type=int, help="WebSocket port")
 @requires_server
@@ -553,7 +555,9 @@ async def _extract_content_command(port: Optional[int], json_output: bool):
         console.print("[cyan]🔍 Searching for active server...[/cyan]")
         port = await find_active_port()
         if port is None:
-            console.print("[red]✗ No active server found. Start with: mcp-browser start[/red]")
+            console.print(
+                "[red]✗ No active server found. Start with: mcp-browser start[/red]"
+            )
             sys.exit(1)
         console.print(f"[green]✓ Found server on port {port}[/green]\n")
 
@@ -567,6 +571,7 @@ async def _extract_content_command(port: Optional[int], json_output: bool):
 
         if json_output:
             import json as json_module
+
             print(json_module.dumps(result, indent=2))
             return
 
@@ -575,21 +580,27 @@ async def _extract_content_command(port: Optional[int], json_output: bool):
             content = response.get("content", {})
 
             # Display formatted output
-            console.print(Panel(
-                f"[bold]{content.get('title', 'Untitled')}[/bold]\n\n"
-                f"[dim]By: {content.get('byline', 'Unknown')}[/dim]\n"
-                f"[dim]Words: {content.get('wordCount', 'N/A')}[/dim]\n\n"
-                f"{(content.get('excerpt', '') or content.get('textContent', ''))[:500]}...",
-                title="📄 Extracted Content",
-                border_style="green",
-            ))
+            console.print(
+                Panel(
+                    f"[bold]{content.get('title', 'Untitled')}[/bold]\n\n"
+                    f"[dim]By: {content.get('byline', 'Unknown')}[/dim]\n"
+                    f"[dim]Words: {content.get('wordCount', 'N/A')}[/dim]\n\n"
+                    f"{(content.get('excerpt', '') or content.get('textContent', ''))[:500]}...",
+                    title="📄 Extracted Content",
+                    border_style="green",
+                )
+            )
         else:
-            error = result.get("error") or result.get("response", {}).get("error", "Unknown error")
-            console.print(Panel(
-                f"[red]✗ Extraction failed:[/red]\n{error}",
-                title="Extract Error",
-                border_style="red",
-            ))
+            error = result.get("error") or result.get("response", {}).get(
+                "error", "Unknown error"
+            )
+            console.print(
+                Panel(
+                    f"[red]✗ Extraction failed:[/red]\n{error}",
+                    title="Extract Error",
+                    border_style="red",
+                )
+            )
             sys.exit(1)
     finally:
         await client.disconnect()
@@ -603,7 +614,14 @@ async def _extract_content_command(port: Optional[int], json_output: bool):
 @click.option("--forms/--no-forms", default=True, help="Include forms")
 @click.option("--json", "json_output", is_flag=True, help="Output as JSON")
 @requires_server
-def extract_semantic(port: int, headings: bool, landmarks: bool, links: bool, forms: bool, json_output: bool):
+def extract_semantic(
+    port: int,
+    headings: bool,
+    landmarks: bool,
+    links: bool,
+    forms: bool,
+    json_output: bool,
+):
     """Extract semantic DOM structure.
 
     Provides quick page understanding without screenshots:
@@ -618,7 +636,9 @@ def extract_semantic(port: int, headings: bool, landmarks: bool, links: bool, fo
       mcp-browser browser extract semantic --no-links
       mcp-browser browser extract semantic --json
     """
-    asyncio.run(_extract_semantic_command(port, headings, landmarks, links, forms, json_output))
+    asyncio.run(
+        _extract_semantic_command(port, headings, landmarks, links, forms, json_output)
+    )
 
 
 async def _extract_semantic_command(
@@ -634,7 +654,9 @@ async def _extract_semantic_command(
         console.print("[cyan]🔍 Searching for active server...[/cyan]")
         port = await find_active_port()
         if port is None:
-            console.print("[red]✗ No active server found. Start with: mcp-browser start[/red]")
+            console.print(
+                "[red]✗ No active server found. Start with: mcp-browser start[/red]"
+            )
             sys.exit(1)
         console.print(f"[green]✓ Found server on port {port}[/green]\n")
 
@@ -654,6 +676,7 @@ async def _extract_semantic_command(
 
         if json_output:
             import json as json_module
+
             print(json_module.dumps(result, indent=2))
             return
 
@@ -663,31 +686,43 @@ async def _extract_semantic_command(
             _display_semantic_dom(dom, headings, landmarks, links, forms)
         else:
             error = response.get("error", "Unknown error")
-            console.print(Panel(
-                f"[red]✗ Extraction failed:[/red]\n{error}",
-                title="Extract Error",
-                border_style="red",
-            ))
+            console.print(
+                Panel(
+                    f"[red]✗ Extraction failed:[/red]\n{error}",
+                    title="Extract Error",
+                    border_style="red",
+                )
+            )
             sys.exit(1)
     finally:
         await client.disconnect()
 
 
-def _display_semantic_dom(dom: Dict[str, Any], show_headings: bool, show_landmarks: bool, show_links: bool, show_forms: bool):
+def _display_semantic_dom(
+    dom: Dict[str, Any],
+    show_headings: bool,
+    show_landmarks: bool,
+    show_links: bool,
+    show_forms: bool,
+):
     """Display semantic DOM in rich format."""
-    console.print(Panel(
-        f"[bold]{dom.get('title', 'Untitled')}[/bold]\n"
-        f"[dim]{dom.get('url', '')}[/dim]",
-        title="🔍 Semantic Structure",
-        border_style="cyan",
-    ))
+    console.print(
+        Panel(
+            f"[bold]{dom.get('title', 'Untitled')}[/bold]\n"
+            f"[dim]{dom.get('url', '')}[/dim]",
+            title="🔍 Semantic Structure",
+            border_style="cyan",
+        )
+    )
 
     # Headings
     if show_headings and dom.get("headings"):
         console.print("\n[bold cyan]📑 Document Outline[/bold cyan]")
         for h in dom["headings"]:
             indent = "  " * (h.get("level", 1) - 1)
-            console.print(f"{indent}[yellow]H{h.get('level')}[/yellow] {h.get('text', '')[:80]}")
+            console.print(
+                f"{indent}[yellow]H{h.get('level')}[/yellow] {h.get('text', '')[:80]}"
+            )
 
     # Landmarks
     if show_landmarks and dom.get("landmarks"):
@@ -714,7 +749,12 @@ def _display_semantic_dom(dom: Dict[str, Any], show_headings: bool, show_landmar
     if show_forms and dom.get("forms"):
         console.print(f"\n[bold cyan]📝 Forms ({len(dom['forms'])} total)[/bold cyan]")
         for form in dom["forms"]:
-            name = form.get("name") or form.get("id") or form.get("ariaLabel") or "[unnamed]"
+            name = (
+                form.get("name")
+                or form.get("id")
+                or form.get("ariaLabel")
+                or "[unnamed]"
+            )
             method = (form.get("method") or "GET").upper()
             fields = form.get("fields", [])
             console.print(f"  [bold]{name}[/bold] ({method}, {len(fields)} fields)")
@@ -745,13 +785,17 @@ def extract_selector(selector: str, port: int, json_output: bool):
     asyncio.run(_extract_selector_command(selector, port, json_output))
 
 
-async def _extract_selector_command(selector: str, port: Optional[int], json_output: bool):
+async def _extract_selector_command(
+    selector: str, port: Optional[int], json_output: bool
+):
     """Execute selector extraction."""
     if port is None:
         console.print("[cyan]🔍 Searching for active server...[/cyan]")
         port = await find_active_port()
         if port is None:
-            console.print("[red]✗ No active server found. Start with: mcp-browser start[/red]")
+            console.print(
+                "[red]✗ No active server found. Start with: mcp-browser start[/red]"
+            )
             sys.exit(1)
         console.print(f"[green]✓ Found server on port {port}[/green]\n")
 
@@ -765,26 +809,31 @@ async def _extract_selector_command(selector: str, port: Optional[int], json_out
 
         if json_output:
             import json as json_module
+
             print(json_module.dumps(result, indent=2))
             return
 
         response = result.get("response", result)
         if response.get("success") or result.get("success"):
             element = response.get("element", response)
-            console.print(Panel(
-                f"[bold]Selector:[/bold] {selector}\n\n"
-                f"[bold]Tag:[/bold] {element.get('tagName', 'unknown')}\n"
-                f"[bold]Text:[/bold] {(element.get('textContent', '') or element.get('innerText', ''))[:500]}",
-                title="📌 Element Content",
-                border_style="green",
-            ))
+            console.print(
+                Panel(
+                    f"[bold]Selector:[/bold] {selector}\n\n"
+                    f"[bold]Tag:[/bold] {element.get('tagName', 'unknown')}\n"
+                    f"[bold]Text:[/bold] {(element.get('textContent', '') or element.get('innerText', ''))[:500]}",
+                    title="📌 Element Content",
+                    border_style="green",
+                )
+            )
         else:
             error = response.get("error", "Element not found or extraction failed")
-            console.print(Panel(
-                f"[red]✗ Extraction failed:[/red]\n{error}",
-                title="Extract Error",
-                border_style="red",
-            ))
+            console.print(
+                Panel(
+                    f"[red]✗ Extraction failed:[/red]\n{error}",
+                    title="Extract Error",
+                    border_style="red",
+                )
+            )
             sys.exit(1)
     finally:
         await client.disconnect()

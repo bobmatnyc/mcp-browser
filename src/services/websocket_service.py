@@ -42,7 +42,9 @@ class WebSocketService:
 
         # Generate project identity
         self.project_identity = self._generate_project_identity()
-        logger.info(f"Project identity: {self.project_identity['project_id']} ({self.project_identity['project_name']})")
+        logger.info(
+            f"Project identity: {self.project_identity['project_id']} ({self.project_identity['project_name']})"
+        )
 
     def _generate_project_identity(self) -> dict:
         """Generate stable identity for this project.
@@ -56,18 +58,19 @@ class WebSocketService:
         project_name = os.path.basename(project_path)
 
         return {
-            'project_id': project_id,
-            'project_name': project_name,
-            'project_path': project_path
+            "project_id": project_id,
+            "project_name": project_name,
+            "project_path": project_path,
         }
 
     def _get_version(self) -> str:
         """Get the current version string."""
         try:
             from .._version import __version__
+
             return __version__
         except ImportError:
-            return 'unknown'
+            return "unknown"
 
     async def start(self) -> int:
         """Start WebSocket server with port auto-discovery.
@@ -130,18 +133,22 @@ class WebSocketService:
         """
         self._connection_handlers[event] = handler
 
-    async def handle_connection_init(self, message: dict, websocket: WebSocketServerProtocol) -> None:
+    async def handle_connection_init(
+        self, message: dict, websocket: WebSocketServerProtocol
+    ) -> None:
         """Handle connection initialization handshake.
 
         Args:
             message: The connection_init message
             websocket: WebSocket connection
         """
-        last_sequence = message.get('lastSequence', 0)
-        extension_version = message.get('extensionVersion', 'unknown')
-        capabilities = message.get('capabilities', [])
+        last_sequence = message.get("lastSequence", 0)
+        extension_version = message.get("extensionVersion", "unknown")
+        capabilities = message.get("capabilities", [])
 
-        logger.info(f"Connection init from extension v{extension_version}, lastSequence={last_sequence}")
+        logger.info(
+            f"Connection init from extension v{extension_version}, lastSequence={last_sequence}"
+        )
         logger.info(f"Client capabilities: {capabilities}")
 
         # Find messages the client missed
@@ -149,38 +156,49 @@ class WebSocketService:
 
         # Send connection acknowledgment with replay
         ack_message = {
-            'type': 'connection_ack',
-            'serverVersion': self._get_version(),
-            'project_id': self.project_identity['project_id'],
-            'project_name': self.project_identity['project_name'],
-            'currentSequence': self.current_sequence,
-            'replay': replay_messages[:100]  # Limit replay to 100 messages
+            "type": "connection_ack",
+            "serverVersion": self._get_version(),
+            "project_id": self.project_identity["project_id"],
+            "project_name": self.project_identity["project_name"],
+            "currentSequence": self.current_sequence,
+            "replay": replay_messages[:100],  # Limit replay to 100 messages
         }
 
         await self.send_message(websocket, ack_message)
-        logger.info(f"Sent connection_ack with {len(replay_messages[:100])} replayed messages")
+        logger.info(
+            f"Sent connection_ack with {len(replay_messages[:100])} replayed messages"
+        )
 
-    async def handle_gap_recovery(self, message: dict, websocket: WebSocketServerProtocol) -> None:
+    async def handle_gap_recovery(
+        self, message: dict, websocket: WebSocketServerProtocol
+    ) -> None:
         """Handle gap recovery request - send messages in requested sequence range.
 
         Args:
             message: Gap recovery request message
             websocket: WebSocket connection
         """
-        from_sequence = message.get('fromSequence', 0)
-        to_sequence = message.get('toSequence', 0)
+        from_sequence = message.get("fromSequence", 0)
+        to_sequence = message.get("toSequence", 0)
 
-        logger.info(f"Gap recovery requested: sequences {from_sequence} to {to_sequence}")
+        logger.info(
+            f"Gap recovery requested: sequences {from_sequence} to {to_sequence}"
+        )
 
         # Validate request
         if from_sequence <= 0 or to_sequence < from_sequence:
-            logger.warning(f"Invalid gap recovery request: {from_sequence} to {to_sequence}")
-            await self.send_message(websocket, {
-                'type': 'gap_recovery_response',
-                'success': False,
-                'error': 'Invalid sequence range',
-                'messages': []
-            })
+            logger.warning(
+                f"Invalid gap recovery request: {from_sequence} to {to_sequence}"
+            )
+            await self.send_message(
+                websocket,
+                {
+                    "type": "gap_recovery_response",
+                    "success": False,
+                    "error": "Invalid sequence range",
+                    "messages": [],
+                },
+            )
             return
 
         # Limit recovery size to prevent abuse
@@ -193,13 +211,16 @@ class WebSocketService:
         recovery_messages = self._get_messages_in_range(from_sequence, to_sequence)
 
         # Send recovery response
-        await self.send_message(websocket, {
-            'type': 'gap_recovery_response',
-            'success': True,
-            'fromSequence': from_sequence,
-            'toSequence': to_sequence,
-            'messages': recovery_messages
-        })
+        await self.send_message(
+            websocket,
+            {
+                "type": "gap_recovery_response",
+                "success": True,
+                "fromSequence": from_sequence,
+                "toSequence": to_sequence,
+                "messages": recovery_messages,
+            },
+        )
 
         logger.info(f"Gap recovery complete: sent {len(recovery_messages)} messages")
 
@@ -213,11 +234,12 @@ class WebSocketService:
             List of messages that occurred after the given sequence
         """
         return [
-            msg for msg in self.message_buffer
-            if msg.get('sequence', 0) > last_sequence
+            msg for msg in self.message_buffer if msg.get("sequence", 0) > last_sequence
         ]
 
-    def _get_messages_in_range(self, from_seq: int, to_seq: int) -> List[Dict[str, Any]]:
+    def _get_messages_in_range(
+        self, from_seq: int, to_seq: int
+    ) -> List[Dict[str, Any]]:
         """Get messages with sequence numbers in the given range (inclusive).
 
         Args:
@@ -228,8 +250,9 @@ class WebSocketService:
             List of messages in the sequence range
         """
         return [
-            msg for msg in self.message_buffer
-            if msg.get('sequence', 0) >= from_seq and msg.get('sequence', 0) <= to_seq
+            msg
+            for msg in self.message_buffer
+            if msg.get("sequence", 0) >= from_seq and msg.get("sequence", 0) <= to_seq
         ]
 
     def _add_sequence(self, message: dict) -> dict:
@@ -242,7 +265,7 @@ class WebSocketService:
             Message with sequence number added
         """
         self.current_sequence += 1
-        message['sequence'] = self.current_sequence
+        message["sequence"] = self.current_sequence
         self.message_buffer.append(message.copy())
         return message
 
@@ -315,10 +338,7 @@ class WebSocketService:
 
             # Handle heartbeat - respond with pong immediately
             if message_type == "heartbeat":
-                pong_response = {
-                    "type": "pong",
-                    "timestamp": data.get("timestamp", 0)
-                }
+                pong_response = {"type": "pong", "timestamp": data.get("timestamp", 0)}
                 await self.send_message(websocket, pong_response)
                 return
 
@@ -326,18 +346,27 @@ class WebSocketService:
             if message_type == "server_info":
                 server_info = {
                     "type": "server_info_response",
-                    "project_id": self.project_identity['project_id'],
-                    "project_name": self.project_identity['project_name'],
-                    "project_path": self.project_identity['project_path'],
+                    "project_id": self.project_identity["project_id"],
+                    "project_name": self.project_identity["project_name"],
+                    "project_path": self.project_identity["project_path"],
                     "port": self.port,
                     "version": self._get_version(),
-                    "capabilities": ['console_capture', 'dom_interaction', 'screenshots']
+                    "capabilities": [
+                        "console_capture",
+                        "dom_interaction",
+                        "screenshots",
+                    ],
                 }
                 await self.send_message(websocket, server_info)
                 return
 
             # Handle response messages from extension - broadcast back to other connections (CLI/MCP clients)
-            response_messages = ['content_extracted', 'dom_response', 'page_content', 'semantic_dom_extracted']
+            response_messages = [
+                "content_extracted",
+                "dom_response",
+                "page_content",
+                "semantic_dom_extracted",
+            ]
             if message_type in response_messages:
                 logger.info(f"Broadcasting response message: {message_type}")
                 other_connections = [c for c in self._connections if c != websocket]
@@ -354,25 +383,41 @@ class WebSocketService:
                 return
 
             # Handle browser control commands - broadcast to all connections (including browser extension)
-            browser_commands = ['navigate', 'click', 'fill_field', 'scroll', 'get_page_content', 'dom_command', 'extract_content', 'extract_semantic_dom']
+            browser_commands = [
+                "navigate",
+                "click",
+                "fill_field",
+                "scroll",
+                "get_page_content",
+                "dom_command",
+                "extract_content",
+                "extract_semantic_dom",
+            ]
             if message_type in browser_commands:
                 logger.info(f"Broadcasting browser command: {message_type}")
                 # Check if there are other connections besides the sender
                 other_connections = [c for c in self._connections if c != websocket]
                 if not other_connections:
-                    logger.warning(f"No browser extension connected to receive command: {message_type}")
+                    logger.warning(
+                        f"No browser extension connected to receive command: {message_type}"
+                    )
                     # Send error back to sender
-                    await self.send_message(websocket, {
-                        "type": "error",
-                        "message": "No browser extension connected. Please ensure the extension is installed and connected.",
-                        "command": message_type
-                    })
+                    await self.send_message(
+                        websocket,
+                        {
+                            "type": "error",
+                            "message": "No browser extension connected. Please ensure the extension is installed and connected.",
+                            "command": message_type,
+                        },
+                    )
                     return
                 # Broadcast to all other connections (browser extensions)
                 for conn in other_connections:
                     try:
                         await conn.send(json.dumps(data))
-                        logger.debug(f"Sent {message_type} command to browser extension")
+                        logger.debug(
+                            f"Sent {message_type} command to browser extension"
+                        )
                     except Exception as e:
                         logger.error(f"Failed to send command to browser: {e}")
                 return
@@ -397,7 +442,10 @@ class WebSocketService:
             logger.error(f"Error handling message: {e}")
 
     async def send_message(
-        self, websocket: WebSocketServerProtocol, message: Dict[str, Any], add_sequence: bool = False
+        self,
+        websocket: WebSocketServerProtocol,
+        message: Dict[str, Any],
+        add_sequence: bool = False,
     ) -> None:
         """Send a message to a specific WebSocket connection.
 
@@ -413,7 +461,9 @@ class WebSocketService:
         except Exception as e:
             logger.error(f"Failed to send message: {e}")
 
-    async def broadcast_message(self, message: Dict[str, Any], add_sequence: bool = False) -> None:
+    async def broadcast_message(
+        self, message: Dict[str, Any], add_sequence: bool = False
+    ) -> None:
         """Broadcast a message to all connected clients.
 
         Args:

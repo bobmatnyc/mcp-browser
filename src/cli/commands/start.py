@@ -1,7 +1,6 @@
 """Start command implementation."""
 
 import asyncio
-import os
 import signal
 import sys
 
@@ -27,7 +26,9 @@ from ..utils import DATA_DIR, console
     "--dashboard-port", default=8080, type=int, help="Dashboard port (default: 8080)"
 )
 @click.option("--background", "-b", is_flag=True, help="Run server in background")
-@click.option("--daemon", is_flag=True, hidden=True, help="Run as daemon (internal use)")
+@click.option(
+    "--daemon", is_flag=True, hidden=True, help="Run as daemon (internal use)"
+)
 @click.pass_context
 def start(ctx, port, dashboard, dashboard_port, background, daemon):
     """🚀 Start the MCP Browser server.
@@ -116,5 +117,6 @@ def start(ctx, port, dashboard, dashboard_port, background, daemon):
             console.print(f"\n[red]Server error: {e}[/red]")
         if ctx.obj.get("debug"):
             import traceback
+
             traceback.print_exc()
         sys.exit(1)

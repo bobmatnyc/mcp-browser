@@ -3,7 +3,6 @@
 import json
 import shutil
 import sys
-import zipfile
 from pathlib import Path
 from typing import Optional
 
@@ -46,6 +45,7 @@ def get_extension_source_dir() -> Optional[Path]:
     try:
         if sys.version_info >= (3, 9):
             import importlib.resources as resources
+
             package = resources.files("mcp_browser")
             extension_dir = package / "extension"
             if extension_dir.is_dir():
@@ -66,7 +66,9 @@ def get_dist_dir() -> Path:
 @click.command()
 @click.option("--skip-mcp", is_flag=True, help="Skip MCP installation")
 @click.option("--skip-extension", is_flag=True, help="Skip extension packaging")
-@click.option("--force", "-f", is_flag=True, help="Force reinstall even if already setup")
+@click.option(
+    "--force", "-f", is_flag=True, help="Force reinstall even if already setup"
+)
 def setup(skip_mcp: bool, skip_extension: bool, force: bool):
     """🚀 Complete mcp-browser setup.
 
@@ -86,8 +88,7 @@ def setup(skip_mcp: bool, skip_extension: bool, force: bool):
     """
     console.print(
         Panel.fit(
-            "[bold cyan]🚀 mcp-browser Setup[/bold cyan]\n"
-            "Complete installation wizard",
+            "[bold cyan]🚀 mcp-browser Setup[/bold cyan]\nComplete installation wizard",
             border_style="cyan",
         )
     )
@@ -104,7 +105,9 @@ def setup(skip_mcp: bool, skip_extension: bool, force: bool):
         task = progress.add_task("Initializing configuration...", total=1)
         if init_configuration(force):
             steps_completed += 1
-            progress.update(task, completed=1, description="✓ Configuration initialized")
+            progress.update(
+                task, completed=1, description="✓ Configuration initialized"
+            )
         else:
             progress.update(task, description="✗ Configuration failed")
 
@@ -227,13 +230,14 @@ def install_mcp(force: bool = False) -> bool:
     Returns:
         True if successful, False otherwise
     """
-    import sys
     import os
+    import sys
 
     try:
         # Try using install command directly
+        from py_mcp_installer import InstallationError, Platform
+
         from .install import install_to_platform
-        from py_mcp_installer import Platform, InstallationError
     except ImportError:
         # py-mcp-installer not available
         console.print(
@@ -245,7 +249,7 @@ def install_mcp(force: bool = False) -> bool:
     # Suppress stderr completely during installation attempt
     # This prevents py_mcp_installer from printing tracebacks
     old_stderr = sys.stderr
-    sys.stderr = open(os.devnull, 'w')
+    sys.stderr = open(os.devnull, "w")
 
     try:
         # Install for Claude Code (most common use case)
@@ -255,9 +259,11 @@ def install_mcp(force: bool = False) -> bool:
         if not success:
             message_lower = message.lower()
             # Check for various "already exists" scenarios
-            if ("already configured" in message_lower or
-                "already exists" in message_lower or
-                "cli command fail" in message_lower):
+            if (
+                "already configured" in message_lower
+                or "already exists" in message_lower
+                or "cli command fail" in message_lower
+            ):
                 sys.stderr.close()
                 sys.stderr = old_stderr
                 console.print("[dim]  MCP already configured for Claude Code[/dim]")
@@ -275,11 +281,17 @@ def install_mcp(force: bool = False) -> bool:
         # Check if already installed by examining error message
         error_msg = str(e)
 
-        if "already exists" in error_msg.lower() or "already configured" in error_msg.lower():
+        if (
+            "already exists" in error_msg.lower()
+            or "already configured" in error_msg.lower()
+        ):
             console.print("[dim]  MCP already configured for Claude Code[/dim]")
             return True
         # Other installation error - check if it's a known issue
-        if "CLI command failed" in error_msg or "Native CLI installation failed" in error_msg:
+        if (
+            "CLI command failed" in error_msg
+            or "Native CLI installation failed" in error_msg
+        ):
             # Likely already installed, but failed to update
             console.print("[dim]  MCP configuration exists (cannot update)[/dim]")
             return True
@@ -303,7 +315,7 @@ def install_mcp(force: bool = False) -> bool:
         if sys.stderr != old_stderr:
             try:
                 sys.stderr.close()
-            except:
+            except Exception:
                 pass
             sys.stderr = old_stderr
 

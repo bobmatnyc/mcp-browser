@@ -70,7 +70,7 @@ async def check_system_requirements() -> List[Tuple[str, bool, str]]:
     checks.append(("Playwright", playwright_ok, "For screenshots"))
 
     # Port availability
-    from .daemon import PORT_RANGE_START, PORT_RANGE_END
+    from .daemon import PORT_RANGE_END, PORT_RANGE_START
 
     port_available = False
     for port in range(PORT_RANGE_START, PORT_RANGE_END + 1):
@@ -81,7 +81,13 @@ async def check_system_requirements() -> List[Tuple[str, bool, str]]:
                 break
             except Exception:
                 pass
-    checks.append(("Port availability", port_available, f"Ports {PORT_RANGE_START}-{PORT_RANGE_END}"))
+    checks.append(
+        (
+            "Port availability",
+            port_available,
+            f"Ports {PORT_RANGE_START}-{PORT_RANGE_END}",
+        )
+    )
 
     return checks
 

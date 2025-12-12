@@ -10,7 +10,7 @@ from typing import Any, Dict, Optional
 import websockets
 from rich.console import Console
 
-from .daemon import PORT_RANGE_START, PORT_RANGE_END, read_service_info
+from .daemon import PORT_RANGE_END, PORT_RANGE_START, read_service_info
 
 console = Console()
 logger = logging.getLogger(__name__)
@@ -325,7 +325,9 @@ class BrowserClient:
         }
         return await self._send_and_wait(message, timeout)
 
-    async def extract_element(self, selector: str, timeout: float = 10.0) -> Dict[str, Any]:
+    async def extract_element(
+        self, selector: str, timeout: float = 10.0
+    ) -> Dict[str, Any]:
         """Extract content from specific element."""
         message = {
             "type": "dom_command",
@@ -337,7 +339,9 @@ class BrowserClient:
         }
         return await self._send_and_wait(message, timeout)
 
-    async def scroll(self, direction: str = "down", amount: int = 500) -> Dict[str, Any]:
+    async def scroll(
+        self, direction: str = "down", amount: int = 500
+    ) -> Dict[str, Any]:
         """Scroll the page.
 
         Args:
