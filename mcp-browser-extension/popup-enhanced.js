@@ -172,6 +172,13 @@ async function handleConnectToBackend(port, tabId) {
   try {
     console.log(`[Popup] Connecting tab ${tabId} to backend on port ${port}`);
 
+    if (!tabId) {
+      throw new Error('No tab ID provided');
+    }
+    if (!port) {
+      throw new Error('No port provided');
+    }
+
     // Disable all connect buttons
     document.querySelectorAll('.backend-connect-btn').forEach(btn => {
       btn.disabled = true;
