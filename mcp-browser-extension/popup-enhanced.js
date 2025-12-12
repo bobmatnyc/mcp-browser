@@ -27,6 +27,9 @@ async function loadDashboard() {
       await updateCurrentTabStatus(currentTab.id);
     }
 
+    // Update backend list
+    await updateBackendList(status);
+
   } catch (error) {
     console.error('[Popup] Failed to load dashboard:', error);
     showError('Failed to load dashboard data');
@@ -90,9 +93,10 @@ async function updateCurrentTabStatus(tabId) {
     const currentTabConnection = tabConnections.find(tc => tc.tabId === tabId);
 
     if (currentTabConnection && currentTabConnection.assignedPort) {
-      // Tab is connected
+      // Tab is connected - show project name if available
       tabStatusIndicator.className = 'status-indicator connected';
-      tabStatusText.textContent = `Connected to port ${currentTabConnection.assignedPort}`;
+      const projectName = currentTabConnection.backendName || `Port ${currentTabConnection.assignedPort}`;
+      tabStatusText.textContent = `Connected to ${projectName} (port ${currentTabConnection.assignedPort})`;
     } else {
       // Tab is not connected
       tabStatusIndicator.className = 'status-indicator disconnected';
@@ -102,6 +106,103 @@ async function updateCurrentTabStatus(tabId) {
     console.error('[Popup] Failed to get current tab status:', error);
     tabStatusIndicator.className = 'status-indicator disconnected';
     tabStatusText.textContent = 'Error';
+  }
+}
+
+/**
+ * Update backend list display
+ */
+async function updateBackendList(status) {
+  const backendListContainer = document.getElementById('backend-list-container');
+  const backendList = document.getElementById('backend-list');
+
+  // Get available servers from status
+  const availableServers = status?.availableServers || [];
+
+  // Get current tab to check if connected
+  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  const currentTab = tabs[0];
+  let isCurrentTabConnected = false;
+
+  if (currentTab) {
+    const tabConnectionsResponse = await sendMessage({ type: 'get_tab_connections' });
+    const tabConnections = tabConnectionsResponse?.tabConnections || [];
+    const currentTabConnection = tabConnections.find(tc => tc.tabId === currentTab.id);
+    isCurrentTabConnected = currentTabConnection && currentTabConnection.assignedPort;
+  }
+
+  // Show backend list only if:
+  // 1. There are available backends
+  // 2. Current tab is not connected
+  if (availableServers.length > 0 && !isCurrentTabConnected) {
+    backendListContainer.style.display = 'block';
+
+    // Clear existing list
+    backendList.innerHTML = '';
+
+    // Render each backend
+    availableServers.forEach(server => {
+      const item = document.createElement('div');
+      item.className = 'backend-item';
+
+      item.innerHTML = `
+        <div class="backend-info">
+          <div class="backend-name">${server.projectName || 'Unknown Project'}</div>
+          <div class="backend-port">Port ${server.port}</div>
+        </div>
+        <button class="backend-connect-btn" data-port="${server.port}">Connect</button>
+      `;
+
+      // Add click handler to connect button
+      const connectBtn = item.querySelector('.backend-connect-btn');
+      connectBtn.addEventListener('click', () => handleConnectToBackend(server.port, currentTab.id));
+
+      backendList.appendChild(item);
+    });
+  } else {
+    // Hide backend list if connected or no backends available
+    backendListContainer.style.display = 'none';
+  }
+}
+
+/**
+ * Handle connecting current tab to a specific backend
+ */
+async function handleConnectToBackend(port, tabId) {
+  try {
+    console.log(`[Popup] Connecting tab ${tabId} to backend on port ${port}`);
+
+    // Disable all connect buttons
+    document.querySelectorAll('.backend-connect-btn').forEach(btn => {
+      btn.disabled = true;
+      btn.textContent = 'Connecting...';
+    });
+
+    // Assign tab to the selected port
+    const response = await sendMessage({
+      type: 'assign_tab_to_port',
+      tabId: tabId,
+      port: port
+    });
+
+    if (response && response.success) {
+      console.log(`[Popup] Successfully connected tab ${tabId} to port ${port}`);
+
+      // Refresh dashboard to update UI
+      await loadDashboard();
+    } else {
+      throw new Error(response?.error || 'Failed to assign tab to port');
+    }
+
+  } catch (error) {
+    console.error('[Popup] Failed to connect to backend:', error);
+    showError(`Failed to connect: ${error.message}`);
+
+    // Re-enable buttons
+    document.querySelectorAll('.backend-connect-btn').forEach(btn => {
+      btn.disabled = false;
+      btn.textContent = 'Connect';
+    });
   }
 }
 

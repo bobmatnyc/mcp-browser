@@ -2319,12 +2319,36 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.type === 'assign_tab_to_port') {
     // Assign a tab to a specific port/connection
     const { tabId, port } = request;
-    try {
-      connectionManager.assignTabToConnection(tabId, port);
-      sendResponse({ success: true });
-    } catch (error) {
-      sendResponse({ success: false, error: error.message });
-    }
+    (async () => {
+      try {
+        // Ensure connection exists to the backend
+        if (!connectionManager.connections.has(port)) {
+          console.log(`[MCP Browser] Creating connection to port ${port} before assignment`);
+          await connectionManager.connectToBackend(port);
+        }
+
+        // Assign tab to connection
+        connectionManager.assignTabToConnection(tabId, port);
+
+        // Get tab URL for domain caching
+        const tab = await chrome.tabs.get(tabId);
+        if (tab.url) {
+          const hostname = connectionManager._extractHostname(tab.url);
+          if (hostname) {
+            await connectionManager.cacheDomainPort(hostname, port);
+          }
+        }
+
+        // Update MRU
+        connectionManager.portSelector.updateMRU(port);
+
+        sendResponse({ success: true });
+      } catch (error) {
+        console.error(`[MCP Browser] Failed to assign tab ${tabId} to port ${port}:`, error);
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true; // Keep channel open for async response
   } else if (request.type === 'get_connections') {
     // Get list of all active connections
     const connections = connectionManager.getActiveConnections();

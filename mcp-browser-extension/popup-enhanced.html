@@ -118,6 +118,59 @@
       opacity: 0.8;
     }
 
+    /* Backend List Styles */
+    .backend-item {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background 0.2s ease;
+    }
+
+    .backend-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .backend-info {
+      flex: 1;
+    }
+
+    .backend-name {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .backend-port {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+
+    .backend-connect-btn {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 4px;
+      background: rgba(76, 175, 80, 0.3);
+      color: white;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .backend-connect-btn:hover {
+      background: rgba(76, 175, 80, 0.5);
+      transform: translateY(-1px);
+    }
+
+    .backend-connect-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
   </style>
 </head>
 <body>
@@ -147,6 +200,14 @@
         <span id="tab-status-indicator" class="status-indicator disconnected"></span>
         <span id="tab-status-text">Not connected</span>
       </span>
+    </div>
+  </div>
+
+  <!-- Backend Selection List (shown when backends available but not connected) -->
+  <div id="backend-list-container" style="display: none;">
+    <div class="status-container">
+      <div class="section-title">Available Backends</div>
+      <div id="backend-list"></div>
     </div>
   </div>
 
