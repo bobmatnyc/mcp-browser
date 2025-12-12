@@ -1,44 +1,31 @@
 /**
- * Enhanced popup script for MCP Browser - Connection Dashboard
+ * Simplified popup script for MCP Browser
  * Features:
- * - Multi-connection display with detailed status
- * - Unassigned tab management
- * - Per-connection disconnect
- * - Manual tab assignment
+ * - Overall server connection status
+ * - Current tab connection status
  * - Auto-refresh dashboard
- * Version: 2.0.0 - Connection Dashboard
+ * Version: 2.1.0 - Simplified Current Tab View
  */
 
-let currentConnections = [];
-let pendingTabs = [];
-let tabConnections = [];
 let refreshInterval = null;
 
 /**
- * Load complete dashboard state
+ * Load dashboard state
  */
 async function loadDashboard() {
   try {
     // Get overall status
     const status = await sendMessage({ type: 'get_status' });
 
-    // Get active connections
-    const connectionsResponse = await sendMessage({ type: 'get_connections' });
-    currentConnections = connectionsResponse?.connections || [];
+    // Get current tab info
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const currentTab = tabs[0];
 
-    // Get per-tab connections
-    const tabConnectionsResponse = await sendMessage({ type: 'get_tab_connections' });
-    tabConnections = tabConnectionsResponse?.tabConnections || [];
-
-    // Get pending/unassigned tabs
-    const pendingResponse = await sendMessage({ type: 'get_pending_tabs' });
-    pendingTabs = pendingResponse?.pendingTabs || [];
-
-    // Update all UI sections
+    // Update UI
     updateOverallStatus(status);
-    renderConnections(currentConnections);
-    renderTabConnections(tabConnections);
-    renderUnassignedTabs(pendingTabs);
+    if (currentTab) {
+      await updateCurrentTabStatus(currentTab.id);
+    }
 
   } catch (error) {
     console.error('[Popup] Failed to load dashboard:', error);
@@ -47,7 +34,7 @@ async function loadDashboard() {
 }
 
 /**
- * Update overall status indicators
+ * Update overall server status indicators
  */
 function updateOverallStatus(status) {
   const statusIndicator = document.getElementById('status-indicator');
@@ -61,20 +48,19 @@ function updateOverallStatus(status) {
     return;
   }
 
-  // Update connection status - simplified display
+  // Update server connection status
   const activeCount = status.totalConnections || 0;
 
-  // Update status indicator with green glow when connected
   if (activeCount > 0) {
     statusIndicator.className = 'status-indicator connected';
     if (activeCount === 1) {
-      statusText.textContent = 'Connected';
+      statusText.textContent = 'Server Connected';
     } else {
-      statusText.textContent = `Connected (${activeCount} backends)`;
+      statusText.textContent = `${activeCount} Servers Connected`;
     }
   } else {
     statusIndicator.className = 'status-indicator disconnected';
-    statusText.textContent = 'Disconnected';
+    statusText.textContent = 'Server Disconnected';
   }
 
   // Update message count
@@ -89,362 +75,36 @@ function updateOverallStatus(status) {
 }
 
 /**
- * Render active connections
+ * Update current tab connection status
  */
-function renderConnections(connections) {
-  const container = document.getElementById('connections-container');
-  const list = document.getElementById('connections-list');
+async function updateCurrentTabStatus(tabId) {
+  const tabStatusIndicator = document.getElementById('tab-status-indicator');
+  const tabStatusText = document.getElementById('tab-status-text');
 
-  if (!connections || connections.length === 0) {
-    container.style.display = 'none';
-    return;
-  }
-
-  container.style.display = 'block';
-  list.innerHTML = '';
-
-  connections.forEach(connection => {
-    const card = createConnectionCard(connection);
-    list.appendChild(card);
-  });
-}
-
-/**
- * Create connection card element
- */
-function createConnectionCard(connection) {
-  const card = document.createElement('div');
-  card.className = 'connection-card';
-  if (!connection.ready) {
-    card.classList.add('disconnected');
-  }
-
-  // Connection header
-  const header = document.createElement('div');
-  header.className = 'connection-header';
-
-  const info = document.createElement('div');
-  info.className = 'connection-info';
-
-  const title = document.createElement('div');
-  title.className = 'connection-title';
-
-  // Status dot
-  const statusDot = document.createElement('span');
-  statusDot.className = `connection-status-dot ${connection.ready ? '' : 'disconnected'}`;
-  title.appendChild(statusDot);
-
-  // Project name
-  const projectName = document.createElement('span');
-  projectName.className = 'connection-project';
-  projectName.textContent = connection.projectName || `Port ${connection.port}`;
-  title.appendChild(projectName);
-
-  // Expand indicator
-  const expandIndicator = document.createElement('span');
-  expandIndicator.className = 'expand-indicator';
-  expandIndicator.textContent = '▶';
-  title.appendChild(expandIndicator);
-
-  info.appendChild(title);
-
-  // Port and tab count
-  const meta = document.createElement('div');
-  meta.style.display = 'flex';
-  meta.style.gap = '8px';
-  meta.style.alignItems = 'center';
-
-  const portBadge = document.createElement('span');
-  portBadge.className = 'connection-port';
-  portBadge.textContent = `Port ${connection.port}`;
-  meta.appendChild(portBadge);
-
-  const tabBadge = document.createElement('span');
-  tabBadge.className = 'tab-count-badge';
-  tabBadge.textContent = `${connection.tabCount} tab${connection.tabCount !== 1 ? 's' : ''}`;
-  meta.appendChild(tabBadge);
-
-  if (connection.isPrimary) {
-    const primaryBadge = document.createElement('span');
-    primaryBadge.style.fontSize = '10px';
-    primaryBadge.style.opacity = '0.7';
-    primaryBadge.textContent = '(primary)';
-    meta.appendChild(primaryBadge);
-  }
-
-  info.appendChild(meta);
-  header.appendChild(info);
-
-  // Disconnect button
-  const disconnectBtn = document.createElement('button');
-  disconnectBtn.className = 'disconnect-btn';
-  disconnectBtn.textContent = '×';
-  disconnectBtn.title = 'Disconnect';
-  disconnectBtn.onclick = (e) => {
-    e.stopPropagation();
-    handleDisconnect(connection.port);
-  };
-  header.appendChild(disconnectBtn);
-
-  card.appendChild(header);
-
-  // Connection details (expandable)
-  const details = document.createElement('div');
-  details.className = 'connection-details';
-
-  if (connection.projectPath) {
-    const pathRow = document.createElement('div');
-    pathRow.className = 'connection-detail-row';
-    pathRow.innerHTML = `<span>Path:</span><span style="font-size: 10px; opacity: 0.8;">${truncate(connection.projectPath, 40)}</span>`;
-    details.appendChild(pathRow);
-  }
-
-  const queueRow = document.createElement('div');
-  queueRow.className = 'connection-detail-row';
-  queueRow.innerHTML = `<span>Queue Size:</span><span>${connection.queueSize || 0}</span>`;
-  details.appendChild(queueRow);
-
-  const statusRow = document.createElement('div');
-  statusRow.className = 'connection-detail-row';
-  statusRow.innerHTML = `<span>Status:</span><span>${connection.ready ? 'Ready' : 'Connecting...'}</span>`;
-  details.appendChild(statusRow);
-
-  card.appendChild(details);
-
-  // Toggle details on header click
-  header.onclick = () => {
-    details.classList.toggle('expanded');
-    expandIndicator.classList.toggle('expanded');
-  };
-
-  return card;
-}
-
-/**
- * Render per-tab connections
- */
-function renderTabConnections(tabs) {
-  const container = document.getElementById('tab-connections-container');
-  const list = document.getElementById('tab-connections-list');
-  const count = document.getElementById('tab-connections-count');
-
-  count.textContent = tabs.length;
-
-  if (!tabs || tabs.length === 0) {
-    container.style.display = 'none';
-    return;
-  }
-
-  container.style.display = 'block';
-  list.innerHTML = '';
-
-  tabs.forEach(tab => {
-    const card = createTabConnectionCard(tab);
-    list.appendChild(card);
-  });
-}
-
-/**
- * Create tab connection card
- */
-function createTabConnectionCard(tab) {
-  const card = document.createElement('div');
-  card.className = `tab-connection-card ${tab.assignedPort ? 'connected' : 'not-connected'}`;
-
-  // Status dot
-  const statusDot = document.createElement('span');
-  statusDot.className = `tab-status-dot-small ${tab.assignedPort ? 'connected' : 'not-connected'}`;
-  card.appendChild(statusDot);
-
-  // Tab info
-  const infoSection = document.createElement('div');
-  infoSection.className = 'tab-info-section';
-
-  const titleLine = document.createElement('div');
-  titleLine.className = 'tab-title-line';
-  titleLine.textContent = truncate(tab.title, 35);
-  titleLine.title = tab.title;
-  infoSection.appendChild(titleLine);
-
-  const urlLine = document.createElement('div');
-  urlLine.className = 'tab-url-line';
-  urlLine.textContent = truncate(tab.url, 45);
-  urlLine.title = tab.url;
-  infoSection.appendChild(urlLine);
-
-  card.appendChild(infoSection);
-
-  // Backend selection dropdown
-  const select = document.createElement('select');
-  select.className = 'tab-backend-select';
-
-  // Add "Not connected" option
-  const notConnectedOption = document.createElement('option');
-  notConnectedOption.value = '';
-  notConnectedOption.textContent = 'Not connected';
-  select.appendChild(notConnectedOption);
-
-  // Add available backends
-  currentConnections.forEach(conn => {
-    const option = document.createElement('option');
-    option.value = conn.port;
-    option.textContent = `${conn.projectName}`;
-    if (tab.assignedPort === conn.port) {
-      option.selected = true;
-    }
-    select.appendChild(option);
-  });
-
-  // Handle backend change
-  select.onchange = async () => {
-    const newPort = select.value ? parseInt(select.value) : null;
-
-    if (newPort) {
-      // Assign to new backend
-      await handleAssignTab(tab.tabId, newPort);
-    } else {
-      // Unassign from backend (not implemented in ConnectionManager yet)
-      console.log(`[Popup] Unassigning tab ${tab.tabId} not yet implemented`);
-    }
-  };
-
-  card.appendChild(select);
-
-  return card;
-}
-
-/**
- * Render unassigned tabs
- */
-function renderUnassignedTabs(tabs) {
-  const container = document.getElementById('unassigned-container');
-  const list = document.getElementById('unassigned-list');
-  const count = document.getElementById('unassigned-count');
-
-  count.textContent = tabs.length;
-
-  if (!tabs || tabs.length === 0) {
-    container.style.display = 'none';
-    return;
-  }
-
-  container.style.display = 'block';
-  list.innerHTML = '';
-
-  tabs.forEach(tab => {
-    const tabCard = createUnassignedTabCard(tab);
-    list.appendChild(tabCard);
-  });
-}
-
-/**
- * Create unassigned tab card
- */
-function createUnassignedTabCard(tab) {
-  const card = document.createElement('div');
-  card.className = 'unassigned-tab';
-
-  // Tab info
-  const info = document.createElement('div');
-  info.className = 'unassigned-tab-info';
-
-  const title = document.createElement('div');
-  title.className = 'unassigned-tab-title';
-  title.textContent = getTitleFromUrl(tab.url);
-  title.title = getTitleFromUrl(tab.url);
-  info.appendChild(title);
-
-  const url = document.createElement('div');
-  url.className = 'unassigned-tab-url';
-  url.textContent = truncate(tab.url, 50);
-  url.title = tab.url;
-  info.appendChild(url);
-
-  card.appendChild(info);
-
-  // Backend selection dropdown
-  const dropdown = document.createElement('select');
-  dropdown.className = 'tab-assign-dropdown';
-
-  const defaultOption = document.createElement('option');
-  defaultOption.value = '';
-  defaultOption.textContent = 'Select...';
-  dropdown.appendChild(defaultOption);
-
-  currentConnections.forEach(conn => {
-    const option = document.createElement('option');
-    option.value = conn.port;
-    option.textContent = `${conn.projectName} (${conn.port})`;
-    dropdown.appendChild(option);
-  });
-
-  card.appendChild(dropdown);
-
-  // Assign button
-  const assignBtn = document.createElement('button');
-  assignBtn.className = 'assign-btn';
-  assignBtn.textContent = 'Assign';
-  assignBtn.disabled = true;
-
-  dropdown.onchange = () => {
-    assignBtn.disabled = !dropdown.value;
-  };
-
-  assignBtn.onclick = () => {
-    if (dropdown.value) {
-      handleAssignTab(tab.tabId, parseInt(dropdown.value));
-    }
-  };
-
-  card.appendChild(assignBtn);
-
-  return card;
-}
-
-/**
- * Handle disconnect from backend
- */
-async function handleDisconnect(port) {
   try {
-    const response = await sendMessage({
-      type: 'disconnect',
-      port: port
-    });
+    // Get tab connections
+    const tabConnectionsResponse = await sendMessage({ type: 'get_tab_connections' });
+    const tabConnections = tabConnectionsResponse?.tabConnections || [];
 
-    if (response) {
-      console.log(`[Popup] Disconnected from port ${port}`);
-      // Refresh dashboard immediately
-      await loadDashboard();
+    // Find current tab
+    const currentTabConnection = tabConnections.find(tc => tc.tabId === tabId);
+
+    if (currentTabConnection && currentTabConnection.assignedPort) {
+      // Tab is connected
+      tabStatusIndicator.className = 'status-indicator connected';
+      tabStatusText.textContent = `Connected to port ${currentTabConnection.assignedPort}`;
+    } else {
+      // Tab is not connected
+      tabStatusIndicator.className = 'status-indicator disconnected';
+      tabStatusText.textContent = 'Not connected';
     }
   } catch (error) {
-    console.error(`[Popup] Failed to disconnect from port ${port}:`, error);
-    showError(`Failed to disconnect from port ${port}`);
+    console.error('[Popup] Failed to get current tab status:', error);
+    tabStatusIndicator.className = 'status-indicator disconnected';
+    tabStatusText.textContent = 'Error';
   }
 }
 
-/**
- * Handle manual tab assignment
- */
-async function handleAssignTab(tabId, port) {
-  try {
-    const response = await sendMessage({
-      type: 'assign_tab_to_port',
-      tabId: tabId,
-      port: port
-    });
-
-    if (response && response.success) {
-      console.log(`[Popup] Assigned tab ${tabId} to port ${port}`);
-      // Refresh dashboard immediately
-      await loadDashboard();
-    } else {
-      showError(`Failed to assign tab to port ${port}`);
-    }
-  } catch (error) {
-    console.error(`[Popup] Failed to assign tab ${tabId}:`, error);
-    showError(`Failed to assign tab`);
-  }
-}
 
 /**
  * Handle scan for backends
@@ -509,32 +169,6 @@ function showError(message) {
   }, 5000);
 }
 
-/**
- * Truncate text to max length
- */
-function truncate(text, maxLength) {
-  if (!text) return '';
-  if (text.length <= maxLength) return text;
-  return text.substring(0, maxLength - 3) + '...';
-}
-
-/**
- * Get readable title from URL
- */
-function getTitleFromUrl(url) {
-  try {
-    const urlObj = new URL(url);
-    const hostname = urlObj.hostname;
-    const path = urlObj.pathname;
-
-    if (path && path !== '/') {
-      return `${hostname}${path}`;
-    }
-    return hostname;
-  } catch (e) {
-    return url;
-  }
-}
 
 /**
  * Start auto-refresh
