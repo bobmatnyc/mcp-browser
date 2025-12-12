@@ -337,7 +337,7 @@ class WebSocketService:
                 return
 
             # Handle response messages from extension - broadcast back to other connections (CLI/MCP clients)
-            response_messages = ['content_extracted', 'dom_response', 'page_content']
+            response_messages = ['content_extracted', 'dom_response', 'page_content', 'semantic_dom_extracted']
             if message_type in response_messages:
                 logger.info(f"Broadcasting response message: {message_type}")
                 other_connections = [c for c in self._connections if c != websocket]
@@ -354,7 +354,7 @@ class WebSocketService:
                 return
 
             # Handle browser control commands - broadcast to all connections (including browser extension)
-            browser_commands = ['navigate', 'click', 'fill_field', 'scroll', 'get_page_content', 'dom_command', 'extract_content']
+            browser_commands = ['navigate', 'click', 'fill_field', 'scroll', 'get_page_content', 'dom_command', 'extract_content', 'extract_semantic_dom']
             if message_type in browser_commands:
                 logger.info(f"Broadcasting browser command: {message_type}")
                 # Check if there are other connections besides the sender
