@@ -335,6 +335,59 @@ class BrowserClient:
         }
         return await self._send_and_wait(message, timeout)
 
+    async def scroll(self, direction: str = "down", amount: int = 500) -> Dict[str, Any]:
+        """Scroll the page.
+
+        Args:
+            direction: Direction to scroll (up or down)
+            amount: Pixels to scroll
+
+        Returns:
+            Response dictionary
+        """
+        if not self._connected:
+            return {"success": False, "error": "Not connected to server"}
+
+        try:
+            message = {
+                "type": "dom_command",
+                "requestId": str(uuid.uuid4()),
+                "command": {
+                    "type": "scroll",
+                    "params": {"direction": direction, "amount": amount},
+                },
+            }
+            await self.websocket.send(json.dumps(message))
+            return {"success": True, "direction": direction, "amount": amount}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def submit_form(self, selector: str) -> Dict[str, Any]:
+        """Submit a form.
+
+        Args:
+            selector: CSS selector for the form
+
+        Returns:
+            Response dictionary
+        """
+        if not self._connected:
+            return {"success": False, "error": "Not connected to server"}
+
+        try:
+            message = {
+                "type": "dom_command",
+                "requestId": str(uuid.uuid4()),
+                "command": {
+                    "type": "submit",
+                    "params": {"selector": selector, "index": 0},
+                },
+            }
+            await self.websocket.send(json.dumps(message))
+            return {"success": True, "selector": selector}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
 
 async def find_active_port(
     start_port: int = 8875, end_port: int = 8895

@@ -31,16 +31,39 @@ def browser():
 
     \b
     Examples:
-      mcp-browser browser navigate https://example.com
+      mcp-browser browser control navigate https://example.com
+      mcp-browser browser control fill "#email" "test@example.com"
+      mcp-browser browser control click "#submit-button"
+      mcp-browser browser extract content
       mcp-browser browser logs --limit 10
-      mcp-browser browser fill "#email" "test@example.com"
-      mcp-browser browser click "#submit-button"
       mcp-browser browser test --demo
     """
     pass
 
 
-@browser.command()
+@browser.group()
+def control():
+    """🎮 Control browser interactions.
+
+    \b
+    Control commands:
+      navigate  - Go to URL
+      click     - Click element
+      fill      - Fill form field
+      scroll    - Scroll page
+      submit    - Submit form
+
+    \b
+    Examples:
+      mcp-browser browser control navigate https://example.com
+      mcp-browser browser control click "#submit-btn"
+      mcp-browser browser control fill "#email" "test@example.com"
+      mcp-browser browser control scroll --down 500
+    """
+    pass
+
+
+@control.command(name="navigate")
 @click.argument("url")
 @click.option(
     "--wait", default=0, type=float, help="Wait time after navigation (seconds)"
@@ -51,14 +74,14 @@ def browser():
     type=int,
     help="WebSocket port (auto-detect if not specified)",
 )
-def navigate(url: str, wait: float, port: int):
+def navigate_to_url(url: str, wait: float, port: int):
     """Navigate browser to a URL.
 
     \b
     Examples:
-      mcp-browser browser navigate https://example.com
-      mcp-browser browser navigate https://google.com --wait 2
-      mcp-browser browser navigate https://github.com --port 8875
+      mcp-browser browser control navigate https://example.com
+      mcp-browser browser control navigate https://google.com --wait 2
+      mcp-browser browser control navigate https://github.com --port 8875
     """
     asyncio.run(_navigate_command(url, wait, port))
 
@@ -183,7 +206,7 @@ async def _logs_command(limit: int, level: str, port: Optional[int], json_output
         )
 
 
-@browser.command()
+@control.command(name="fill")
 @click.argument("selector")
 @click.argument("value")
 @click.option(
@@ -192,14 +215,14 @@ async def _logs_command(limit: int, level: str, port: Optional[int], json_output
     type=int,
     help="WebSocket port (auto-detect if not specified)",
 )
-def fill(selector: str, value: str, port: int):
+def fill_field(selector: str, value: str, port: int):
     """Fill a form field.
 
     \b
     Examples:
-      mcp-browser browser fill "#email" "test@example.com"
-      mcp-browser browser fill "input[name='username']" "testuser"
-      mcp-browser browser fill ".search-box" "query text"
+      mcp-browser browser control fill "#email" "test@example.com"
+      mcp-browser browser control fill "input[name='username']" "testuser"
+      mcp-browser browser control fill ".search-box" "query text"
     """
     asyncio.run(_fill_command(selector, value, port))
 
@@ -249,7 +272,7 @@ async def _fill_command(selector: str, value: str, port: Optional[int]):
         await client.disconnect()
 
 
-@browser.command(name="click")
+@control.command(name="click")
 @click.argument("selector")
 @click.option(
     "--port",
@@ -262,9 +285,9 @@ def click_element(selector: str, port: int):
 
     \b
     Examples:
-      mcp-browser browser click "#submit-button"
-      mcp-browser browser click "button.login"
-      mcp-browser browser click "a[href='/dashboard']"
+      mcp-browser browser control click "#submit-button"
+      mcp-browser browser control click "button.login"
+      mcp-browser browser control click "a[href='/dashboard']"
     """
     asyncio.run(_click_command(selector, port))
 
@@ -304,6 +327,125 @@ async def _click_command(selector: str, port: Optional[int]):
                 Panel(
                     f"[red]✗ Click failed:[/red]\n{result.get('error', 'Unknown error')}",
                     title="Click Error",
+                    border_style="red",
+                )
+            )
+            sys.exit(1)
+    finally:
+        await client.disconnect()
+
+
+@control.command(name="scroll")
+@click.option("--up", "direction", flag_value="up", help="Scroll up")
+@click.option("--down", "direction", flag_value="down", default=True, help="Scroll down")
+@click.option("--amount", default=500, type=int, help="Pixels to scroll")
+@click.option("--port", default=None, type=int, help="WebSocket port")
+def scroll_page(direction: str, amount: int, port: int):
+    """Scroll the page up or down.
+
+    \b
+    Examples:
+      mcp-browser browser control scroll
+      mcp-browser browser control scroll --down 1000
+      mcp-browser browser control scroll --up 300
+    """
+    asyncio.run(_scroll_command(direction, amount, port))
+
+
+async def _scroll_command(direction: str, amount: int, port: Optional[int]):
+    """Execute scroll command."""
+    # Find active port if not specified
+    if port is None:
+        console.print("[cyan]🔍 Searching for active server...[/cyan]")
+        port = await find_active_port()
+        if port is None:
+            console.print(
+                "[red]✗ No active server found. Start with: mcp-browser start[/red]"
+            )
+            sys.exit(1)
+        console.print(f"[green]✓ Found server on port {port}[/green]\n")
+
+    # Connect to server
+    client = BrowserClient(port=port)
+    if not await client.connect():
+        sys.exit(1)
+
+    try:
+        console.print(f"[cyan]→ Scrolling {direction} by {amount}px...[/cyan]")
+        result = await client.scroll(direction, amount)
+
+        if result["success"]:
+            console.print(
+                Panel(
+                    f"[green]✓ Successfully scrolled:[/green]\n"
+                    f"Direction: {direction}\n"
+                    f"Amount: {amount}px",
+                    title="Scroll Complete",
+                    border_style="green",
+                )
+            )
+        else:
+            console.print(
+                Panel(
+                    f"[red]✗ Scroll failed:[/red]\n{result.get('error', 'Unknown error')}",
+                    title="Scroll Error",
+                    border_style="red",
+                )
+            )
+            sys.exit(1)
+    finally:
+        await client.disconnect()
+
+
+@control.command(name="submit")
+@click.argument("selector")
+@click.option("--port", default=None, type=int, help="WebSocket port")
+def submit_form(selector: str, port: int):
+    """Submit a form.
+
+    \b
+    Examples:
+      mcp-browser browser control submit "form#login"
+      mcp-browser browser control submit "form.search-form"
+    """
+    asyncio.run(_submit_command(selector, port))
+
+
+async def _submit_command(selector: str, port: Optional[int]):
+    """Execute submit command."""
+    # Find active port if not specified
+    if port is None:
+        console.print("[cyan]🔍 Searching for active server...[/cyan]")
+        port = await find_active_port()
+        if port is None:
+            console.print(
+                "[red]✗ No active server found. Start with: mcp-browser start[/red]"
+            )
+            sys.exit(1)
+        console.print(f"[green]✓ Found server on port {port}[/green]\n")
+
+    # Connect to server
+    client = BrowserClient(port=port)
+    if not await client.connect():
+        sys.exit(1)
+
+    try:
+        console.print(f"[cyan]→ Submitting form '{selector}'...[/cyan]")
+        result = await client.submit_form(selector)
+
+        if result["success"]:
+            console.print(
+                Panel(
+                    f"[green]✓ Successfully submitted form:[/green]\n{selector}",
+                    title="Submit Complete",
+                    border_style="green",
+                )
+            )
+        else:
+            console.print(
+                Panel(
+                    f"[red]✗ Submit failed:[/red]\n{result.get('error', 'Unknown error')}",
+                    title="Submit Error",
                     border_style="red",
                 )
             )
@@ -761,6 +903,8 @@ async def _run_interactive_test(port: int):
             "  [cyan]navigate <url>[/cyan]     - Navigate to URL\n"
             "  [cyan]click <selector>[/cyan]   - Click element\n"
             "  [cyan]fill <selector> <value>[/cyan] - Fill form field\n"
+            "  [cyan]scroll <up|down> [px][/cyan] - Scroll page\n"
+            "  [cyan]submit <selector>[/cyan] - Submit form\n"
             "  [cyan]extract <selector>[/cyan] - Extract content\n"
             "  [cyan]status[/cyan]            - Check server status\n"
             "  [cyan]help[/cyan]              - Show this help\n"
@@ -799,6 +943,8 @@ async def _run_interactive_test(port: int):
                         "  navigate <url>           Navigate to URL\n"
                         "  click <selector>         Click element\n"
                         "  fill <selector> <value>  Fill form field\n"
+                        "  scroll <up|down> [px]    Scroll page\n"
+                        "  submit <selector>        Submit form\n"
                         "  extract <selector>       Extract content\n"
                         "  status                   Check server status\n"
                         "  help                     Show this help\n"
@@ -847,6 +993,39 @@ async def _run_interactive_test(port: int):
                         console.print(
                             f"[green]✓ Filled {selector} with '{value}'[/green]"
                         )
+                    else:
+                        console.print(f"[red]✗ Failed: {result.get('error')}[/red]")
+
+                elif cmd == "scroll":
+                    direction = "down"
+                    amount = 500
+                    if len(parts) >= 2:
+                        direction = parts[1].lower()
+                        if direction not in ["up", "down"]:
+                            console.print("[red]Direction must be 'up' or 'down'[/red]")
+                            continue
+                    if len(parts) >= 3:
+                        try:
+                            amount = int(parts[2])
+                        except ValueError:
+                            console.print("[red]Amount must be a number[/red]")
+                            continue
+                    result = await client.scroll(direction, amount)
+                    if result["success"]:
+                        console.print(
+                            f"[green]✓ Scrolled {direction} by {amount}px[/green]"
+                        )
+                    else:
+                        console.print(f"[red]✗ Failed: {result.get('error')}[/red]")
+
+                elif cmd == "submit":
+                    if len(parts) < 2:
+                        console.print("[red]Usage: submit <selector>[/red]")
+                        continue
+                    selector = parts[1]
+                    result = await client.submit_form(selector)
+                    if result["success"]:
+                        console.print(f"[green]✓ Submitted form {selector}[/green]")
                     else:
                         console.print(f"[red]✗ Failed: {result.get('error')}[/red]")
 
