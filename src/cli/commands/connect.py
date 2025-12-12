@@ -11,9 +11,12 @@ from ..utils import console
 
 # Import required for CDP connection
 try:
-    from ...services.browser_controller import BrowserController, BrowserNotAvailableError
     from ...services import BrowserService, WebSocketService
     from ...services.applescript_service import AppleScriptService
+    from ...services.browser_controller import (
+        BrowserController,
+        BrowserNotAvailableError,
+    )
     CDP_IMPORTS_AVAILABLE = True
 except ImportError:
     CDP_IMPORTS_AVAILABLE = False

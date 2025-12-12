@@ -2,7 +2,7 @@
 """Quick test to verify state recovery handshake protocol implementation."""
 
 import asyncio
-import json
+
 from src.services.websocket_service import WebSocketService
 
 
@@ -91,11 +91,10 @@ async def test_state_recovery():
 
     # Test 6: Buffer limit (maxlen=1000)
     print("\n6. Testing buffer limit (1000 messages):")
-    initial_seq = service.current_sequence
     for i in range(1005):
         service._add_sequence({"type": "test", "data": f"msg_{i}"})
 
-    print(f"   - Messages added: 1005")
+    print("   - Messages added: 1005")
     print(f"   - Buffer size: {len(service.message_buffer)}")
     print(f"   - Sequence incremented to: {service.current_sequence}")
     assert len(service.message_buffer) == 1000, "Buffer should be capped at 1000"

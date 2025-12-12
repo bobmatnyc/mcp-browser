@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 # CDP/Playwright imports - optional dependency
 try:
-    from playwright.async_api import async_playwright, Browser, Page, Playwright
+    from playwright.async_api import Browser, Page, Playwright, async_playwright
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
