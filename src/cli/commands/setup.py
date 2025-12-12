@@ -146,9 +146,8 @@ def setup(skip_mcp: bool, skip_extension: bool, force: bool):
                 f"   • Open Chrome and go to: [cyan]chrome://extensions/[/cyan]\n"
                 f"   • Enable 'Developer mode' (toggle in top right)\n"
                 f"   • Click 'Load unpacked'\n"
-                f"   • Extract [cyan]{extension_path}[/cyan] first\n"
-                f"   • Select the extracted folder\n\n"
-                f"   [dim]Extension packaged at: {extension_path}[/dim]\n\n"
+                f"   • Select: [cyan]{extension_path}[/cyan]\n\n"
+                f"   [dim]Extensions ready at: dist/chrome/, dist/firefox/, dist/safari/[/dim]\n\n"
             )
 
         console.print(
@@ -200,7 +199,7 @@ def init_configuration(force: bool = False) -> bool:
             "retention_days": 7,
         },
         "websocket": {
-            "port_range": [8875, 8895],
+            "port_range": [8851, 8899],
             "host": "localhost",
             "auto_start": True,
         },
@@ -310,67 +309,84 @@ def install_mcp(force: bool = False) -> bool:
 
 
 def package_extension() -> Optional[Path]:
-    """Package browser extension as ZIP file.
+    """Package browser extensions as unpacked directories.
+
+    Creates dist/chrome/, dist/firefox/, dist/safari/ directories
+    ready for loading in developer mode.
 
     Returns:
-        Path to created ZIP file, or None if failed
+        Path to Chrome extension directory, or None if failed
     """
-    source_dir = get_extension_source_dir()
-    if not source_dir or not source_dir.exists():
+    root = get_project_root()
+    dist_dir = get_dist_dir()
+
+    # Extension source locations
+    extensions_src = root / "src" / "extensions"
+    legacy_chrome = root / "mcp-browser-extension"
+
+    # Determine Chrome source (prefer src/extensions/chrome, fallback to legacy)
+    if (extensions_src / "chrome").exists():
+        chrome_src = extensions_src / "chrome"
+        firefox_src = extensions_src / "firefox"
+        safari_src = extensions_src / "safari"
+    elif legacy_chrome.exists():
+        chrome_src = legacy_chrome
+        firefox_src = None
+        safari_src = None
+    else:
         console.print("[yellow]Extension source not found[/yellow]")
         return None
 
-    dist_dir = get_dist_dir()
-    zip_path = dist_dir / "mcp-browser-extension.zip"
+    # Files to exclude when copying
+    exclude_patterns = {
+        ".claude-mpm",
+        "node_modules",
+        ".git",
+        ".DS_Store",
+        "__pycache__",
+        "CHECKLIST.md",
+        "README.md",
+    }
 
-    # Remove existing zip if present
-    if zip_path.exists():
-        zip_path.unlink()
+    def should_exclude(path: Path) -> bool:
+        """Check if path should be excluded."""
+        return any(pattern in str(path) for pattern in exclude_patterns)
+
+    def copy_extension(src: Path, dest: Path, name: str) -> bool:
+        """Copy extension to destination, excluding unwanted files."""
+        try:
+            # Remove existing destination
+            if dest.exists():
+                shutil.rmtree(dest)
+
+            # Copy directory
+            shutil.copytree(
+                src,
+                dest,
+                ignore=shutil.ignore_patterns(*exclude_patterns),
+            )
+            console.print(f"[dim]  Created {name} extension: dist/{name}/[/dim]")
+            return True
+        except Exception as e:
+            console.print(f"[yellow]  Warning: Failed to copy {name}: {e}[/yellow]")
+            return False
 
     try:
-        # Files to include in the extension (all necessary files)
-        extension_files = [
-            "manifest.json",
-            "background-enhanced.js",
-            "content.js",
-            "popup-enhanced.html",
-            "popup-enhanced.js",
-            "Readability.js",  # Required by content.js
-        ]
+        # Copy Chrome extension (required)
+        chrome_dest = dist_dir / "chrome"
+        if not copy_extension(chrome_src, chrome_dest, "Chrome"):
+            return None
 
-        # Directories to exclude
-        exclude_patterns = {
-            ".claude-mpm",
-            "node_modules",
-            ".git",
-            ".DS_Store",
-            "__pycache__",
-            "*.pyc",
-            "create_icons.html",  # Development file
-            "demo.html",  # Demo file
-            "background.js",  # Old version (using enhanced version)
-            "popup.html",  # Old version (using enhanced version)
-            "popup.js",  # Old version (using enhanced version)
-            "package.json",  # Not needed in extension
-            "package-lock.json",  # Not needed in extension
-            "README.md",  # Not needed in extension
-        }
+        # Copy Firefox extension (optional)
+        if firefox_src and firefox_src.exists():
+            copy_extension(firefox_src, dist_dir / "firefox", "Firefox")
 
-        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-            # Add core extension files
-            for file_name in extension_files:
-                file_path = source_dir / file_name
-                if file_path.exists():
-                    zf.write(file_path, file_name)
+        # Copy Safari extension (optional)
+        if safari_src and safari_src.exists():
+            copy_extension(safari_src, dist_dir / "safari", "Safari")
 
-            # Add icons directory
-            icons_dir = source_dir / "icons"
-            if icons_dir.exists():
-                for icon_file in icons_dir.iterdir():
-                    if icon_file.is_file() and not icon_file.name.startswith("."):
-                        zf.write(icon_file, f"icons/{icon_file.name}")
+        return chrome_dest
 
-        return zip_path
     except Exception as e:
-        console.print(f"[red]Error packaging extension: {e}[/red]")
+        console.print(f"[red]Error packaging extensions: {e}[/red]")
         return None
