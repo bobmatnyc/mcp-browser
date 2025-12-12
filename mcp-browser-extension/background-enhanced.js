@@ -104,27 +104,27 @@ class PortSelector {
 
     // Priority 1: Exact URL rule match (user-defined patterns)
     const ruleMatch = await this.matchUrlRules(url);
-    if (ruleMatch && await this.isBackendAlive(ruleMatch)) {
+    if (ruleMatch && this.isBackendAlive(ruleMatch)) {
       console.log(`[PortSelector] P1: URL rule match -> port ${ruleMatch}`);
       return ruleMatch;
     }
 
     // Priority 2: Domain → backend cache
     const domainMatch = await this.matchDomainCache(url);
-    if (domainMatch && await this.isBackendAlive(domainMatch)) {
+    if (domainMatch && this.isBackendAlive(domainMatch)) {
       console.log(`[PortSelector] P2: Domain cache match -> port ${domainMatch}`);
       return domainMatch;
     }
 
     // Priority 3: Project path heuristic (URL contains project name)
     const projectMatch = await this.matchProjectName(url);
-    if (projectMatch && await this.isBackendAlive(projectMatch)) {
+    if (projectMatch && this.isBackendAlive(projectMatch)) {
       console.log(`[PortSelector] P3: Project name match -> port ${projectMatch}`);
       return projectMatch;
     }
 
     // Priority 4: Most recently used backend
-    if (this.mruPort && await this.isBackendAlive(this.mruPort)) {
+    if (this.mruPort && this.isBackendAlive(this.mruPort)) {
       console.log(`[PortSelector] P4: MRU -> port ${this.mruPort}`);
       return this.mruPort;
     }
@@ -231,61 +231,29 @@ class PortSelector {
   }
 
   /**
-   * Check if backend is alive and responsive
+   * Check if backend has an active connection
+   * ONLY checks existing connections - does NOT probe ports
+   * This prevents ERR_CONNECTION_REFUSED spam
    * @param {number} port - Port to check
-   * @returns {Promise<boolean>} True if alive
+   * @returns {boolean} True if we have an active connection
    */
-  async isBackendAlive(port) {
-    // First check if we already have an active connection
+  isBackendAlive(port) {
+    // Only check existing connections - never probe ports
     const connection = this.connectionManager.connections.get(port);
-    if (connection && connection.ws && connection.ws.readyState === WebSocket.OPEN) {
-      return true;
-    }
-
-    // Quick WebSocket check with timeout
-    return new Promise((resolve) => {
-      const timeout = setTimeout(() => {
-        if (ws && ws.readyState !== WebSocket.CLOSED) {
-          ws.close();
-        }
-        resolve(false);
-      }, 1000); // 1 second timeout
-
-      let ws = null;
-      try {
-        ws = new WebSocket(`ws://localhost:${port}`);
-
-        ws.onopen = () => {
-          clearTimeout(timeout);
-          ws.close();
-          resolve(true);
-        };
-
-        ws.onerror = () => {
-          clearTimeout(timeout);
-          resolve(false);
-        };
-
-        ws.onclose = () => {
-          clearTimeout(timeout);
-        };
-      } catch (e) {
-        clearTimeout(timeout);
-        resolve(false);
-      }
-    });
+    return !!(connection && connection.ws && connection.ws.readyState === WebSocket.OPEN);
   }
 
   /**
-   * Scan port range for first available backend
-   * @returns {Promise<number|null>} Port number or null
+   * Scan port range for first available backend with active connection
+   * Note: This only checks existing connections, does not probe ports
+   * @returns {number|null} Port number or null
    */
-  async scanForFirstAvailable() {
-    console.log(`[PortSelector] Scanning ports ${PORT_RANGE.start}-${PORT_RANGE.end}...`);
+  scanForFirstAvailable() {
+    console.log(`[PortSelector] Checking active connections...`);
 
     for (let port = PORT_RANGE.start; port <= PORT_RANGE.end; port++) {
-      if (await this.isBackendAlive(port)) {
-        console.log(`[PortSelector] Found available backend at port ${port}`);
+      if (this.isBackendAlive(port)) {
+        console.log(`[PortSelector] Found active connection at port ${port}`);
         return port;
       }
     }
