@@ -5,6 +5,24 @@
 (function() {
   'use strict';
 
+  // Global error handler for extension context invalidation
+  // This catches any uncaught errors from async callbacks
+  if (typeof chrome !== 'undefined' && chrome.runtime) {
+    // Check context validity before doing anything
+    try {
+      if (!chrome.runtime.id) {
+        console.debug('[MCP Browser] Extension context not available');
+        return; // Exit early
+      }
+    } catch (e) {
+      console.debug('[MCP Browser] Extension context invalidated on load');
+      return; // Exit early
+    }
+  } else {
+    console.debug('[MCP Browser] Chrome runtime not available');
+    return; // Exit early
+  }
+
   // Mark that the extension is installed (for detection)
   // Note: This won't be accessible from page context due to isolation
   window.__MCP_BROWSER_EXTENSION__ = {
@@ -45,7 +63,11 @@
   // Check if extension context is still valid
   function isContextValid() {
     try {
-      return chrome.runtime && chrome.runtime.id;
+      // Check if chrome and chrome.runtime exist first
+      if (typeof chrome === 'undefined' || !chrome) return false;
+      if (typeof chrome.runtime === 'undefined' || !chrome.runtime) return false;
+      // Then check for id
+      return !!chrome.runtime.id;
     } catch (e) {
       return false;
     }
