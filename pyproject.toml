@@ -31,10 +31,8 @@ dependencies = [
     "aiohttp>=3.9.0",
     "click>=8.1.0",
     "rich>=13.7.0",
+    "py-mcp-installer>=0.1.4",
 ]
-
-# Note: Install py-mcp-installer manually from submodule:
-# pip install -e ./lib/py-mcp-installer-service
 
 [project.optional-dependencies]
 dev = [

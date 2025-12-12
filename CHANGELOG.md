@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.1] - 2025-12-12
+
+### Fixed
+- Added missing `py-mcp-installer` dependency to pyproject.toml that prevented package from running after pip install
+
 ## [2.2.0] - 2025-12-12
 
 ### Added
