@@ -42,14 +42,41 @@
     debug: console.debug
   };
 
+  // Check if extension context is still valid
+  function isContextValid() {
+    try {
+      return chrome.runtime && chrome.runtime.id;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // Send message to background script
   function sendToBackground(messages) {
-    chrome.runtime.sendMessage({
-      type: 'console_messages',
-      messages: messages,
-      url: window.location.href,
-      timestamp: new Date().toISOString()
-    });
+    // Check if extension context is still valid
+    if (!isContextValid()) {
+      // Extension was reloaded/updated - stop trying to send messages
+      console.debug('[MCP Browser] Extension context invalidated, stopping message capture');
+      return;
+    }
+
+    try {
+      chrome.runtime.sendMessage({
+        type: 'console_messages',
+        messages: messages,
+        url: window.location.href,
+        timestamp: new Date().toISOString()
+      }, (response) => {
+        // Handle potential errors silently
+        if (chrome.runtime.lastError) {
+          // Context invalidated - this is expected during extension reload
+          console.debug('[MCP Browser] Message send failed:', chrome.runtime.lastError.message);
+        }
+      });
+    } catch (e) {
+      // Extension context invalidated
+      console.debug('[MCP Browser] Extension context error:', e.message);
+    }
   }
 
   // Flush message buffer
