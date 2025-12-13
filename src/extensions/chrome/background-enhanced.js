@@ -497,6 +497,12 @@ class ConnectionManager {
       await chrome.storage.local.set({ [queueKey]: connection.messageQueue.slice(-MAX_QUEUE_SIZE) });
     }
 
+    // Clean up storage keys to prevent memory leaks
+    await chrome.storage.local.remove([
+      `mcp_message_queue_${port}`,
+      `mcp_last_sequence_${port}`
+    ]);
+
     // Remove all tab associations
     for (const [tabId, tabPort] of this.tabConnections.entries()) {
       if (tabPort === port) {
@@ -794,6 +800,12 @@ class ConnectionManager {
     if (!connection) {
       console.warn(`[ConnectionManager] No connection for tab ${tabId}, queueing message`);
       this.unroutedMessages.push({ tabId, message, timestamp: Date.now() });
+
+      // Enforce max size to prevent memory leak (1000 messages)
+      if (this.unroutedMessages.length > 1000) {
+        this.unroutedMessages = this.unroutedMessages.slice(-1000);
+      }
+
       return false;
     }
 
@@ -1265,6 +1277,14 @@ class ConnectionManager {
     }
 
     connection.outOfOrderBuffer.push({ sequence: incomingSequence });
+
+    // Prevent unbounded growth - memory leak fix
+    if (connection.outOfOrderBuffer.length > 100) {
+      console.warn('[ConnectionManager] Out of order buffer too large, clearing');
+      connection.outOfOrderBuffer = [];
+      connection.pendingGapRecovery = false;
+    }
+
     return false;
   }
 
@@ -1444,6 +1464,14 @@ function checkSequenceGap(incomingSequence) {
 
   // Buffer this message for later processing
   outOfOrderBuffer.push({ sequence: incomingSequence, message: null }); // Will be set by caller
+
+  // Prevent unbounded growth - memory leak fix
+  if (outOfOrderBuffer.length > 100) {
+    console.warn('[MCP Browser] Out of order buffer too large, clearing');
+    outOfOrderBuffer = [];
+    pendingGapRecovery = false;
+  }
+
   return false;
 }
 
@@ -2725,6 +2753,9 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
   // Remove tab from ConnectionManager
   connectionManager.removeTab(tabId);
+
+  // Remove unrouted messages for closed tab - memory leak fix
+  connectionManager.unroutedMessages = connectionManager.unroutedMessages.filter(item => item.tabId !== tabId);
 
   // Remove from pending tabs
   if (connectionManager.pendingTabs.has(tabId)) {

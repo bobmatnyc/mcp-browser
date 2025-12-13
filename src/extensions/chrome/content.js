@@ -51,6 +51,25 @@
   const BUFFER_INTERVAL = 2500; // 2.5 seconds
   const MAX_BUFFER_SIZE = 100;
 
+  // Event listener tracking for cleanup - memory leak prevention
+  const trackedListeners = [];
+
+  function addTrackedListener(target, event, handler, options) {
+    target.addEventListener(event, handler, options);
+    trackedListeners.push({ target, event, handler, options });
+  }
+
+  function removeAllTrackedListeners() {
+    trackedListeners.forEach(({ target, event, handler, options }) => {
+      try {
+        target.removeEventListener(event, handler, options);
+      } catch (e) {
+        // Ignore errors for removed elements
+      }
+    });
+    trackedListeners.length = 0;
+  }
+
   // Store original console methods
   const originalConsole = {
     log: console.log,
@@ -64,12 +83,38 @@
   function isContextValid() {
     try {
       // Check if chrome and chrome.runtime exist first
-      if (typeof chrome === 'undefined' || !chrome) return false;
-      if (typeof chrome.runtime === 'undefined' || !chrome.runtime) return false;
+      if (typeof chrome === 'undefined' || !chrome) {
+        cleanupOnContextInvalidation();
+        return false;
+      }
+      if (typeof chrome.runtime === 'undefined' || !chrome.runtime) {
+        cleanupOnContextInvalidation();
+        return false;
+      }
       // Then check for id
-      return !!chrome.runtime.id;
+      const isValid = !!chrome.runtime.id;
+      if (!isValid) {
+        cleanupOnContextInvalidation();
+      }
+      return isValid;
     } catch (e) {
+      cleanupOnContextInvalidation();
       return false;
+    }
+  }
+
+  // Clean up resources when extension context is invalidated - memory leak prevention
+  function cleanupOnContextInvalidation() {
+    // Clear message buffer to prevent memory leak
+    messageBuffer.length = 0;
+
+    // Remove all tracked event listeners
+    removeAllTrackedListeners();
+
+    // Clear buffer timer
+    if (bufferTimer) {
+      clearTimeout(bufferTimer);
+      bufferTimer = null;
     }
   }
 
@@ -176,7 +221,7 @@
   captureConsoleMethod('debug', 'debug');
 
   // Capture unhandled errors
-  window.addEventListener('error', function(event) {
+  addTrackedListener(window, 'error', function(event) {
     const message = {
       level: 'error',
       timestamp: new Date().toISOString(),
@@ -193,7 +238,7 @@
   });
 
   // Capture unhandled promise rejections
-  window.addEventListener('unhandledrejection', function(event) {
+  addTrackedListener(window, 'unhandledrejection', function(event) {
     const message = {
       level: 'error',
       timestamp: new Date().toISOString(),
@@ -207,7 +252,7 @@
   });
 
   // Flush buffer before page unload
-  window.addEventListener('beforeunload', function() {
+  addTrackedListener(window, 'beforeunload', function() {
     flushBuffer();
   });
 
@@ -738,7 +783,7 @@
       };
 
       // Listen for detection pings
-      window.addEventListener('message', function(event) {
+      addTrackedListener(window, 'message', function(event) {
         if (event.data && event.data.type === 'MCP_BROWSER_PING') {
           // Respond with pong
           window.postMessage({
@@ -770,7 +815,7 @@
       document.dispatchEvent(readyEvent);
 
       // Listen for test pings via custom events
-      document.addEventListener('mcp-browser-test-ping', function(event) {
+      addTrackedListener(document, 'mcp-browser-test-ping', function(event) {
         const responseEvent = new CustomEvent('mcp-browser-test-pong', {
           detail: {
             timestamp: event.detail.timestamp,
