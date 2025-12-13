@@ -41,6 +41,10 @@ def get_extension_source_dir() -> Optional[Path]:
     if (root / "mcp-browser-extension").exists():
         return root / "mcp-browser-extension"
 
+    # Check src/extensions/chrome (newer structure)
+    if (root / "src" / "extensions" / "chrome").exists():
+        return root / "src" / "extensions" / "chrome"
+
     # Try package data location
     try:
         if sys.version_info >= (3, 9):
@@ -54,6 +58,47 @@ def get_extension_source_dir() -> Optional[Path]:
         pass
 
     return None
+
+
+def is_mcp_browser_project() -> bool:
+    """Check if we're running inside the mcp-browser project.
+
+    This is used to determine if extension packaging should be attempted.
+    Only returns True if we're in the actual mcp-browser development environment,
+    not just a project that depends on mcp-browser.
+
+    Returns:
+        True if inside mcp-browser project, False otherwise
+    """
+    root = get_project_root()
+
+    # Primary check: Extension source directories exist
+    # This is the most reliable indicator we're in the mcp-browser project
+    if (root / "mcp-browser-extension").exists():
+        return True
+    if (root / "src" / "extensions" / "chrome").exists():
+        return True
+
+    # Secondary check: pyproject.toml with mcp-browser as project name
+    # Note: This checks [project] name, not dependencies, to avoid false positives
+    pyproject = root / "pyproject.toml"
+    if pyproject.exists():
+        try:
+            content = pyproject.read_text()
+            # Look for [project] section with name = "mcp-browser" or "mcp_browser"
+            # This is more specific than just checking if string appears anywhere
+            if '[project]' in content:
+                # Simple check: project name should be on its own line
+                for line in content.split('\n'):
+                    line = line.strip()
+                    if line.startswith('name') and ('mcp-browser' in line or 'mcp_browser' in line):
+                        # Check it's actually the name field, not a comment
+                        if '=' in line:
+                            return True
+        except Exception:
+            pass
+
+    return False
 
 
 def get_dist_dir() -> Path:
@@ -77,7 +122,7 @@ def setup(skip_mcp: bool, skip_extension: bool, force: bool):
 
     1. Initialize configuration (~/.mcp-browser/)
     2. Install MCP server for Claude Desktop/Code
-    3. Package browser extension
+    3. Package browser extension (only in mcp-browser project)
     4. Display installation instructions
 
     \b
@@ -93,8 +138,18 @@ def setup(skip_mcp: bool, skip_extension: bool, force: bool):
         )
     )
 
+    # Auto-detect if we should package extension (only in mcp-browser project)
+    is_dev_env = is_mcp_browser_project()
+    should_package_extension = is_dev_env and not skip_extension
+
     steps_completed = 0
-    total_steps = 4 - (1 if skip_mcp else 0) - (1 if skip_extension else 0)  # config, mcp, extension, server
+    # Calculate total steps based on what will actually run
+    total_steps = (
+        1  # config (always)
+        + (0 if skip_mcp else 1)  # mcp
+        + (1 if should_package_extension else 0)  # extension (conditional)
+        + 1  # server (always)
+    )
 
     with Progress(
         SpinnerColumn(),
@@ -124,9 +179,9 @@ def setup(skip_mcp: bool, skip_extension: bool, force: bool):
                     description="⚠ MCP installation skipped (manual install needed)",
                 )
 
-        # Step 3: Package extension (if not skipped)
+        # Step 3: Package extension (only in mcp-browser project)
         extension_path = None
-        if not skip_extension:
+        if should_package_extension:
             task = progress.add_task("Packaging browser extension...", total=1)
             extension_path = package_extension()
             if extension_path:
@@ -138,6 +193,10 @@ def setup(skip_mcp: bool, skip_extension: bool, force: bool):
                 )
             else:
                 progress.update(task, description="⚠ Extension packaging failed")
+        elif not skip_extension and not is_dev_env:
+            # Not in dev environment - silently skip extension packaging
+            # This is expected behavior when running setup from user projects
+            pass
 
         # Step 4: Start server
         task = progress.add_task("Starting server...", total=1)
@@ -162,6 +221,14 @@ def setup(skip_mcp: bool, skip_extension: bool, force: bool):
                 f"   3. Click 'Load unpacked'\n"
                 f"   4. Select: [cyan]{extension_path}[/cyan]\n\n"
             )
+        elif not is_dev_env:
+            # Provide download link for non-dev environments
+            extension_msg = (
+                "[bold yellow]→ Install the Chrome extension:[/bold yellow]\n"
+                "   Download the extension from:\n"
+                "   [cyan]https://github.com/your-repo/mcp-browser/releases[/cyan]\n"
+                "   Or install from source following README instructions\n\n"
+            )
 
         console.print(
             Panel(
@@ -182,7 +249,7 @@ def setup(skip_mcp: bool, skip_extension: bool, force: bool):
     else:
         console.print(
             Panel(
-                f"[yellow]⚠ Setup partially complete ({steps_completed}/{total_steps + 1} steps)[/yellow]\n\n"
+                f"[yellow]⚠ Setup partially complete ({steps_completed}/{total_steps} steps)[/yellow]\n\n"
                 "Run [cyan]mcp-browser doctor[/cyan] to diagnose issues.",
                 title="Setup Incomplete",
                 border_style="yellow",
