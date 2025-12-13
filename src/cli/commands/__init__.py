@@ -11,11 +11,13 @@ from .quickstart import quickstart
 from .setup import setup
 from .start import start
 from .status import status
+from .stop import stop
 from .tutorial import tutorial
 
 __all__ = [
     "init",
     "start",
+    "stop",
     "status",
     "doctor",
     "dashboard",

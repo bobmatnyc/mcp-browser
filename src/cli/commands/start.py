@@ -1,6 +1,7 @@
 """Start command implementation."""
 
 import asyncio
+import os
 import signal
 import sys
 
@@ -9,6 +10,11 @@ from rich.panel import Panel
 
 from ..._version import __version__
 from ..utils import DATA_DIR, console
+from ..utils.daemon import (
+    get_server_status,
+    remove_project_server,
+    start_daemon,
+)
 
 
 @click.command()
@@ -65,10 +71,53 @@ def start(ctx, port, dashboard, dashboard_port, background, daemon):
     from ...cli.main import BrowserMCPServer
 
     config = ctx.obj.get("config")
+    project_path = os.getcwd()
 
+    # Handle background mode
     if background:
-        console.print("[yellow]Background mode not yet implemented[/yellow]")
-        console.print("[dim]Tip: Use screen/tmux or run with '&' on Unix systems[/dim]")
+        # Check if server already running for this project
+        is_running, existing_pid, existing_port = get_server_status()
+
+        if is_running:
+            console.print(
+                Panel.fit(
+                    f"[yellow]Server already running for this project[/yellow]\n\n"
+                    f"PID: {existing_pid}\n"
+                    f"Port: {existing_port}\n"
+                    f"Project: {project_path}\n\n"
+                    f"[dim]Stop it with 'mcp-browser stop' or restart with --port flag[/dim]",
+                    title="Already Running",
+                    border_style="yellow",
+                )
+            )
+            return
+
+        # Start daemon
+        success, pid, actual_port = start_daemon(port)
+
+        if success:
+            console.print(
+                Panel.fit(
+                    f"[bold green]Server started in background[/bold green]\n\n"
+                    f"PID: {pid}\n"
+                    f"Port: {actual_port}\n"
+                    f"Project: {project_path}\n\n"
+                    f"[dim]Check status: mcp-browser status[/dim]\n"
+                    f"[dim]Stop server: mcp-browser stop[/dim]",
+                    title="Background Server Started",
+                    border_style="green",
+                )
+            )
+        else:
+            console.print(
+                Panel.fit(
+                    "[red]Failed to start server in background[/red]\n\n"
+                    f"[dim]Try running without --background to see errors[/dim]",
+                    title="Startup Failed",
+                    border_style="red",
+                )
+            )
+            sys.exit(1)
         return
 
     # Override port if specified
@@ -79,12 +128,29 @@ def start(ctx, port, dashboard, dashboard_port, background, daemon):
 
     # Suppress output in daemon mode
     if not daemon:
+        # Check if server already running for this project (foreground mode)
+        is_running, existing_pid, existing_port = get_server_status()
+        if is_running:
+            console.print(
+                Panel.fit(
+                    f"[yellow]Server already running for this project[/yellow]\n\n"
+                    f"PID: {existing_pid}\n"
+                    f"Port: {existing_port}\n"
+                    f"Project: {project_path}\n\n"
+                    f"[dim]Stop it with 'mcp-browser stop' first[/dim]",
+                    title="Already Running",
+                    border_style="yellow",
+                )
+            )
+            sys.exit(1)
+
         console.print(
             Panel.fit(
                 f"[bold green]Starting MCP Browser Server v{__version__}[/bold green]\n\n"
                 f"WebSocket: Ports {config.get('websocket', {}).get('port_range', [8851, 8899]) if config else [8851, 8899]}\n"
                 f"Dashboard: {'Enabled' if dashboard else 'Disabled'} (port {dashboard_port})\n"
-                f"Data: {DATA_DIR}",
+                f"Data: {DATA_DIR}\n"
+                f"Project: {project_path}",
                 title="Server Starting",
                 border_style="green",
             )
@@ -99,6 +165,9 @@ def start(ctx, port, dashboard, dashboard_port, background, daemon):
         if server.running:
             loop = asyncio.get_event_loop()
             loop.create_task(server.stop())
+        # Clean up registry on shutdown
+        if not daemon:
+            remove_project_server(project_path)
         sys.exit(0)
 
     signal.signal(signal.SIGINT, signal_handler)
@@ -120,3 +189,7 @@ def start(ctx, port, dashboard, dashboard_port, background, daemon):
 
             traceback.print_exc()
         sys.exit(1)
+    finally:
+        # Ensure cleanup on all exit paths
+        if not daemon:
+            remove_project_server(project_path)

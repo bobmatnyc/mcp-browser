@@ -28,30 +28,124 @@ def get_pid_file() -> Path:
     return get_config_dir() / "server.pid"
 
 
-def read_service_info() -> Optional[dict]:
-    """Read service info from PID file."""
+def read_service_registry() -> dict:
+    """
+    Read server registry from PID file.
+
+    Returns:
+        Dictionary with 'servers' list containing server entries
+    """
     pid_file = get_pid_file()
     if pid_file.exists():
         try:
             with open(pid_file) as f:
-                return json.load(f)
+                data = json.load(f)
+                # Handle legacy format (single server) by converting to new format
+                if "pid" in data and "servers" not in data:
+                    return {
+                        "servers": [
+                            {
+                                "pid": data["pid"],
+                                "port": data["port"],
+                                "project_path": data.get("project_path", ""),
+                                "started_at": data.get("started_at", datetime.now().isoformat()),
+                            }
+                        ]
+                    }
+                return data
         except (json.JSONDecodeError, IOError):
-            return None
+            return {"servers": []}
+    return {"servers": []}
+
+
+def save_server_registry(registry: dict) -> None:
+    """Save server registry to PID file."""
+    with open(get_pid_file(), "w") as f:
+        json.dump(registry, f, indent=2)
+
+
+def get_project_server(project_path: str) -> Optional[dict]:
+    """
+    Find server entry for a specific project.
+
+    Args:
+        project_path: Absolute path to the project directory
+
+    Returns:
+        Server entry dict or None if not found
+    """
+    registry = read_service_registry()
+    for server in registry.get("servers", []):
+        if server.get("project_path") == project_path:
+            # Verify process is still running
+            if is_process_running(server.get("pid")):
+                return server
+            # Process died, remove stale entry
+            remove_project_server(project_path)
+    return None
+
+
+def remove_project_server(project_path: str) -> None:
+    """Remove server entry for a specific project."""
+    registry = read_service_registry()
+    registry["servers"] = [
+        s for s in registry.get("servers", []) if s.get("project_path") != project_path
+    ]
+    save_server_registry(registry)
+
+
+def add_project_server(pid: int, port: int, project_path: str) -> None:
+    """Add or update server entry for a project."""
+    registry = read_service_registry()
+
+    # Remove existing entry for this project if any
+    registry["servers"] = [
+        s for s in registry.get("servers", []) if s.get("project_path") != project_path
+    ]
+
+    # Add new entry
+    registry["servers"].append({
+        "pid": pid,
+        "port": port,
+        "project_path": project_path,
+        "started_at": datetime.now().isoformat(),
+    })
+
+    save_server_registry(registry)
+
+
+def read_service_info() -> Optional[dict]:
+    """
+    Read service info from PID file (legacy compatibility).
+
+    Deprecated: Use get_project_server() instead for project-aware access.
+    """
+    registry = read_service_registry()
+    servers = registry.get("servers", [])
+    if servers:
+        # Return first server for backward compatibility
+        return servers[0]
     return None
 
 
 def write_service_info(pid: int, port: int) -> None:
-    """Write service info to PID file."""
-    info = {"pid": pid, "port": port, "started_at": datetime.now().isoformat()}
-    with open(get_pid_file(), "w") as f:
-        json.dump(info, f)
+    """
+    Write service info to PID file (legacy compatibility).
+
+    Deprecated: Use add_project_server() instead for project-aware access.
+    """
+    project_path = os.getcwd()
+    add_project_server(pid, port, project_path)
 
 
 def clear_service_info() -> None:
-    """Remove PID file."""
-    pid_file = get_pid_file()
-    if pid_file.exists():
-        pid_file.unlink()
+    """
+    Remove PID file (legacy compatibility).
+
+    Deprecated: Use remove_project_server() instead for project-aware access.
+    """
+    project_path = os.getcwd()
+    remove_project_server(project_path)
 
 
 def is_process_running(pid: int) -> bool:
@@ -83,19 +177,15 @@ def find_available_port() -> Optional[int]:
 
 def get_server_status() -> Tuple[bool, Optional[int], Optional[int]]:
     """
-    Check if server is running.
+    Check if server is running for the current project.
 
     Returns:
         (is_running, pid, port) tuple
     """
-    info = read_service_info()
-    if info:
-        pid = info.get("pid")
-        port = info.get("port")
-        if pid and is_process_running(pid):
-            return True, pid, port
-        # Stale PID file
-        clear_service_info()
+    project_path = os.getcwd()
+    server = get_project_server(project_path)
+    if server:
+        return True, server.get("pid"), server.get("port")
     return False, None, None
 
 
@@ -103,7 +193,10 @@ def start_daemon(
     port: Optional[int] = None,
 ) -> Tuple[bool, Optional[int], Optional[int]]:
     """
-    Start server as background daemon.
+    Start server as background daemon for the current project.
+
+    If a server is already running for this project, it will be stopped
+    and restarted on the same port to ensure consistency.
 
     Args:
         port: Specific port to use, or None to auto-select
@@ -111,12 +204,37 @@ def start_daemon(
     Returns:
         (success, pid, port) tuple
     """
-    # Check if already running
-    is_running, existing_pid, existing_port = get_server_status()
-    if is_running:
-        return True, existing_pid, existing_port
+    project_path = os.getcwd()
 
-    # Find available port
+    # Check if server already exists for this project
+    existing_server = get_project_server(project_path)
+
+    if existing_server:
+        # Server already running for this project
+        existing_pid = existing_server.get("pid")
+        existing_port = existing_server.get("port")
+
+        # If it's running and we didn't request a specific port, just return it
+        if port is None and is_process_running(existing_pid):
+            return True, existing_pid, existing_port
+
+        # Otherwise, kill the old server and restart on same port (or new port if specified)
+        try:
+            os.kill(existing_pid, 15)  # SIGTERM
+            time.sleep(0.5)
+            if is_process_running(existing_pid):
+                os.kill(existing_pid, 9)  # SIGKILL
+        except (OSError, ProcessLookupError):
+            pass
+
+        # Reuse the existing port if not specified
+        if port is None:
+            port = existing_port
+
+        # Remove old registry entry
+        remove_project_server(project_path)
+
+    # Find available port if not specified
     if port is None:
         port = find_available_port()
         if port is None:
@@ -146,7 +264,7 @@ def start_daemon(
 
         # Verify it started
         if process.poll() is None:
-            write_service_info(process.pid, port)
+            add_project_server(process.pid, port, project_path)
             return True, process.pid, port
         else:
             return False, None, None
@@ -156,17 +274,20 @@ def start_daemon(
 
 
 def stop_daemon() -> bool:
-    """Stop the running daemon."""
-    is_running, pid, _ = get_server_status()
-    if not is_running:
+    """Stop the running daemon for the current project."""
+    project_path = os.getcwd()
+    server = get_project_server(project_path)
+
+    if not server:
         return True
 
+    pid = server.get("pid")
     try:
         os.kill(pid, 15)  # SIGTERM
         time.sleep(0.5)
         if is_process_running(pid):
             os.kill(pid, 9)  # SIGKILL
-        clear_service_info()
+        remove_project_server(project_path)
         return True
     except Exception:
         return False

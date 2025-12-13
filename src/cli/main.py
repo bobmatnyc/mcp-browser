@@ -26,6 +26,7 @@ from .commands import (
     setup,
     start,
     status,
+    stop,
     tutorial,
     uninstall,
 )
@@ -180,6 +181,7 @@ def reference():
   [cyan]setup[/cyan]       - Complete installation (config + MCP + extension)
   [cyan]init[/cyan]        - Initialize extension
   [cyan]start[/cyan]       - Start server + dashboard
+  [cyan]stop[/cyan]        - Stop server for current project
   [cyan]status[/cyan]      - Check installation status
   [cyan]doctor[/cyan]      - Diagnose & fix issues
   [cyan]dashboard[/cyan]   - Run dashboard only
@@ -283,7 +285,7 @@ def completion(shell):
     bash_completion = """
 _mcp_browser_completions() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
-    local commands="quickstart init start status doctor dashboard tutorial install uninstall extension browser mcp version completion --help --version"
+    local commands="quickstart init start stop status doctor dashboard tutorial install uninstall extension browser mcp version completion --help --version"
     COMPREPLY=( $(compgen -W "${commands}" -- ${cur}) )
 }
 complete -F _mcp_browser_completions mcp-browser
@@ -296,6 +298,7 @@ _mcp_browser() {
         'quickstart:Interactive setup wizard'
         'init:Initialize extension'
         'start:Start server'
+        'stop:Stop server for current project'
         'status:Show status'
         'doctor:Diagnose issues'
         'dashboard:Run dashboard'
@@ -316,6 +319,7 @@ _mcp_browser() {
 complete -c mcp-browser -n "__fish_use_subcommand" -a quickstart -d "Interactive setup wizard"
 complete -c mcp-browser -n "__fish_use_subcommand" -a init -d "Initialize extension"
 complete -c mcp-browser -n "__fish_use_subcommand" -a start -d "Start server"
+complete -c mcp-browser -n "__fish_use_subcommand" -a stop -d "Stop server for current project"
 complete -c mcp-browser -n "__fish_use_subcommand" -a status -d "Show status"
 complete -c mcp-browser -n "__fish_use_subcommand" -a doctor -d "Diagnose issues"
 complete -c mcp-browser -n "__fish_use_subcommand" -a dashboard -d "Run dashboard"
@@ -350,6 +354,7 @@ cli.add_command(quickstart)
 cli.add_command(setup)
 cli.add_command(init)
 cli.add_command(start)
+cli.add_command(stop)
 cli.add_command(status)
 cli.add_command(doctor)
 cli.add_command(dashboard)
