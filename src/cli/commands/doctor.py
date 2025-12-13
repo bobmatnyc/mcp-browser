@@ -293,12 +293,18 @@ def _check_port_availability() -> dict:
 
 
 def _check_extension_package() -> dict:
-    """Check if unpacked extension directories exist."""
-    # Check for unpacked extension directories (preferred over ZIP)
+    """Check extension availability.
+
+    The extension should be loaded from the cloned mcp-browser repo,
+    not from this project's directories.
+    """
+    # Check if we're inside the mcp-browser project (has extension source)
     project_root = Path(__file__).parent.parent.parent.parent
     possible_dirs = [
-        Path.cwd() / "dist" / "chrome",
-        project_root / "dist" / "chrome",
+        # Primary: mcp-browser-extension/ in project root
+        Path.cwd() / "mcp-browser-extension",
+        project_root / "mcp-browser-extension",
+        # Alternative: src/extensions/chrome
         Path.cwd() / "src" / "extensions" / "chrome",
         project_root / "src" / "extensions" / "chrome",
     ]
@@ -313,16 +319,16 @@ def _check_extension_package() -> dict:
             except ValueError:
                 rel_path = ext_dir
             return {
-                "name": "Extension Directory",
+                "name": "Extension Source",
                 "status": "pass",
                 "message": f"Found at {rel_path} ({file_count} files)",
             }
 
+    # Not in mcp-browser project - this is expected for users
     return {
-        "name": "Extension Directory",
-        "status": "warning",
-        "message": "Extension not found in dist/chrome/ or src/extensions/chrome/",
-        "fix": "Run: mcp-browser setup",
+        "name": "Extension Source",
+        "status": "pass",
+        "message": "Load from: https://github.com/bobmatnyc/mcp-browser",
     }
 
 
