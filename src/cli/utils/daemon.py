@@ -175,6 +175,61 @@ def find_available_port() -> Optional[int]:
     return None
 
 
+def cleanup_stale_servers() -> int:
+    """Kill all stale mcp-browser processes and clear registry.
+
+    Scans ports 8851-8899 for any listening processes, checks if they are
+    mcp-browser servers, and kills them to ensure clean startup.
+
+    Returns:
+        Number of processes killed
+    """
+    killed = 0
+
+    # Find all processes listening on our port range
+    for port in range(PORT_RANGE_START, PORT_RANGE_END + 1):
+        try:
+            # Use lsof to find process on port
+            result = subprocess.run(
+                ["lsof", "-ti", f":{port}"],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                pid_str = result.stdout.strip().split()[0]
+                pid = int(pid_str)
+
+                # Check if it's an mcp-browser process
+                try:
+                    proc_result = subprocess.run(
+                        ["ps", "-p", str(pid), "-o", "command="],
+                        capture_output=True,
+                        text=True,
+                        timeout=2
+                    )
+                    if proc_result.returncode == 0:
+                        cmd = proc_result.stdout.lower()
+                        if "mcp-browser" in cmd or "mcp_browser" in cmd:
+                            # Kill the process
+                            os.kill(pid, 15)  # SIGTERM
+                            time.sleep(0.3)
+                            if is_process_running(pid):
+                                os.kill(pid, 9)  # SIGKILL
+                            killed += 1
+                except (subprocess.TimeoutExpired, subprocess.SubprocessError):
+                    # Skip if we can't check the process
+                    pass
+        except (subprocess.TimeoutExpired, subprocess.SubprocessError, ValueError):
+            # Skip if lsof fails or returns invalid data
+            pass
+
+    # Clear the registry after cleanup
+    save_server_registry({"servers": []})
+
+    return killed
+
+
 def get_server_status() -> Tuple[bool, Optional[int], Optional[int]]:
     """
     Check if server is running for the current project.
@@ -204,6 +259,9 @@ def start_daemon(
     Returns:
         (success, pid, port) tuple
     """
+    # Clean up any stale processes first to enforce one server per project
+    cleanup_stale_servers()
+
     project_path = os.getcwd()
 
     # Check if server already exists for this project
