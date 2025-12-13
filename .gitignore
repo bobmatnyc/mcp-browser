@@ -238,3 +238,4 @@ docs/research/
 # Development documentation
 DOCTOR_MCP_CONFIG_FIX.md
 SETUP_FIX_SUMMARY.md
+uv.lock
