@@ -27,7 +27,7 @@ def setup(skip_mcp: bool, force: bool):
     This command performs complete installation:
 
     1. Initialize configuration (~/.mcp-browser/)
-    2. Install Chrome extension to ~/.mcp-browser/extension/
+    2. Install Chrome extension to ./mcp-browser-extensions/chrome/
     3. Install MCP server for Claude Code
     4. Start WebSocket server
 
@@ -36,7 +36,7 @@ def setup(skip_mcp: bool, force: bool):
       1. Open chrome://extensions/
       2. Enable 'Developer mode'
       3. Click 'Load unpacked'
-      4. Select ~/.mcp-browser/extension/
+      4. Select ./mcp-browser-extensions/chrome/
 
     \b
     Examples:
@@ -116,7 +116,7 @@ def setup(skip_mcp: bool, force: bool):
                 "   1. Open Chrome: [cyan]chrome://extensions/[/cyan]\n"
                 "   2. Enable 'Developer mode' (toggle in top right)\n"
                 "   3. Click 'Load unpacked'\n"
-                "   4. Select: [cyan]~/.mcp-browser/extension/[/cyan]\n\n"
+                "   4. Select: [cyan]./mcp-browser-extensions/chrome/[/cyan]\n\n"
                 "[bold yellow]→ Connect your browser:[/bold yellow]\n"
                 f"   Server is running on port [cyan]{server_port or 8851}[/cyan]\n"
                 "   After loading the extension, click the extension icon\n"
@@ -183,9 +183,9 @@ def init_configuration(force: bool = False) -> bool:
 
 
 def install_extension(force: bool = False) -> bool:
-    """Install browser extension to config directory.
+    """Install browser extension to visible project directory.
 
-    Copies the unpacked extension to ~/.mcp-browser/extension/
+    Copies the unpacked extension to ./mcp-browser-extensions/chrome/
     for easy loading in Chrome developer mode.
 
     Args:
@@ -194,8 +194,7 @@ def install_extension(force: bool = False) -> bool:
     Returns:
         True if installed, False if source not found or error
     """
-    config_dir = get_config_dir()
-    target_dir = config_dir / "extension"
+    target_dir = Path.cwd() / "mcp-browser-extensions" / "chrome"
 
     # Find source extension
     source_locations = [
@@ -223,6 +222,10 @@ def install_extension(force: bool = False) -> bool:
 
         # Copy extension
         shutil.copytree(source_dir, target_dir)
+
+        # Print .gitignore tip
+        console.print("[dim]  Tip: Add 'mcp-browser-extensions/' to .gitignore[/dim]")
+
         return True
     except Exception:
         return False
