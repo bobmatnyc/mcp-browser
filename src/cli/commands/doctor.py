@@ -333,19 +333,19 @@ def _check_extension_package() -> dict:
 
 
 def _check_mcp_config() -> dict:
-    """Check if MCP is configured for Claude."""
-    # Check common MCP config locations
-    claude_config = Path.home() / ".config" / "claude" / "claude_desktop_config.json"
+    """Check if MCP is configured for Claude Code."""
+    # Claude Code stores config in ~/.claude.json
+    claude_code_config = Path.home() / ".claude.json"
 
-    if claude_config.exists():
+    if claude_code_config.exists():
         try:
-            with open(claude_config) as f:
+            with open(claude_code_config) as f:
                 config = json.load(f)
             if "mcpServers" in config and "mcp-browser" in config.get("mcpServers", {}):
                 return {
                     "name": "MCP Configuration",
                     "status": "pass",
-                    "message": "mcp-browser configured in Claude",
+                    "message": "MCP configured for Claude Code",
                 }
         except Exception:
             pass
@@ -353,7 +353,7 @@ def _check_mcp_config() -> dict:
     return {
         "name": "MCP Configuration",
         "status": "warning",
-        "message": "MCP not configured for Claude",
+        "message": "MCP not configured for Claude Code",
         "fix": "Run: mcp-browser setup",
     }
 
