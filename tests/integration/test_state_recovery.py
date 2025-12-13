@@ -60,7 +60,7 @@ async def test_state_recovery():
         "type": "connection_init",
         "lastSequence": 1,
         "extensionVersion": "1.0.0",
-        "capabilities": ["console", "dom"]
+        "capabilities": ["console", "dom"],
     }
     print(f"   - Message type: {connection_init.get('type')}")
     print(f"   - Last sequence: {connection_init.get('lastSequence')}")
@@ -72,15 +72,16 @@ async def test_state_recovery():
     print("\n5. Connection ack response structure:")
     try:
         from src._version import __version__
+
         server_version = __version__
     except ImportError:
         server_version = "2.1.1"
 
     ack_message = {
-        'type': 'connection_ack',
-        'serverVersion': server_version,
-        'currentSequence': service.current_sequence,
-        'replay': replay_from_1[:100]
+        "type": "connection_ack",
+        "serverVersion": server_version,
+        "currentSequence": service.current_sequence,
+        "replay": replay_from_1[:100],
     }
 
     print(f"   - Response type: {ack_message.get('type')}")

@@ -254,7 +254,9 @@ def install_mcp(force: bool = False) -> bool:
             console.print(f"[dim]  MCP configured for: {platform_list}[/dim]")
             return True
         else:
-            console.print("[dim]  No platforms configured (may need manual setup)[/dim]")
+            console.print(
+                "[dim]  No platforms configured (may need manual setup)[/dim]"
+            )
             return False
 
     except Exception:
