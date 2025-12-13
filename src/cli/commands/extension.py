@@ -78,19 +78,20 @@ def find_extension_source() -> Optional[Path]:
     return None
 
 
-def get_extension_install_path(local: bool = False) -> Path:
+def get_extension_install_path(local: bool = False, browser: str = "chrome") -> Path:
     """Get the extension installation path.
 
     Args:
-        local: If True, use local .mcp-browser directory, else use home directory
+        local: If True, use local project directory, else use home directory
+        browser: Browser type (chrome, firefox, safari)
 
     Returns:
         Path to extension installation directory
     """
     if local:
-        return Path.cwd() / ".mcp-browser" / "extension"
+        return Path.cwd() / "mcp-browser-extensions" / browser
     else:
-        return Path.home() / ".mcp-browser" / "extension"
+        return Path.home() / "mcp-browser-extensions" / browser
 
 
 def copy_extension(source: Path, destination: Path, force: bool = False) -> bool:
@@ -150,8 +151,8 @@ def extension():
 
     \b
     The extension can be installed:
-      • Locally:  ./.mcp-browser/extension/ (project-specific)
-      • Globally: ~/.mcp-browser/extension/ (user-wide)
+      • Locally:  ./mcp-browser-extensions/chrome/ (project-specific)
+      • Globally: ~/mcp-browser-extensions/chrome/ (user-wide)
 
     \b
     Examples:
@@ -165,7 +166,7 @@ def extension():
 
 @extension.command()
 @click.option(
-    "--local", "-l", is_flag=True, help="Install to current directory (./.mcp-browser/)"
+    "--local", "-l", is_flag=True, help="Install to current directory (./mcp-browser-extensions/)"
 )
 @click.option("--force", "-f", is_flag=True, help="Overwrite existing installation")
 def install(local: bool, force: bool):
@@ -176,8 +177,8 @@ def install(local: bool, force: bool):
 
     \b
     Installation locations:
-      Default: ~/.mcp-browser/extension/
-      --local: ./.mcp-browser/extension/
+      Default: ~/mcp-browser-extensions/chrome/
+      --local: ./mcp-browser-extensions/chrome/
 
     \b
     Examples:
@@ -188,7 +189,7 @@ def install(local: bool, force: bool):
     console.print(
         Panel.fit(
             "[bold]Installing Chrome Extension[/bold]\n\n"
-            f"Location: [cyan]{'Local (.mcp-browser/)' if local else 'Global (~/.mcp-browser/)'}[/cyan]\n"
+            f"Location: [cyan]{'Local (./mcp-browser-extensions/)' if local else 'Global (~/mcp-browser-extensions/)'}[/cyan]\n"
             f"Force: [cyan]{force}[/cyan]",
             title="Extension Install",
             border_style="blue",
@@ -239,7 +240,7 @@ def install(local: bool, force: bool):
 
 @extension.command()
 @click.option(
-    "--local", "-l", is_flag=True, help="Update local installation (./.mcp-browser/)"
+    "--local", "-l", is_flag=True, help="Update local installation (./mcp-browser-extensions/)"
 )
 def update(local: bool):
     """🔄 Update Chrome extension files.
@@ -256,7 +257,7 @@ def update(local: bool):
     console.print(
         Panel.fit(
             "[bold]Updating Chrome Extension[/bold]\n\n"
-            f"Location: [cyan]{'Local (.mcp-browser/)' if local else 'Global (~/.mcp-browser/)'}[/cyan]",
+            f"Location: [cyan]{'Local (./mcp-browser-extensions/)' if local else 'Global (~/mcp-browser-extensions/)'}[/cyan]",
             title="Extension Update",
             border_style="blue",
         )

@@ -292,8 +292,8 @@ def find_extension_directories() -> List[Path]:
     if local_extension.exists() and local_extension.is_dir():
         directories.append(local_extension)
 
-    # Check .mcp-browser/extension in current directory
-    local_mcp_extension = Path.cwd() / ".mcp-browser" / "extension"
+    # Check mcp-browser-extensions/chrome in current directory
+    local_mcp_extension = Path.cwd() / "mcp-browser-extensions" / "chrome"
     if local_mcp_extension.exists() and local_mcp_extension.is_dir():
         directories.append(local_mcp_extension)
 
@@ -782,7 +782,7 @@ def install(target: str, force: bool, extension: bool):
 @click.option(
     "--clean-local",
     is_flag=True,
-    help="Remove local .mcp-browser/ and extension/",
+    help="Remove local mcp-browser-extensions/",
 )
 @click.option(
     "--clean-all",

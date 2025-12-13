@@ -76,7 +76,7 @@ Install the Chrome extension:
    a. Open Chrome Extensions (chrome://extensions)
    b. Enable "Developer mode"
    c. Click "Load unpacked"
-   d. Select .mcp-browser/extension folder
+   d. Select mcp-browser-extensions/chrome folder
 
 5. Verify connection in extension popup (puzzle icon)
 """,

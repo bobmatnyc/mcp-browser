@@ -106,8 +106,8 @@ async def check_installation_status() -> Dict[str, Any]:
         "extension_installed": False,
     }
 
-    # Check for project-local extension
-    local_ext = Path.cwd() / ".mcp-browser" / "extension"
+    # Check for project-local extension (visible directory, no dot prefix)
+    local_ext = Path.cwd() / "mcp-browser-extensions" / "chrome"
     status["extension_initialized"] = local_ext.exists()
 
     # Check if server is running using daemon module's status function

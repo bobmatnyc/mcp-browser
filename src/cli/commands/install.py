@@ -332,7 +332,7 @@ def install(target: str, force: bool, extension: bool):
 @click.option(
     "--clean-local",
     is_flag=True,
-    help="Remove local .mcp-browser/ and extension/ (uses legacy uninstall)",
+    help="Remove local mcp-browser-extensions/ (uses legacy uninstall)",
 )
 @click.option(
     "--backup/--no-backup",

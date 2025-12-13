@@ -38,7 +38,7 @@ class DashboardService:
         self.site: Optional[web.TCPSite] = None
         self.port = 8080
         self.project_path = Path.cwd()
-        self.extension_path = self.project_path / ".mcp-browser" / "extension"
+        self.extension_path = self.project_path / "mcp-browser-extensions" / "chrome"
         self.package_path = Path(__file__).parent.parent
 
     async def start(self, port: int = 8080) -> None:
