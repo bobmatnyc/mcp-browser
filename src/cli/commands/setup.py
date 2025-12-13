@@ -2,7 +2,9 @@
 
 import json
 import os
+import shutil
 import sys
+from pathlib import Path
 from typing import Optional
 
 import click
@@ -25,8 +27,16 @@ def setup(skip_mcp: bool, force: bool):
     This command performs complete installation:
 
     1. Initialize configuration (~/.mcp-browser/)
-    2. Install MCP server for Claude Desktop/Code
-    3. Start WebSocket server
+    2. Install Chrome extension to ~/.mcp-browser/extension/
+    3. Install MCP server for Claude Code
+    4. Start WebSocket server
+
+    \b
+    After setup, load the extension in Chrome:
+      1. Open chrome://extensions/
+      2. Enable 'Developer mode'
+      3. Click 'Load unpacked'
+      4. Select ~/.mcp-browser/extension/
 
     \b
     Examples:
@@ -42,8 +52,8 @@ def setup(skip_mcp: bool, force: bool):
     )
 
     steps_completed = 0
-    # Calculate total steps: config, mcp (optional), server
-    total_steps = 2 if skip_mcp else 3
+    # Calculate total steps: config, extension, mcp (optional), server
+    total_steps = 3 if skip_mcp else 4
 
     with Progress(
         SpinnerColumn(),
@@ -60,7 +70,19 @@ def setup(skip_mcp: bool, force: bool):
         else:
             progress.update(task, description="✗ Configuration failed")
 
-        # Step 2: Install MCP (if not skipped)
+        # Step 2: Install browser extension
+        task = progress.add_task("Installing browser extension...", total=1)
+        if install_extension(force):
+            steps_completed += 1
+            progress.update(
+                task, completed=1, description="✓ Extension installed"
+            )
+        else:
+            progress.update(
+                task, description="⚠ Extension not found (skip if not needed)"
+            )
+
+        # Step 3: Install MCP (if not skipped)
         if not skip_mcp:
             task = progress.add_task("Installing MCP server...", total=1)
             mcp_result = install_mcp(force)
@@ -73,7 +95,7 @@ def setup(skip_mcp: bool, force: bool):
                     description="⚠ MCP installation skipped (manual install needed)",
                 )
 
-        # Step 3: Start server
+        # Step 4: Start server
         task = progress.add_task("Starting server...", total=1)
         server_port = start_server_for_setup()
         if server_port:
@@ -91,11 +113,10 @@ def setup(skip_mcp: bool, force: bool):
             Panel(
                 "[bold green]✓ Setup Complete![/bold green]\n\n"
                 "[bold yellow]→ Install the Chrome extension:[/bold yellow]\n"
-                "   1. Clone or download: [cyan]https://github.com/bobmatnyc/mcp-browser[/cyan]\n"
-                "   2. Open Chrome: [cyan]chrome://extensions/[/cyan]\n"
-                "   3. Enable 'Developer mode' (toggle in top right)\n"
-                "   4. Click 'Load unpacked'\n"
-                "   5. Select: [cyan]mcp-browser-extension/[/cyan] from the repo root\n\n"
+                "   1. Open Chrome: [cyan]chrome://extensions/[/cyan]\n"
+                "   2. Enable 'Developer mode' (toggle in top right)\n"
+                "   3. Click 'Load unpacked'\n"
+                "   4. Select: [cyan]~/.mcp-browser/extension/[/cyan]\n\n"
                 "[bold yellow]→ Connect your browser:[/bold yellow]\n"
                 f"   Server is running on port [cyan]{server_port or 8851}[/cyan]\n"
                 "   After loading the extension, click the extension icon\n"
@@ -156,6 +177,52 @@ def init_configuration(force: bool = False) -> bool:
         config_file.parent.mkdir(parents=True, exist_ok=True)
         with open(config_file, "w") as f:
             json.dump(default_config, f, indent=2)
+        return True
+    except Exception:
+        return False
+
+
+def install_extension(force: bool = False) -> bool:
+    """Install browser extension to config directory.
+
+    Copies the unpacked extension to ~/.mcp-browser/extension/
+    for easy loading in Chrome developer mode.
+
+    Args:
+        force: Force reinstallation even if already installed
+
+    Returns:
+        True if installed, False if source not found or error
+    """
+    config_dir = get_config_dir()
+    target_dir = config_dir / "extension"
+
+    # Find source extension
+    source_locations = [
+        Path.cwd() / "mcp-browser-extension",
+        Path(__file__).parent.parent.parent.parent / "mcp-browser-extension",
+    ]
+
+    source_dir = None
+    for loc in source_locations:
+        if (loc / "manifest.json").exists():
+            source_dir = loc
+            break
+
+    if not source_dir:
+        return False  # No source found, skip silently
+
+    # Skip if already installed (unless force)
+    if target_dir.exists() and not force:
+        return True
+
+    try:
+        # Remove existing if force
+        if target_dir.exists():
+            shutil.rmtree(target_dir)
+
+        # Copy extension
+        shutil.copytree(source_dir, target_dir)
         return True
     except Exception:
         return False
