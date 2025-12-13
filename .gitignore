@@ -201,7 +201,6 @@ $RECYCLE.BIN/
 .claude-mpm/logs/
 .claude-mpm/sessions/
 .claude-mpm/tmp/
-.claude-mpm/correlations/*.json
 .claude/cache/
 .claude/sessions/
 .conda/
@@ -234,8 +233,4 @@ docs/research/
 # Added by Claude MPM /mpm-init
 .claude.json
 .claude/
-
-# Development documentation
-DOCTOR_MCP_CONFIG_FIX.md
-SETUP_FIX_SUMMARY.md
 uv.lock
