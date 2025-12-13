@@ -94,7 +94,7 @@ def setup(skip_mcp: bool, skip_extension: bool, force: bool):
     )
 
     steps_completed = 0
-    total_steps = 3 - (1 if skip_mcp else 0) - (1 if skip_extension else 0)
+    total_steps = 4 - (1 if skip_mcp else 0) - (1 if skip_extension else 0)  # config, mcp, extension, server
 
     with Progress(
         SpinnerColumn(),
@@ -139,30 +139,41 @@ def setup(skip_mcp: bool, skip_extension: bool, force: bool):
             else:
                 progress.update(task, description="⚠ Extension packaging failed")
 
-    # Summary
+        # Step 4: Start server
+        task = progress.add_task("Starting server...", total=1)
+        server_port = start_server_for_setup()
+        if server_port:
+            steps_completed += 1
+            progress.update(
+                task, completed=1, description=f"✓ Server running on port {server_port}"
+            )
+        else:
+            progress.update(task, description="⚠ Server failed to start")
+
+    # Summary and browser connection prompt
     console.print()
-    if steps_completed == total_steps:
+    if steps_completed >= total_steps:
         extension_msg = ""
         if extension_path:
             extension_msg = (
-                f"1. Install the Chrome extension:\n"
-                f"   • Open Chrome and go to: [cyan]chrome://extensions/[/cyan]\n"
-                f"   • Enable 'Developer mode' (toggle in top right)\n"
-                f"   • Click 'Load unpacked'\n"
-                f"   • Select: [cyan]{extension_path}[/cyan]\n\n"
-                f"   [dim]Extensions ready at: dist/chrome/, dist/firefox/, dist/safari/[/dim]\n\n"
+                f"[bold yellow]→ Install the Chrome extension:[/bold yellow]\n"
+                f"   1. Open Chrome: [cyan]chrome://extensions/[/cyan]\n"
+                f"   2. Enable 'Developer mode' (toggle in top right)\n"
+                f"   3. Click 'Load unpacked'\n"
+                f"   4. Select: [cyan]{extension_path}[/cyan]\n\n"
             )
 
         console.print(
             Panel(
                 "[bold green]✓ Setup Complete![/bold green]\n\n"
-                "[yellow]Next Steps:[/yellow]\n"
                 + extension_msg
-                + "2. Start the server:\n"
-                "   [cyan]mcp-browser start[/cyan]\n\n"
-                "3. Test the connection:\n"
+                + "[bold yellow]→ Connect your browser:[/bold yellow]\n"
+                f"   Server is running on port [cyan]{server_port or 8851}[/cyan]\n"
+                "   After loading the extension, click the extension icon\n"
+                "   and connect to the server.\n\n"
+                "[bold yellow]→ Test the connection:[/bold yellow]\n"
                 "   [cyan]mcp-browser doctor[/cyan]\n\n"
-                "4. Try a browser command:\n"
+                "[bold yellow]→ Try a browser command:[/bold yellow]\n"
                 "   [cyan]mcp-browser browser control navigate https://example.com[/cyan]",
                 title="Setup Complete",
                 border_style="green",
@@ -171,7 +182,7 @@ def setup(skip_mcp: bool, skip_extension: bool, force: bool):
     else:
         console.print(
             Panel(
-                f"[yellow]⚠ Setup partially complete ({steps_completed}/{total_steps} steps)[/yellow]\n\n"
+                f"[yellow]⚠ Setup partially complete ({steps_completed}/{total_steps + 1} steps)[/yellow]\n\n"
                 "Run [cyan]mcp-browser doctor[/cyan] to diagnose issues.",
                 title="Setup Incomplete",
                 border_style="yellow",
@@ -222,13 +233,20 @@ def init_configuration(force: bool = False) -> bool:
 
 
 def install_mcp(force: bool = False) -> bool:
-    """Install MCP server configuration.
+    """Install MCP server configuration for all available platforms.
+
+    Auto-detects and installs MCP configuration for all supported platforms:
+    - Claude Code (project scope)
+    - Claude Desktop (global scope)
+    - Cursor
+    - Windsurf
+    - And other detected platforms
 
     Args:
         force: Force reinstallation even if already installed
 
     Returns:
-        True if successful, False otherwise
+        True if at least one platform was configured, False otherwise
     """
     import os
     import sys
@@ -246,68 +264,80 @@ def install_mcp(force: bool = False) -> bool:
         )
         return False
 
-    # Suppress stderr completely during installation attempt
+    # Platforms to try (exclude UNKNOWN and less common ones)
+    target_platforms = [
+        Platform.CLAUDE_CODE,
+        Platform.CLAUDE_DESKTOP,
+        Platform.CURSOR,
+        Platform.WINDSURF,
+    ]
+
+    # Track successful installations
+    configured_platforms = []
+
+    # Suppress stderr completely during installation attempts
     # This prevents py_mcp_installer from printing tracebacks
     old_stderr = sys.stderr
     sys.stderr = open(os.devnull, "w")
 
     try:
-        # Install for Claude Code (most common use case)
-        success, message = install_to_platform(Platform.CLAUDE_CODE, force=force)
+        for platform in target_platforms:
+            try:
+                success, message = install_to_platform(platform, force=force)
 
-        # If installation failed, check if it's because already exists
-        if not success:
-            message_lower = message.lower()
-            # Check for various "already exists" scenarios
-            if (
-                "already configured" in message_lower
-                or "already exists" in message_lower
-                or "cli command fail" in message_lower
-            ):
+                # If installation succeeded, track it
+                if success:
+                    configured_platforms.append(platform.name)
+                    continue
+
+                # If installation failed, check if it's because already exists
+                message_lower = message.lower()
+                if (
+                    "already configured" in message_lower
+                    or "already exists" in message_lower
+                    or "cli command fail" in message_lower
+                ):
+                    # Already configured counts as success
+                    configured_platforms.append(platform.name)
+
+            except InstallationError as e:
+                # Check if already installed by examining error message
+                error_msg = str(e).lower()
+                if (
+                    "already exists" in error_msg
+                    or "already configured" in error_msg
+                    or "cli command failed" in error_msg
+                    or "native cli installation failed" in error_msg
+                ):
+                    # Already configured counts as success
+                    configured_platforms.append(platform.name)
+                # Otherwise, silently skip this platform
+
+            except Exception:
+                # Silently skip platforms that fail to install
+                pass
+
+        # Restore stderr
+        sys.stderr.close()
+        sys.stderr = old_stderr
+
+        # Report results
+        if configured_platforms:
+            platform_list = ", ".join(configured_platforms)
+            console.print(f"[dim]  MCP configured for: {platform_list}[/dim]")
+            return True
+        else:
+            console.print("[dim]  No platforms configured (may need manual setup)[/dim]")
+            return False
+
+    except Exception:
+        # Restore stderr first
+        if sys.stderr != old_stderr:
+            try:
                 sys.stderr.close()
-                sys.stderr = old_stderr
-                console.print("[dim]  MCP already configured for Claude Code[/dim]")
-                return True
-
-        sys.stderr.close()
-        sys.stderr = old_stderr
-        return success
-
-    except InstallationError as e:
-        # Restore stderr first
-        sys.stderr.close()
-        sys.stderr = old_stderr
-
-        # Check if already installed by examining error message
-        error_msg = str(e)
-
-        if (
-            "already exists" in error_msg.lower()
-            or "already configured" in error_msg.lower()
-        ):
-            console.print("[dim]  MCP already configured for Claude Code[/dim]")
-            return True
-        # Other installation error - check if it's a known issue
-        if (
-            "CLI command failed" in error_msg
-            or "Native CLI installation failed" in error_msg
-        ):
-            # Likely already installed, but failed to update
-            console.print("[dim]  MCP configuration exists (cannot update)[/dim]")
-            return True
-        return False
-
-    except Exception as e:
-        # Restore stderr first
-        sys.stderr.close()
-        sys.stderr = old_stderr
-
-        # Check the exception message for "already exists"
-        error_msg = str(e)
-
-        if "already exists" in error_msg.lower():
-            console.print("[dim]  MCP already configured for Claude Code[/dim]")
-            return True
+            except Exception:
+                pass
+            sys.stderr = old_stderr
         return False
 
     finally:
@@ -402,3 +432,24 @@ def package_extension() -> Optional[Path]:
     except Exception as e:
         console.print(f"[red]Error packaging extensions: {e}[/red]")
         return None
+
+
+def start_server_for_setup() -> Optional[int]:
+    """Start the server in background for setup.
+
+    Returns:
+        Port number if started, None if failed
+    """
+    from ..utils.daemon import get_server_status, start_daemon
+
+    # Check if already running
+    is_running, _, port = get_server_status()
+    if is_running:
+        return port
+
+    # Start daemon
+    success, _, port = start_daemon()
+    if success:
+        return port
+
+    return None

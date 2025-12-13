@@ -293,29 +293,35 @@ def _check_port_availability() -> dict:
 
 
 def _check_extension_package() -> dict:
-    """Check if extension ZIP exists."""
-    # Try to find extension in common locations
-    possible_paths = [
-        Path.cwd() / "dist" / "mcp-browser-extension.zip",
-        Path(__file__).parent.parent.parent.parent
-        / "dist"
-        / "mcp-browser-extension.zip",
-        Path.home() / ".mcp-browser" / "mcp-browser-extension.zip",
+    """Check if unpacked extension directories exist."""
+    # Check for unpacked extension directories (preferred over ZIP)
+    project_root = Path(__file__).parent.parent.parent.parent
+    possible_dirs = [
+        Path.cwd() / "dist" / "chrome",
+        project_root / "dist" / "chrome",
+        Path.cwd() / "src" / "extensions" / "chrome",
+        project_root / "src" / "extensions" / "chrome",
     ]
 
-    for zip_path in possible_paths:
-        if zip_path.exists():
-            size = zip_path.stat().st_size / 1024  # KB
+    for ext_dir in possible_dirs:
+        manifest = ext_dir / "manifest.json"
+        if manifest.exists():
+            # Count files in extension
+            file_count = len(list(ext_dir.rglob("*")))
+            try:
+                rel_path = ext_dir.relative_to(Path.cwd())
+            except ValueError:
+                rel_path = ext_dir
             return {
-                "name": "Extension Package",
+                "name": "Extension Directory",
                 "status": "pass",
-                "message": f"Found at {zip_path.relative_to(Path.cwd() if zip_path.is_relative_to(Path.cwd()) else Path.home())} ({size:.1f} KB)",
+                "message": f"Found at {rel_path} ({file_count} files)",
             }
 
     return {
-        "name": "Extension Package",
+        "name": "Extension Directory",
         "status": "warning",
-        "message": "Extension ZIP not found in common locations",
+        "message": "Extension not found in dist/chrome/ or src/extensions/chrome/",
         "fix": "Run: mcp-browser setup",
     }
 
