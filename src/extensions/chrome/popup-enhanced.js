@@ -478,8 +478,100 @@ function stopAutoRefresh() {
   }
 }
 
+/**
+ * Toggle technical details panel
+ */
+function toggleTechnicalPanel() {
+  const panel = document.getElementById('technical-panel');
+  const isVisible = panel.classList.contains('visible');
+
+  if (isVisible) {
+    panel.classList.remove('visible');
+  } else {
+    panel.classList.add('visible');
+    // Load detailed technical info when opening
+    loadTechnicalDetails();
+  }
+}
+
+/**
+ * Load detailed technical information
+ */
+async function loadTechnicalDetails() {
+  try {
+    // Get detailed status from background
+    const detailedStatus = await sendMessage({ type: 'get_detailed_status' });
+
+    // Get manifest version
+    const manifest = chrome.runtime.getManifest();
+
+    // Update technical panel fields
+    document.getElementById('tech-version').textContent = manifest.version || 'unknown';
+    document.getElementById('tech-ws-port').textContent = detailedStatus.port || '-';
+    document.getElementById('tech-conn-state').textContent = detailedStatus.connectionState || 'disconnected';
+    document.getElementById('tech-retry-count').textContent = detailedStatus.retryCount || '0';
+    document.getElementById('tech-project-name').textContent = detailedStatus.projectName || '-';
+    document.getElementById('tech-server-pid').textContent = detailedStatus.serverPid || '-';
+    document.getElementById('tech-msg-count').textContent = detailedStatus.messageCount || '0';
+    document.getElementById('tech-last-error').textContent = detailedStatus.lastError || 'none';
+
+  } catch (error) {
+    console.error('[Popup] Failed to load technical details:', error);
+  }
+}
+
+/**
+ * Copy debug info to clipboard
+ */
+async function copyDebugInfo() {
+  const btn = document.getElementById('copy-debug-btn');
+
+  try {
+    // Get detailed status
+    const detailedStatus = await sendMessage({ type: 'get_detailed_status' });
+    const manifest = chrome.runtime.getManifest();
+
+    // Format debug info
+    const debugInfo = `MCP Browser Extension - Debug Info
+=====================================
+Extension Version: ${manifest.version}
+WebSocket Port: ${detailedStatus.port || 'not connected'}
+Connection State: ${detailedStatus.connectionState || 'disconnected'}
+Retry Count: ${detailedStatus.retryCount || '0'}
+Server Project: ${detailedStatus.projectName || 'none'}
+Server PID: ${detailedStatus.serverPid || 'unknown'}
+Messages Captured: ${detailedStatus.messageCount || '0'}
+Last Error: ${detailedStatus.lastError || 'none'}
+Timestamp: ${new Date().toISOString()}
+=====================================`;
+
+    // Copy to clipboard
+    await navigator.clipboard.writeText(debugInfo);
+
+    // Show feedback
+    const originalText = btn.textContent;
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('copied');
+
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.classList.remove('copied');
+    }, 2000);
+
+  } catch (error) {
+    console.error('[Popup] Failed to copy debug info:', error);
+    btn.textContent = '✗ Failed';
+    setTimeout(() => {
+      btn.textContent = '📋 Copy Debug Info';
+    }, 2000);
+  }
+}
+
 // Event Listeners
 document.getElementById('scan-button').addEventListener('click', handleScanBackends);
+document.getElementById('gear-icon').addEventListener('click', toggleTechnicalPanel);
+document.getElementById('close-tech-panel').addEventListener('click', toggleTechnicalPanel);
+document.getElementById('copy-debug-btn').addEventListener('click', copyDebugInfo);
 
 // Cleanup on popup close
 window.addEventListener('unload', () => {

@@ -3023,6 +3023,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ tabConnections });
     });
     return true; // Keep channel open for async response
+  } else if (request.type === 'get_detailed_status') {
+    // Get detailed technical status for debugging
+    const connections = connectionManager.getActiveConnections();
+    const firstConnection = connections.length > 0 ? connections[0] : null;
+
+    const detailedStatus = {
+      port: firstConnection?.port || connectionStatus.port || null,
+      connectionState: firstConnection ? (firstConnection.connectionReady ? 'connected' : 'connecting') : 'disconnected',
+      retryCount: firstConnection?.reconnectAttempts || reconnectAttempts || 0,
+      projectName: firstConnection?.projectName || connectionStatus.projectName || null,
+      serverPid: firstConnection?.serverPid || null,
+      messageCount: connectionStatus.messageCount || 0,
+      lastError: connectionStatus.lastError || null,
+      totalConnections: connections.length,
+      extensionState: extensionState
+    };
+
+    sendResponse(detailedStatus);
   }
 });
 
