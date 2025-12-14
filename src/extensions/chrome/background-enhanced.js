@@ -1844,7 +1844,7 @@ async function scanForServers() {
   if (servers.length > 0) {
     connectionStatus.lastError = null;
   } else {
-    connectionStatus.lastError = 'No servers found. Ensure mcp-browser server is running.';
+    connectionStatus.lastError = 'No servers found. Run "mcp-browser start" to start a server.';
   }
 
   extensionState = servers.length > 0 ? 'idle' : 'idle';
@@ -1953,8 +1953,12 @@ async function probePort(port) {
  * @param {Object} serverInfo - Optional server info
  * @returns {Promise<boolean>} Success status
  */
-async function connectToServer(port, serverInfo = null) {
-  console.log(`[MCP Browser] Connecting to server on port ${port}...`);
+async function connectToServer(port, serverInfo = null, retryAttempt = 0) {
+  const maxRetries = 3;
+  const baseTimeout = 5000; // Increased from 3000ms to 5000ms
+  const retryDelay = Math.min(1000 * Math.pow(2, retryAttempt), 5000); // Exponential backoff: 1s, 2s, 4s
+
+  console.log(`[MCP Browser] Connecting to server on port ${port}... (attempt ${retryAttempt + 1}/${maxRetries + 1})`);
 
   // Disconnect from current server if connected
   if (currentConnection) {
@@ -1970,8 +1974,19 @@ async function connectToServer(port, serverInfo = null) {
         if (ws && ws.readyState !== WebSocket.CLOSED) {
           ws.close();
         }
-        resolve(false);
-      }, 3000);
+
+        // Retry with exponential backoff if attempts remain
+        if (retryAttempt < maxRetries) {
+          console.log(`[MCP Browser] Connection timeout, retrying in ${retryDelay}ms...`);
+          setTimeout(async () => {
+            const retryResult = await connectToServer(port, serverInfo, retryAttempt + 1);
+            resolve(retryResult);
+          }, retryDelay);
+        } else {
+          console.log(`[MCP Browser] Connection failed after ${maxRetries + 1} attempts`);
+          resolve(false);
+        }
+      }, baseTimeout);
 
       ws.onopen = async () => {
         clearTimeout(timeout);
@@ -2243,8 +2258,8 @@ async function autoConnect() {
 
     // REMOVED: Automatic full port scan
     // User must explicitly click "Scan for Backends" button in popup
-    console.log('[MCP Browser] No known servers available. Click "Scan for Backends" in popup to search.');
-    connectionStatus.lastError = 'No known servers - click "Scan for Backends" to search';
+    // Don't show error message on startup - only after user scans and finds nothing
+    console.log('[MCP Browser] No known servers available. User can click "Scan for Backends" in popup.');
     extensionState = 'idle';
     updateBadgeStatus();
   } catch (error) {

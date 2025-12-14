@@ -9,6 +9,7 @@
 
 let refreshInterval = null;
 let isUpdating = false; // Prevent concurrent updates
+let errorDebounceTimer = null; // Debounce error messages
 
 /**
  * Load dashboard state
@@ -93,8 +94,20 @@ function updateOverallStatus(status) {
     if (errorContainer.innerHTML !== '') {
       errorContainer.innerHTML = '';
     }
+    // Clear any pending error debounce
+    if (errorDebounceTimer) {
+      clearTimeout(errorDebounceTimer);
+      errorDebounceTimer = null;
+    }
   } else if (status.lastError) {
-    showError(status.lastError);
+    // Debounce error messages to avoid rapid flashing
+    if (errorDebounceTimer) {
+      clearTimeout(errorDebounceTimer);
+    }
+    errorDebounceTimer = setTimeout(() => {
+      showError(status.lastError);
+      errorDebounceTimer = null;
+    }, 500); // Wait 500ms before showing error
   }
 }
 
@@ -373,6 +386,30 @@ async function handleScanBackends() {
       if (response.servers.length > 0) {
         // Clear error container immediately
         document.getElementById('error-container').innerHTML = '';
+
+        // Auto-connect if exactly 1 server found
+        if (response.servers.length === 1) {
+          const server = response.servers[0];
+          const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+          const currentTab = tabs[0];
+
+          if (currentTab) {
+            console.log(`[Popup] Auto-connecting to single server on port ${server.port}...`);
+            progressText.textContent = `Auto-connecting to ${server.projectName || 'server'}...`;
+
+            // Small delay for UX
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            try {
+              await handleConnectToBackend(server.port, currentTab.id);
+              console.log('[Popup] Auto-connect successful');
+              return; // Exit early, handleConnectToBackend handles progress hiding
+            } catch (error) {
+              console.error('[Popup] Auto-connect failed:', error);
+              // Continue to normal dashboard refresh on error
+            }
+          }
+        }
       }
     } else {
       console.log('[Popup] Scan response:', response);

@@ -112,19 +112,21 @@ def setup(skip_mcp: bool, force: bool):
         console.print(
             Panel(
                 "[bold green]✓ Setup Complete![/bold green]\n\n"
-                "[bold yellow]→ Install the Chrome extension:[/bold yellow]\n"
-                "   1. Open Chrome: [cyan]chrome://extensions/[/cyan]\n"
-                "   2. Enable 'Developer mode' (toggle in top right)\n"
-                "   3. Click 'Load unpacked'\n"
-                "   4. Select: [cyan]./mcp-browser-extensions/chrome/[/cyan]\n\n"
+                "[bold yellow]→ Install a browser extension:[/bold yellow]\n"
+                "   [bold]Chrome:[/bold]\n"
+                "     1. Open [cyan]chrome://extensions/[/cyan]\n"
+                "     2. Enable 'Developer mode' → Click 'Load unpacked'\n"
+                "     3. Select: [cyan]./mcp-browser-extensions/chrome/[/cyan]\n"
+                "   [bold]Firefox:[/bold]\n"
+                "     1. Open [cyan]about:debugging#/runtime/this-firefox[/cyan]\n"
+                "     2. Click 'Load Temporary Add-on'\n"
+                "     3. Select: [cyan]./mcp-browser-extensions/firefox/manifest.json[/cyan]\n\n"
                 "[bold yellow]→ Connect your browser:[/bold yellow]\n"
                 f"   Server is running on port [cyan]{server_port or 8851}[/cyan]\n"
                 "   After loading the extension, click the extension icon\n"
-                "   and connect to the server.\n\n"
+                "   and scan for backends.\n\n"
                 "[bold yellow]→ Test the connection:[/bold yellow]\n"
-                "   [cyan]mcp-browser doctor[/cyan]\n\n"
-                "[bold yellow]→ Try a browser command:[/bold yellow]\n"
-                "   [cyan]mcp-browser browser control navigate https://example.com[/cyan]",
+                "   [cyan]mcp-browser doctor[/cyan]",
                 title="Setup Complete",
                 border_style="green",
             )
@@ -183,59 +185,73 @@ def init_configuration(force: bool = False) -> bool:
 
 
 def install_extension(force: bool = False) -> bool:
-    """Install browser extension to visible project directory.
+    """Install all browser extensions to visible project directory.
 
-    Copies the unpacked extension to ./mcp-browser-extensions/chrome/
-    for easy loading in Chrome developer mode.
+    Copies the unpacked extensions to ./mcp-browser-extensions/{browser}/
+    for easy loading in browser developer mode.
+
+    Installs:
+      - Chrome extension (./mcp-browser-extensions/chrome/)
+      - Firefox extension (./mcp-browser-extensions/firefox/)
+      - Safari extension (./mcp-browser-extensions/safari/)
 
     Args:
         force: Force reinstallation even if already installed
 
     Returns:
-        True if installed, False if source not found or error
+        True if at least one extension installed, False if none found
     """
-    target_dir = Path.cwd() / "mcp-browser-extensions" / "chrome"
-
-    # Find source extension - check multiple locations
     package_dir = Path(__file__).parent.parent.parent  # src/
-    source_locations = [
-        # New location: src/extensions/chrome/
-        package_dir / "extensions" / "chrome",
-        # Package install location
-        package_dir.parent / "extensions" / "chrome",
-        # Old location (backwards compatibility)
-        Path.cwd() / "mcp-browser-extension",
-        package_dir.parent / "mcp-browser-extension",
-    ]
+    base_target = Path.cwd() / "mcp-browser-extensions"
 
-    source_dir = None
-    for loc in source_locations:
-        if loc.exists() and (loc / "manifest.json").exists():
-            source_dir = loc
-            break
+    # Browser extensions to install
+    browsers = ["chrome", "firefox", "safari"]
+    installed_count = 0
 
-    if not source_dir:
-        console.print("[yellow]  Extension source not found in package[/yellow]")
-        return False
+    for browser in browsers:
+        target_dir = base_target / browser
 
-    # Skip if already installed (unless force)
-    if target_dir.exists() and not force:
-        return True
+        # Find source extension - check multiple locations
+        source_locations = [
+            # Primary: src/extensions/{browser}/
+            package_dir / "extensions" / browser,
+            # Package install location
+            package_dir.parent / "extensions" / browser,
+        ]
 
-    try:
-        # Remove existing if force
-        if target_dir.exists():
-            shutil.rmtree(target_dir)
+        source_dir = None
+        for loc in source_locations:
+            if loc.exists() and (loc / "manifest.json").exists():
+                source_dir = loc
+                break
 
-        # Copy extension
-        shutil.copytree(source_dir, target_dir)
+        if not source_dir:
+            # Skip browsers without source (not an error)
+            continue
 
-        # Print .gitignore tip
+        # Skip if already installed (unless force)
+        if target_dir.exists() and not force:
+            installed_count += 1
+            continue
+
+        try:
+            # Remove existing if force
+            if target_dir.exists():
+                shutil.rmtree(target_dir)
+
+            # Copy extension
+            shutil.copytree(source_dir, target_dir)
+            installed_count += 1
+            console.print(f"[dim]  Installed {browser} extension[/dim]")
+        except Exception:
+            console.print(f"[yellow]  Failed to install {browser} extension[/yellow]")
+
+    if installed_count > 0:
         console.print("[dim]  Tip: Add 'mcp-browser-extensions/' to .gitignore[/dim]")
-
         return True
-    except Exception:
-        return False
+
+    console.print("[yellow]  No extension sources found in package[/yellow]")
+    return False
 
 
 def install_mcp(force: bool = False) -> bool:
