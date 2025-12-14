@@ -65,7 +65,7 @@ help-all: ## Show all available targets
 # ============================================================================
 # Build Target
 # ============================================================================
-build: ## Build and validate the project
+build: ext-deploy ## Build and validate the project
 	@echo "$(BLUE)Building project...$(NC)"
 	@$(PYTHON) -m build
 	@echo "$(BLUE)Validating installation...$(NC)"
@@ -88,7 +88,7 @@ clean: ## Clean build artifacts and cache
 # ============================================================================
 # Development Targets
 # ============================================================================
-dev: ## Start full development environment (server + extension)
+dev: ext-deploy ## Start full development environment (server + extension)
 	@echo "$(BLUE)Starting full development environment...$(NC)"
 	@echo "$(YELLOW)This will start both MCP server and Chrome with extension loaded$(NC)"
 	@scripts/dev-full.sh
@@ -211,6 +211,18 @@ ext-sync: ## Sync extension version with project version
 
 ext-info: ## Show extension version information and change status
 	@$(PYTHON) scripts/build_extension.py info
+
+ext-deploy: ## Deploy extensions from source to mcp-browser-extensions/
+	@echo "$(BLUE)Deploying browser extensions from source...$(NC)"
+	@mkdir -p mcp-browser-extensions
+	@rm -rf mcp-browser-extensions/chrome mcp-browser-extensions/firefox mcp-browser-extensions/safari
+	@cp -r src/extensions/chrome mcp-browser-extensions/chrome
+	@cp -r src/extensions/firefox mcp-browser-extensions/firefox
+	@if [ -d src/extensions/safari ]; then cp -r src/extensions/safari mcp-browser-extensions/safari; fi
+	@echo "$(GREEN)✓ Extensions deployed to mcp-browser-extensions/$(NC)"
+	@echo "  - Chrome:  mcp-browser-extensions/chrome/"
+	@echo "  - Firefox: mcp-browser-extensions/firefox/"
+	@test -d mcp-browser-extensions/safari && echo "  - Safari:  mcp-browser-extensions/safari/" || true
 
 # ============================================================================
 # Docker Development

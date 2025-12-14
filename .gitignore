@@ -234,3 +234,4 @@ docs/research/
 .claude.json
 .claude/
 uv.lock
+mcp-browser-extensions/
