@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-browser"
-version = "2.2.21"
+version = "2.2.22"
 description = "Browser console log capture and control via MCP for Claude Code"
 readme = "README.md"
 authors = [
