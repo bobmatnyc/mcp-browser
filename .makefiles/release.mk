@@ -108,7 +108,7 @@ bump-major: ## Bump major version using scripts/bump_version.py
 # Release Build
 # ============================================================================
 
-release-build: pre-publish ## Build Python package for release (runs quality checks first)
+release-build: pre-publish ext-deploy ## Build Python package for release (runs quality checks first)
 	@echo "$(YELLOW)📦 Building package...$(NC)"
 	@$(MAKE) build-metadata
 	@rm -rf $(DIST_DIR)/ $(BUILD_DIR)/ *.egg-info
