@@ -232,14 +232,15 @@ def install_extension(force: bool = False) -> bool:
 
 
 def install_mcp(force: bool = False) -> bool:
-    """Install MCP server configuration for all available platforms.
+    """Install MCP server configuration for coding CLI platforms.
 
-    Auto-detects and installs MCP configuration for all supported platforms:
+    Auto-detects and installs MCP configuration for supported coding CLIs:
     - Claude Code (project scope)
-    - Claude Desktop (global scope)
     - Cursor
     - Windsurf
-    - And other detected platforms
+
+    NOTE: Claude Desktop is intentionally excluded - mcp-browser is designed
+    for coding CLIs only, not the desktop chat application.
 
     Args:
         force: Force reinstallation even if already installed
@@ -261,10 +262,9 @@ def install_mcp(force: bool = False) -> bool:
         )
         return False
 
-    # Platforms to try (exclude UNKNOWN and less common ones)
+    # Platforms to try - coding CLIs only (Claude Desktop intentionally excluded)
     target_platforms = [
         Platform.CLAUDE_CODE,
-        Platform.CLAUDE_DESKTOP,
         Platform.CURSOR,
         Platform.WINDSURF,
     ]
