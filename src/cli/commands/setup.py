@@ -196,20 +196,27 @@ def install_extension(force: bool = False) -> bool:
     """
     target_dir = Path.cwd() / "mcp-browser-extensions" / "chrome"
 
-    # Find source extension
+    # Find source extension - check multiple locations
+    package_dir = Path(__file__).parent.parent.parent  # src/
     source_locations = [
+        # New location: src/extensions/chrome/
+        package_dir / "extensions" / "chrome",
+        # Package install location
+        package_dir.parent / "extensions" / "chrome",
+        # Old location (backwards compatibility)
         Path.cwd() / "mcp-browser-extension",
-        Path(__file__).parent.parent.parent.parent / "mcp-browser-extension",
+        package_dir.parent / "mcp-browser-extension",
     ]
 
     source_dir = None
     for loc in source_locations:
-        if (loc / "manifest.json").exists():
+        if loc.exists() and (loc / "manifest.json").exists():
             source_dir = loc
             break
 
     if not source_dir:
-        return False  # No source found, skip silently
+        console.print("[yellow]  Extension source not found in package[/yellow]")
+        return False
 
     # Skip if already installed (unless force)
     if target_dir.exists() and not force:
