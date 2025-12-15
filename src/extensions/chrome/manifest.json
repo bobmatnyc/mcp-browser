@@ -49,5 +49,11 @@
     "32": "icons/icon32-yellow.png",
     "48": "icons/icon48-yellow.png",
     "128": "icons/icon128-yellow.png"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["build-info.json"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }

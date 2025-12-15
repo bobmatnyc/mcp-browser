@@ -360,6 +360,61 @@ Visual status indicator showing:
 - Message count
 - Recent console activity
 
+### Build Tracking System
+**File**: `scripts/generate_build_info.py`
+
+Automatic build number tracking for deployed extensions.
+
+**Build Number Format**: `YYYY.MM.DD.HHMM` (UTC timestamp)
+
+**Example**: `2025.12.15.0630` = December 15, 2025 at 06:30 UTC
+
+**Generated File**: `build-info.json` in each extension directory
+```json
+{
+  "version": "2.2.25",
+  "build": "2025.12.15.0630",
+  "deployed": "2025-12-15T06:30:00.123456+00:00",
+  "extension": "chrome"
+}
+```
+
+**Integration**:
+- Automatically generated during `make ext-deploy`
+- Displayed in extension popup (Technical Details panel)
+- Included in debug info clipboard copy
+
+**Display Location**:
+- Open extension popup → Click gear icon (⚙️) → View "Extension Version"
+- Format: `2.2.24 (build 2025.12.15.0630)`
+
+**Usage**:
+```bash
+# Deploy extensions with new build number
+make ext-deploy
+
+# Build numbers update every deployment
+# Helps track which extension version is installed during development
+```
+
+**Implementation Details**:
+```python
+# scripts/generate_build_info.py
+def generate_build_number() -> str:
+    """Generate timestamp-based build number"""
+    now = datetime.now(timezone.utc)
+    return f"{now.year}.{now.month:02d}.{now.day:02d}.{now.hour:02d}{now.minute:02d}"
+```
+
+```javascript
+// Extension popup loads build info
+async function loadBuildInfo() {
+    const response = await fetch(chrome.runtime.getURL('build-info.json'));
+    const buildInfo = await response.json();
+    return buildInfo;  // { version, build, deployed, extension }
+}
+```
+
 ## Development Workflows
 
 ### Adding New Services

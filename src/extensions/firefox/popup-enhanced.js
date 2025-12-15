@@ -532,6 +532,21 @@ function toggleTechnicalPanel() {
 }
 
 /**
+ * Load build information from build-info.json
+ */
+async function loadBuildInfo() {
+  try {
+    const response = await fetch(chrome.runtime.getURL('build-info.json'));
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (error) {
+    console.log('[Popup] No build info available:', error);
+  }
+  return null;
+}
+
+/**
  * Load detailed technical information
  */
 async function loadTechnicalDetails() {
@@ -542,8 +557,17 @@ async function loadTechnicalDetails() {
     // Get manifest version
     const manifest = chrome.runtime.getManifest();
 
+    // Get build info
+    const buildInfo = await loadBuildInfo();
+
+    // Format version display with build number
+    let versionText = manifest.version || 'unknown';
+    if (buildInfo && buildInfo.build) {
+      versionText = `${manifest.version} (build ${buildInfo.build})`;
+    }
+
     // Update technical panel fields
-    document.getElementById('tech-version').textContent = manifest.version || 'unknown';
+    document.getElementById('tech-version').textContent = versionText;
     document.getElementById('tech-ws-port').textContent = detailedStatus.port || '-';
     document.getElementById('tech-conn-state').textContent = detailedStatus.connectionState || 'disconnected';
     document.getElementById('tech-retry-count').textContent = detailedStatus.retryCount || '0';
@@ -567,11 +591,19 @@ async function copyDebugInfo() {
     // Get detailed status
     const detailedStatus = await sendMessage({ type: 'get_detailed_status' });
     const manifest = chrome.runtime.getManifest();
+    const buildInfo = await loadBuildInfo();
+
+    // Format version with build number
+    let versionText = manifest.version;
+    if (buildInfo && buildInfo.build) {
+      versionText = `${manifest.version} (build ${buildInfo.build})`;
+    }
 
     // Format debug info
     const debugInfo = `MCP Browser Extension - Debug Info
 =====================================
-Extension Version: ${manifest.version}
+Extension Version: ${versionText}
+Build Deployed: ${buildInfo?.deployed || 'unknown'}
 WebSocket Port: ${detailedStatus.port || 'not connected'}
 Connection State: ${detailedStatus.connectionState || 'disconnected'}
 Retry Count: ${detailedStatus.retryCount || '0'}

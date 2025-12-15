@@ -229,6 +229,10 @@ ext-deploy: ## Deploy extensions from source to mcp-browser-extensions/
 	@echo "  - Firefox: mcp-browser-extensions/firefox/"
 	@test -d mcp-browser-extensions/safari && echo "  - Safari:  mcp-browser-extensions/safari/" || true
 	@cat mcp-browser-extensions/VERSION.txt
+	@echo "$(BLUE)Generating build information...$(NC)"
+	@$(PYTHON) scripts/generate_build_info.py mcp-browser-extensions/chrome
+	@$(PYTHON) scripts/generate_build_info.py mcp-browser-extensions/firefox
+	@test -d mcp-browser-extensions/safari && $(PYTHON) scripts/generate_build_info.py mcp-browser-extensions/safari || true
 
 # ============================================================================
 # Docker Development
