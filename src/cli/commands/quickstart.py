@@ -2,8 +2,10 @@
 
 import asyncio
 import json
+import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 import click
 from rich.panel import Panel
@@ -22,6 +24,43 @@ from ..utils import (
 from .init import init_project_extension_interactive
 
 
+def get_playwright_cache_dir():
+    """Get Playwright browser cache directory.
+
+    Returns:
+        Path to Playwright cache, or None if not found
+    """
+    if sys.platform == "darwin" or sys.platform == "linux":
+        cache_dir = Path.home() / ".cache" / "ms-playwright"
+    elif sys.platform == "win32":
+        import os
+
+        local_appdata = os.environ.get("LOCALAPPDATA")
+        if local_appdata:
+            cache_dir = Path(local_appdata) / "ms-playwright"
+        else:
+            return None
+    else:
+        return None
+
+    if cache_dir.exists() and cache_dir.is_dir():
+        return cache_dir
+
+    return None
+
+
+def get_directory_size_mb(path: Path) -> float:
+    """Get directory size in megabytes."""
+    total = 0
+    try:
+        for entry in path.rglob("*"):
+            if entry.is_file():
+                total += entry.stat().st_size
+    except (OSError, PermissionError):
+        pass
+    return total / (1024 * 1024)
+
+
 @click.command()
 @click.pass_context
 def quickstart(ctx):
@@ -30,11 +69,11 @@ def quickstart(ctx):
     \b
     This wizard will:
       1. Check system requirements
-      2. Create necessary directories
-      3. Initialize the Chrome extension
-      4. Configure MCP settings
-      5. Start the server
-      6. Help you install the Chrome extension
+      2. Clean up legacy Playwright cache (if present)
+      3. Create necessary directories
+      4. Initialize the Chrome extension
+      5. Configure MCP settings
+      6. Start the server
 
     Perfect for getting started quickly without reading documentation!
     """
@@ -78,8 +117,38 @@ def quickstart(ctx):
             console.print("[red]Setup cancelled.[/red]")
             return
 
-    # Step 2: Create directories
-    console.print("\n[bold]Step 2: Creating directories...[/bold]")
+    # Step 2: Clean up Playwright cache (no longer needed)
+    console.print("\n[bold]Step 2: Checking for legacy Playwright cache...[/bold]")
+
+    playwright_cache = get_playwright_cache_dir()
+    if playwright_cache:
+        cache_size_mb = get_directory_size_mb(playwright_cache)
+        console.print(
+            f"  [yellow]⚠[/yellow] Found Playwright browser cache: {playwright_cache}"
+        )
+        console.print(f"  [dim]Size: {cache_size_mb:.1f} MB[/dim]")
+        console.print(
+            "\n  [dim]Note: Playwright is no longer used by mcp-browser (removed in v2.2.29[/dim]"
+        )
+        console.print(
+            "  [dim]to fix a critical memory leak). This cache can be safely removed.[/dim]"
+        )
+
+        if Confirm.ask("\n  Remove Playwright cache to free disk space?", default=True):
+            try:
+                shutil.rmtree(playwright_cache)
+                console.print(
+                    f"  [green]✓[/green] Removed {cache_size_mb:.1f} MB of Playwright cache"
+                )
+            except (OSError, PermissionError) as e:
+                console.print(f"  [red]✗[/red] Could not remove cache: {e}")
+        else:
+            console.print("  [dim]Skipping Playwright cache cleanup[/dim]")
+    else:
+        console.print("  [green]✓[/green] No Playwright cache found (clean install)")
+
+    # Step 3: Create directories
+    console.print("\n[bold]Step 3: Creating directories...[/bold]")
 
     dirs_to_create = [
         (HOME_DIR / "config", "Configuration"),
@@ -94,8 +163,8 @@ def quickstart(ctx):
         else:
             console.print(f"  [dim]✓ {desc} exists: {dir_path}[/dim]")
 
-    # Step 3: Initialize extension
-    console.print("\n[bold]Step 3: Setting up Chrome extension...[/bold]")
+    # Step 4: Initialize extension
+    console.print("\n[bold]Step 4: Setting up Chrome extension...[/bold]")
 
     use_local = Confirm.ask(
         "\nInitialize extension in current directory? (recommended for projects)"
@@ -108,8 +177,8 @@ def quickstart(ctx):
             "[dim]Skipping local extension setup. You can run 'mcp-browser init' later.[/dim]"
         )
 
-    # Step 4: Configure settings
-    console.print("\n[bold]Step 4: Configuring settings...[/bold]")
+    # Step 5: Configure settings
+    console.print("\n[bold]Step 5: Configuring settings...[/bold]")
 
     if not CONFIG_FILE.exists():
         default_config = {
@@ -132,8 +201,8 @@ def quickstart(ctx):
     else:
         console.print("  [dim]✓ Configuration exists[/dim]")
 
-    # Step 5: Start server
-    console.print("\n[bold]Step 5: Starting the server...[/bold]")
+    # Step 6: Start server
+    console.print("\n[bold]Step 6: Starting the server...[/bold]")
 
     if Confirm.ask("\nStart the MCP Browser server now?"):
         console.print("\n[green]✨ Setup complete![/green]")
