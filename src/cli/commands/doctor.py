@@ -450,7 +450,7 @@ async def _start_server_for_doctor() -> dict:
 
     try:
         # Start server in background
-        process = subprocess.Popen(
+        subprocess.Popen(
             [sys.executable, "-m", "mcp_browser.cli.main", "start"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -678,8 +678,6 @@ async def _check_browser_control() -> dict:
 
     try:
         import websockets
-
-        capabilities = []
 
         async def test_control():
             uri = f"ws://localhost:{port}"

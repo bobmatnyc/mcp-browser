@@ -112,7 +112,7 @@ def start(ctx, port, dashboard, dashboard_port, background, daemon):
             console.print(
                 Panel.fit(
                     "[red]Failed to start server in background[/red]\n\n"
-                    f"[dim]Try running without --background to see errors[/dim]",
+                    "[dim]Try running without --background to see errors[/dim]",
                     title="Startup Failed",
                     border_style="red",
                 )
