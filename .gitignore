@@ -236,3 +236,4 @@ docs/research/
 uv.lock
 mcp-browser-extensions/
 .claude-mpm/correlations/
+chunk-graph.json
