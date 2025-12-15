@@ -23,12 +23,11 @@ Usage:
 
 import argparse
 import os
-import re
 import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List
 
 
 # ANSI Color Codes
@@ -280,7 +279,7 @@ def bump_version(bump_type: str, dry_run: bool = False) -> str:
     if dry_run:
         cmd.append('--dry-run')
 
-    result = run_command(cmd, f"Version bump ({bump_type})")
+    run_command(cmd, f"Version bump ({bump_type})")
 
     # Read new version from VERSION file
     version_file = PROJECT_ROOT / 'VERSION'
@@ -515,10 +514,10 @@ def display_homebrew_instructions(version: str) -> None:
     print(f"{Colors.BLUE}  HOMEBREW TAP UPDATE{Colors.NC}")
     print(f"{Colors.BLUE}{'='*60}{Colors.NC}")
     print(f"\n{Colors.YELLOW}If you maintain a Homebrew tap:{Colors.NC}")
-    print(f"  1. Wait 5-10 minutes for PyPI propagation")
+    print("  1. Wait 5-10 minutes for PyPI propagation")
     print(f"  2. Run: bash scripts/update_homebrew_tap.sh {version}")
-    print(f"  3. Update formula with SHA256 from PyPI")
-    print(f"  4. Commit and push formula changes")
+    print("  3. Update formula with SHA256 from PyPI")
+    print("  4. Commit and push formula changes")
 
 
 def verify_release(version: str, dry_run: bool = False) -> None:

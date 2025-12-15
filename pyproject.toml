@@ -86,6 +86,15 @@ include = '\.pyi?$'
 [tool.ruff]
 line-length = 88
 target-version = "py310"
+exclude = [
+    "examples/",
+    "lib/",
+    "tests/",
+    "mcp-server.py",
+    ".venv/",
+    "build/",
+    "dist/",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W"]

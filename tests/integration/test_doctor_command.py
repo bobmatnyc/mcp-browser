@@ -4,14 +4,9 @@
 This script verifies all doctor checks work correctly in different scenarios.
 """
 
-import asyncio
-import json
 import subprocess
 import sys
 import time
-from pathlib import Path
-import tempfile
-import shutil
 
 # ANSI color codes for output
 GREEN = "\033[92m"
@@ -142,7 +137,7 @@ def test_with_server_running():
 
     # Start server
     print_info("Starting server...")
-    start_proc = subprocess.Popen(
+    subprocess.Popen(
         ["mcp-browser", "start"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
