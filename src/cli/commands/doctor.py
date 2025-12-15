@@ -49,8 +49,11 @@ def create_default_config():
 @click.option(
     "--verbose", "-v", is_flag=True, help="Show detailed diagnostic information"
 )
+@click.option(
+    "--start", "-s", is_flag=True, help="Auto-start server if not running"
+)
 @click.pass_context
-def doctor(ctx, fix, verbose):
+def doctor(ctx, fix, verbose, start):
     """🩺 Diagnose and fix common MCP Browser issues.
 
     \b
@@ -62,15 +65,14 @@ def doctor(ctx, fix, verbose):
       • Extension package
       • Claude MCP integration
       • WebSocket connectivity
-      • System requirements (Python, Chrome, Node.js)
-
-    \b
-    This command does NOT require browser connection.
-    It will NOT auto-start the server (only reports status).
+      • Browser extension connection & tab URL
+      • Console log capture
+      • Browser control capabilities
 
     \b
     Examples:
       mcp-browser doctor         # Run diagnostic
+      mcp-browser doctor --start # Auto-start server if needed
       mcp-browser doctor --fix   # Auto-fix issues
       mcp-browser doctor -v      # Verbose output
 
@@ -81,10 +83,10 @@ def doctor(ctx, fix, verbose):
       • "Chrome not detected" - Install Chrome or Chromium
       • "Permission denied" - Check directory permissions
     """
-    asyncio.run(_doctor_command(fix, verbose))
+    asyncio.run(_doctor_command(fix, verbose, start))
 
 
-async def _doctor_command(fix: bool, verbose: bool):
+async def _doctor_command(fix: bool, verbose: bool, start: bool = False):
     """Execute doctor diagnostic checks."""
     console.print(
         Panel.fit(
@@ -108,9 +110,16 @@ async def _doctor_command(fix: bool, verbose: bool):
     console.print("[cyan]→ Checking MCP installer...[/cyan]")
     results.append(_check_mcp_installer())
 
-    # Test 4: Server Status
+    # Test 4: Server Status (with optional auto-start)
     console.print("[cyan]→ Checking server status...[/cyan]")
-    results.append(_check_server_status())
+    server_result = _check_server_status()
+
+    # Auto-start server if requested and not running
+    if start and server_result["status"] != "pass":
+        console.print("[cyan]→ Starting server...[/cyan]")
+        server_result = await _start_server_for_doctor()
+
+    results.append(server_result)
 
     # Test 5: Port Availability
     console.print("[cyan]→ Checking port availability...[/cyan]")
@@ -432,6 +441,47 @@ async def _check_system_requirements() -> dict:
     }
 
 
+async def _start_server_for_doctor() -> dict:
+    """Start the server for doctor testing."""
+    import subprocess
+    import sys
+
+    try:
+        # Start server in background
+        process = subprocess.Popen(
+            [sys.executable, "-m", "mcp_browser.cli.main", "start"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+        # Wait a moment for server to start
+        await asyncio.sleep(2)
+
+        # Check if it started
+        is_running, pid, port = get_server_status()
+
+        if is_running:
+            return {
+                "name": "Server Status",
+                "status": "pass",
+                "message": f"Started on port {port} (PID: {pid})",
+            }
+        else:
+            return {
+                "name": "Server Status",
+                "status": "fail",
+                "message": "Failed to start server",
+                "fix": "Run: mcp-browser start --verbose",
+            }
+    except Exception as e:
+        return {
+            "name": "Server Status",
+            "status": "fail",
+            "message": f"Failed to start: {e}",
+            "fix": "Run: mcp-browser start",
+        }
+
+
 async def _check_browser_extension_connection() -> dict:
     """Check if browser extension is connected to the server."""
     is_running, _, port = get_server_status()
@@ -448,9 +498,11 @@ async def _check_browser_extension_connection() -> dict:
 
         connected_tabs = []
         extension_version = None
+        tab_url = None
+        tab_title = None
 
         async def check_extension():
-            nonlocal connected_tabs, extension_version
+            nonlocal connected_tabs, extension_version, tab_url, tab_title
             uri = f"ws://localhost:{port}"
             async with websockets.connect(uri, open_timeout=3.0) as ws:
                 # Send a status request
@@ -467,6 +519,11 @@ async def _check_browser_extension_connection() -> dict:
                     if data.get("type") == "status":
                         connected_tabs = data.get("connectedTabs", [])
                         extension_version = data.get("extensionVersion")
+                        # Get URL from first connected tab
+                        if connected_tabs:
+                            first_tab = connected_tabs[0]
+                            tab_url = first_tab.get("url", first_tab.get("tabUrl"))
+                            tab_title = first_tab.get("title", first_tab.get("tabTitle"))
                         return True
                     elif data.get("type") == "error":
                         return False
@@ -480,17 +537,30 @@ async def _check_browser_extension_connection() -> dict:
         if result and connected_tabs:
             tab_count = len(connected_tabs)
             version_info = f" (v{extension_version})" if extension_version else ""
+
+            # Build detailed message
+            message = f"Connected{version_info}, {tab_count} active tab(s)"
+            if tab_url:
+                # Truncate URL if too long
+                display_url = tab_url if len(tab_url) < 50 else tab_url[:47] + "..."
+                message += f"\n    → Tab: {display_url}"
+            elif tab_title:
+                display_title = tab_title if len(tab_title) < 50 else tab_title[:47] + "..."
+                message += f"\n    → Tab: {display_title}"
+
             return {
                 "name": "Browser Extension",
                 "status": "pass",
-                "message": f"Connected{version_info}, {tab_count} active tab(s)",
+                "message": message,
+                "tab_url": tab_url,
+                "tab_title": tab_title,
             }
         elif result:
             return {
                 "name": "Browser Extension",
                 "status": "warning",
                 "message": "Server responding but no tabs connected",
-                "fix": "Open extension popup and click 'Scan for Backends'",
+                "fix": "Open extension popup and click 'Connect' on a backend",
             }
         else:
             return {
@@ -539,15 +609,15 @@ async def _check_console_log_capture() -> dict:
 
                     if data.get("type") == "logs":
                         logs = data.get("logs", [])
-                        return len(logs), None
+                        return logs, None
                     elif data.get("type") == "error":
-                        return 0, data.get("message", "Unknown error")
+                        return [], data.get("message", "Unknown error")
                 except asyncio.TimeoutError:
-                    return 0, "Timeout waiting for response"
+                    return [], "Timeout waiting for response"
 
-            return 0, "Connection closed"
+            return [], "Connection closed"
 
-        log_count, error = await test_logs()
+        logs, error = await test_logs()
 
         if error:
             return {
@@ -557,10 +627,32 @@ async def _check_console_log_capture() -> dict:
                 "fix": "Ensure tab is connected via extension",
             }
 
+        log_count = len(logs)
+        message = f"Working ({log_count} recent logs)"
+
+        # Show sample of recent logs if available
+        if logs:
+            # Get log levels breakdown
+            levels = {}
+            for log in logs:
+                level = log.get("level", "log")
+                levels[level] = levels.get(level, 0) + 1
+
+            level_summary = ", ".join(f"{count} {level}" for level, count in levels.items())
+            message += f"\n    → Types: {level_summary}"
+
+            # Show most recent log entry (truncated)
+            recent = logs[0] if logs else None
+            if recent:
+                log_msg = recent.get("message", recent.get("text", ""))
+                if log_msg:
+                    display_msg = log_msg if len(log_msg) < 40 else log_msg[:37] + "..."
+                    message += f"\n    → Latest: [{recent.get('level', 'log')}] {display_msg}"
+
         return {
             "name": "Console Log Capture",
             "status": "pass",
-            "message": f"Working ({log_count} recent logs)",
+            "message": message,
         }
 
     except Exception as e:
