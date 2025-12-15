@@ -459,8 +459,8 @@ async def _step_content_extraction(port: int):
                     if data.get("type") in ("connection_ack", "server_info_response"):
                         continue
 
-                    if data.get("type") == "content":
-                        content = data.get("content", {})
+                    if data.get("type") == "content_extracted":
+                        content = data.get("content", data)
                         title = content.get("title", "No title")
                         text = content.get("textContent", "")
                         excerpt = content.get("excerpt", "")
@@ -513,8 +513,8 @@ async def _step_content_extraction(port: int):
                     if data.get("type") in ("connection_ack", "server_info_response"):
                         continue
 
-                    if data.get("type") == "semantic_dom":
-                        semantic = data.get("semantic", {})
+                    if data.get("type") == "semantic_dom_extracted":
+                        semantic = data.get("semantic", data)
                         headings = semantic.get("headings", [])
                         links = semantic.get("links", [])
                         forms = semantic.get("forms", [])
