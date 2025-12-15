@@ -128,9 +128,13 @@ class BrowserState:
             First active connection found, or None if no active connections exist
         """
         async with self._lock:
-            logger.info(f"get_any_active_connection: {len(self.connections)} total connections")
+            logger.info(
+                f"get_any_active_connection: {len(self.connections)} total connections"
+            )
             for port, conn in self.connections.items():
-                logger.info(f"  Port {port}: is_active={conn.is_active}, websocket={conn.websocket is not None}")
+                logger.info(
+                    f"  Port {port}: is_active={conn.is_active}, websocket={conn.websocket is not None}"
+                )
                 if conn.is_active:
                     return conn
             return None

@@ -278,6 +278,7 @@ class BrowserController:
         browser_service,
         applescript_service,
         config: Optional[Dict[str, Any]] = None,
+        daemon_client=None,
     ):
         """Initialize browser controller.
 
@@ -286,11 +287,13 @@ class BrowserController:
             browser_service: Browser service for state management
             applescript_service: AppleScript service for macOS fallback
             config: Optional configuration dictionary
+            daemon_client: Optional daemon client for MCP mode relay
         """
         self.websocket = websocket_service
         self.browser_service = browser_service
         self.applescript = applescript_service
         self.config = config or {}
+        self.daemon_client = daemon_client
 
         # Get browser control configuration
         browser_control = self.config.get("browser_control", {})
@@ -707,13 +710,24 @@ class BrowserController:
                     "method": "extension",
                     "data": None,
                 }
-            success = await self.browser_service.navigate_browser(port, url)
-            return {
-                "success": success,
-                "error": None if success else "Navigation command failed",
-                "method": "extension",
-                "data": {"url": url, "port": port},
-            }
+
+            # Use daemon client if available (MCP mode), otherwise direct
+            if self.daemon_client and self.daemon_client.is_connected:
+                result = await self.daemon_client.navigate(url, port)
+                return {
+                    "success": result.get("success", False),
+                    "error": result.get("error") if not result.get("success") else None,
+                    "method": "extension",
+                    "data": {"url": url, "port": port, "via": "daemon"},
+                }
+            else:
+                success = await self.browser_service.navigate_browser(port, url)
+                return {
+                    "success": success,
+                    "error": None if success else "Navigation command failed",
+                    "method": "extension",
+                    "data": {"url": url, "port": port},
+                }
 
         elif action in ["click", "fill", "get_element"]:
             # Use DOMInteractionService
@@ -1075,14 +1089,25 @@ class BrowserController:
                     "data": None,
                 }
 
-            # Use extension
-            success = await self.browser_service.navigate_browser(port, url)
-            return {
-                "success": success,
-                "error": None if success else "Navigation command failed",
-                "method": "extension",
-                "data": {"url": url, "port": port},
-            }
+            # Use extension (via daemon client if available, otherwise direct)
+            if self.daemon_client and self.daemon_client.is_connected:
+                # MCP mode: relay command via daemon
+                result = await self.daemon_client.navigate(url, port)
+                return {
+                    "success": result.get("success", False),
+                    "error": result.get("error") if not result.get("success") else None,
+                    "method": "extension",
+                    "data": {"url": url, "port": port, "via": "daemon"},
+                }
+            else:
+                # Direct mode: use browser_service
+                success = await self.browser_service.navigate_browser(port, url)
+                return {
+                    "success": success,
+                    "error": None if success else "Navigation command failed",
+                    "method": "extension",
+                    "data": {"url": url, "port": port},
+                }
 
         # Mode: cdp-only
         if self.mode == "cdp":
@@ -1701,22 +1726,37 @@ class BrowserController:
 
         Performance: O(1) dictionary lookup + await (~10-50ms)
         """
+        # Check if daemon_client is available (MCP mode)
+        if self.daemon_client and self.daemon_client.is_connected:
+            logger.info(f"_has_extension_connection({port}): Using daemon client relay")
+            return True
+
         # If no websocket service available, extension cannot be connected
         if not self.websocket:
-            logger.info(f"_has_extension_connection({port}): No websocket service")
+            logger.info(
+                f"_has_extension_connection({port}): No websocket service or daemon client"
+            )
             return False
 
         try:
             # Try exact port match first
             connection = await self.browser_service.browser_state.get_connection(port)
-            logger.info(f"_has_extension_connection({port}): Exact match = {connection is not None}")
+            logger.info(
+                f"_has_extension_connection({port}): Exact match = {connection is not None}"
+            )
 
             # If no exact match and port is in server range, try any active connection
             if connection is None and 8851 <= port <= 8895:
-                connection = await self.browser_service.browser_state.get_any_active_connection()
-                logger.info(f"_has_extension_connection({port}): Fallback match = {connection is not None}")
+                connection = (
+                    await self.browser_service.browser_state.get_any_active_connection()
+                )
+                logger.info(
+                    f"_has_extension_connection({port}): Fallback match = {connection is not None}"
+                )
                 if connection:
-                    logger.info(f"_has_extension_connection({port}): Found active connection on port {connection.port}, is_active={connection.is_active}")
+                    logger.info(
+                        f"_has_extension_connection({port}): Found active connection on port {connection.port}, is_active={connection.is_active}"
+                    )
 
             result = connection is not None and connection.websocket is not None
             logger.info(f"_has_extension_connection({port}): Final result = {result}")

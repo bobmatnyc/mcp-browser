@@ -448,6 +448,33 @@ class BrowserMCPServer:
         dom_interaction = DOMInteractionService(browser_service=browser)
         browser.dom_interaction_service = dom_interaction
 
+        # Try to connect to running WebSocket daemon for extension communication
+        daemon_client = None
+        from .daemon import get_project_server
+
+        project_server = get_project_server(os.getcwd())
+        if project_server and project_server.get("port"):
+            from ...services.daemon_client import DaemonClient
+
+            daemon_port = project_server["port"]
+            daemon_client = DaemonClient(port=daemon_port)
+
+            # Try to connect (non-blocking)
+            try:
+                connected = await daemon_client.connect()
+                if connected:
+                    logger.info(
+                        f"MCP mode connected to WebSocket daemon on port {daemon_port}"
+                    )
+                else:
+                    logger.warning(
+                        "Failed to connect to daemon, extension commands will fall back to AppleScript"
+                    )
+                    daemon_client = None
+            except Exception as e:
+                logger.warning(f"Could not connect to daemon: {e}")
+                daemon_client = None
+
         # Create AppleScript service (macOS only)
         applescript = None
         if sys.platform == "darwin":
@@ -455,18 +482,18 @@ class BrowserMCPServer:
 
             applescript = AppleScriptService()
 
-        # Create BrowserController for fallback support
+        # Create BrowserController with daemon client or AppleScript fallback
         browser_controller = None
-        if applescript:
+        if daemon_client or applescript:
             from ...services.browser_controller import BrowserController
 
-            # Note: WebSocketService not available in MCP stdio mode
-            # BrowserController will use AppleScript fallback when port is None
+            # Pass daemon_client to BrowserController for extension communication
             browser_controller = BrowserController(
                 websocket_service=None,  # Not available in stdio mode
                 browser_service=browser,
                 applescript_service=applescript,
                 config=self.config,
+                daemon_client=daemon_client,  # New: relay commands via daemon
             )
 
         # Create capability detector
