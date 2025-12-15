@@ -360,6 +360,54 @@ class WebSocketService:
                 await self.send_message(websocket, server_info)
                 return
 
+            # Handle get_capabilities request
+            if message_type == "get_capabilities":
+                capabilities_response = {
+                    "type": "capabilities",
+                    "capabilities": [
+                        "console_capture",
+                        "dom_interaction",
+                        "screenshots",
+                    ],
+                    "controlMethod": "websocket",
+                }
+                await self.send_message(websocket, capabilities_response)
+                return
+
+            # Handle get_logs request
+            if message_type == "get_logs":
+                # Try to get logs from registered handler
+                handler = self._message_handlers.get("query_logs")
+                logs = []
+                count = 0
+
+                if handler:
+                    try:
+                        # Call handler to get logs
+                        # Handler should return list of ConsoleMessage objects
+                        port = data.get("port", self.port)
+                        # Support both lastN (camelCase from doctor test) and last_n (snake_case)
+                        last_n = data.get("lastN", data.get("last_n", 100))
+                        level_filter = data.get("level_filter")
+
+                        result = await handler(
+                            port=port, last_n=last_n, level_filter=level_filter
+                        )
+
+                        # Convert ConsoleMessage objects to dicts if needed
+                        if result:
+                            logs = [
+                                msg.to_dict() if hasattr(msg, "to_dict") else msg
+                                for msg in result
+                            ]
+                            count = len(logs)
+                    except Exception as e:
+                        logger.error(f"Error querying logs: {e}")
+
+                logs_response = {"type": "logs", "logs": logs, "count": count}
+                await self.send_message(websocket, logs_response)
+                return
+
             # Handle response messages from extension - broadcast back to other connections (CLI/MCP clients)
             response_messages = [
                 "content_extracted",

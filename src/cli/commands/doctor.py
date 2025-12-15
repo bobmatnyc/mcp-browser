@@ -65,9 +65,7 @@ def doctor(ctx, fix, verbose, no_start):
       • Extension package
       • Claude MCP integration
       • WebSocket connectivity
-      • Browser extension connection & tab URL
-      • Console log capture
-      • Browser control capabilities
+      • Browser extension connection
 
     \b
     Examples:

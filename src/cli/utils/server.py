@@ -265,6 +265,10 @@ class BrowserMCPServer:
             "semantic_dom_extracted", browser.handle_semantic_dom_extracted
         )
 
+        # Register query_logs handler for get_logs message type
+        # The websocket service will call this with extracted parameters
+        websocket.register_message_handler("query_logs", browser.query_logs)
+
         # Start WebSocket server
         self.websocket_port = await websocket.start()
         if not self.mcp_mode:
