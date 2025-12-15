@@ -62,20 +62,62 @@ def generate_build_info(extension_dir: Path) -> dict:
     }
 
 
+def update_manifest_version(extension_dir: Path, build_info: dict) -> str:
+    """Update manifest.json version to include build number.
+
+    Chrome allows 4-part versions: X.Y.Z.W
+    We use HHMM as the 4th component for the build number.
+
+    Args:
+        extension_dir: Path to the extension directory
+        build_info: Build information dictionary
+
+    Returns:
+        The new 4-part version string
+    """
+    manifest_file = extension_dir / "manifest.json"
+    if not manifest_file.exists():
+        return build_info["version"]
+
+    with open(manifest_file, "r") as f:
+        manifest = json.load(f)
+
+    # Extract HHMM from build number (format: YYYY.MM.DD.HHMM)
+    build_parts = build_info["build"].split(".")
+    hhmm = int(build_parts[3]) if len(build_parts) >= 4 else 0
+
+    # Get base version (first 3 parts)
+    base_version = manifest.get("version", "1.0.0")
+    version_parts = base_version.split(".")[:3]  # Take only first 3 parts
+
+    # Create 4-part version: X.Y.Z.HHMM
+    new_version = ".".join(version_parts + [str(hhmm)])
+    manifest["version"] = new_version
+
+    with open(manifest_file, "w") as f:
+        json.dump(manifest, f, indent=2)
+
+    return new_version
+
+
 def write_build_info(extension_dir: Path, build_info: dict) -> None:
-    """Write build-info.json to the extension directory.
+    """Write build-info.json and update manifest.json version.
 
     Args:
         extension_dir: Path to the extension directory
         build_info: Build information dictionary
     """
+    # Update manifest.json with 4-part version
+    manifest_version = update_manifest_version(extension_dir, build_info)
+
+    # Write build-info.json
     build_info_file = extension_dir / "build-info.json"
 
     with open(build_info_file, "w") as f:
         json.dump(build_info, f, indent=2)
 
     print(f"✓ Generated {build_info_file}")
-    print(f"  Version: {build_info['version']}")
+    print(f"  Version: {manifest_version}")
     print(f"  Build: {build_info['build']}")
     print(f"  Deployed: {build_info['deployed']}")
 
