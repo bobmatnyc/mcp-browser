@@ -244,7 +244,7 @@ async function updateBackendList(status) {
 
       item.innerHTML = `
         <div class="backend-info">
-          <div class="backend-name">${server.projectName || 'Unknown Project'}</div>
+          <div class="backend-name" title="${server.projectPath || 'No path specified'}">${server.projectName || 'Unknown Project'}</div>
           <div class="backend-port">Port ${server.port}</div>
         </div>
         <button class="backend-connect-btn" data-port="${server.port}">Connect</button>

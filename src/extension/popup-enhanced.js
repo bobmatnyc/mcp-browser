@@ -113,9 +113,9 @@ function showServers(servers) {
     item.innerHTML = `
       <div style="display: flex; align-items: center; margin-bottom: 4px;">
         <span class="server-port">${server.port}</span>
-        <span class="server-project">${server.projectName}</span>
+        <span class="server-project" title="${server.projectPath || 'No path specified'}">${server.projectName}</span>
       </div>
-      <div class="server-path">${server.projectPath || 'No path specified'}</div>
+      <div class="server-path" title="${server.projectPath || 'No path specified'}">${server.projectPath || 'No path specified'}</div>
     `;
 
     item.onclick = () => connectToServer(server);
