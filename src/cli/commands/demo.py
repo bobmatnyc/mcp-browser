@@ -460,9 +460,11 @@ async def _step_content_extraction(port: int):
                         continue
 
                     if data.get("type") == "content_extracted":
-                        content = data.get("content", data)
+                        # Response structure: data.response.content
+                        response = data.get("response", data)
+                        content = response.get("content", response)
                         title = content.get("title", "No title")
-                        text = content.get("textContent", "")
+                        text = content.get("content", content.get("textContent", ""))
                         excerpt = content.get("excerpt", "")
 
                         # Truncate text for display
@@ -514,7 +516,9 @@ async def _step_content_extraction(port: int):
                         continue
 
                     if data.get("type") == "semantic_dom_extracted":
-                        semantic = data.get("semantic", data)
+                        # Response structure: data.response.dom
+                        response = data.get("response", data)
+                        semantic = response.get("dom", response)
                         headings = semantic.get("headings", [])
                         links = semantic.get("links", [])
                         forms = semantic.get("forms", [])
