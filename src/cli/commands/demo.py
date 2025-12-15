@@ -62,6 +62,7 @@ async def _demo_command(skip_checks: bool):
             "  • Verifying your extension connection\n"
             "  • Navigating to a webpage\n"
             "  • Capturing console logs\n"
+            "  • Extracting page content\n"
             "  • Interacting with page elements\n"
             "  • Executing JavaScript code\n\n"
             "[dim]Press Ctrl+C at any time to exit.[/dim]",
@@ -109,11 +110,15 @@ async def _demo_command(skip_checks: bool):
     await _step_console_logs(port)
     _wait_for_continue()
 
-    # Step 4: DOM Interaction (if possible)
+    # Step 4: Content Extraction
+    await _step_content_extraction(port)
+    _wait_for_continue()
+
+    # Step 5: DOM Interaction (if possible)
     await _step_dom_interaction(port)
     _wait_for_continue()
 
-    # Step 5: Summary
+    # Step 6: Summary
     _show_summary()
 
 
@@ -138,17 +143,13 @@ async def _check_prerequisites() -> tuple[bool, Optional[int]]:
         await asyncio.sleep(1)
         return True, port
     else:
-        console.print(
-            f"[green]✓ Server running on port {existing_port}[/green]"
-        )
+        console.print(f"[green]✓ Server running on port {existing_port}[/green]")
         return True, existing_port
 
 
 def _wait_for_continue():
     """Wait for user to press Enter to continue."""
-    console.print(
-        "\n[dim][Press Enter to continue, or Ctrl+C to exit][/dim]", end=""
-    )
+    console.print("\n[dim][Press Enter to continue, or Ctrl+C to exit][/dim]", end="")
     try:
         input()
     except KeyboardInterrupt:
@@ -161,14 +162,13 @@ def _print_step_header(step_num: int, total: int, title: str):
     """Print a step header."""
     console.print(
         "\n" + "━" * 60 + "\n"
-        f"  [bold cyan]Step {step_num} of {total}: {title}[/bold cyan]\n"
-        + "━" * 60
+        f"  [bold cyan]Step {step_num} of {total}: {title}[/bold cyan]\n" + "━" * 60
     )
 
 
 async def _step_verify_connection(port: int):
     """Step 1: Verify extension connection."""
-    _print_step_header(1, 5, "Verify Connection")
+    _print_step_header(1, 6, "Verify Connection")
 
     console.print("\n[cyan]Connecting to server...[/cyan]")
 
@@ -228,28 +228,36 @@ async def _step_verify_connection(port: int):
         await client.disconnect()
 
 
-async def _step_navigate(port: int):
-    """Step 2: Navigate to demo page."""
-    _print_step_header(2, 5, "Navigate to Demo Page")
+async def _step_navigate(port: int) -> str:
+    """Step 2: Navigate to demo page.
 
-    console.print(
-        "\n[cyan]Let's navigate to a demo page that showcases console logging.[/cyan]\n"
-    )
+    Returns:
+        The URL navigated to
+    """
+    _print_step_header(2, 6, "Navigate to Demo Page")
 
-    # Ask user for URL or use default
-    use_default = (
-        Prompt.ask(
-            "Use default demo page (example.com)?",
-            choices=["y", "n"],
-            default="y",
-        )
-        == "y"
-    )
+    console.print("\n[cyan]Choose a demo page to explore:[/cyan]\n")
 
-    if use_default:
-        url = "https://example.com"
-    else:
+    # Present URL choices
+    console.print("  [1] httpbin.org/forms/post - Form with multiple inputs")
+    console.print("  [2] the-internet.herokuapp.com - Interactive testing site")
+    console.print("  [3] Enter your own URL")
+    console.print("  [4] Stay on current page")
+
+    choice = Prompt.ask("\nSelect option", choices=["1", "2", "3", "4"], default="1")
+
+    url_map = {
+        "1": "https://httpbin.org/forms/post",
+        "2": "https://the-internet.herokuapp.com/",
+    }
+
+    if choice == "4":
+        console.print("\n[cyan]Staying on current page[/cyan]")
+        return None  # Stay on current page
+    elif choice == "3":
         url = Prompt.ask("Enter URL to navigate to", default="https://example.com")
+    else:
+        url = url_map[choice]
 
     client = BrowserClient(port=port)
     if not await client.connect():
@@ -276,6 +284,7 @@ async def _step_navigate(port: int):
                     border_style="green",
                 )
             )
+            return url
         else:
             console.print(
                 Panel(
@@ -284,6 +293,7 @@ async def _step_navigate(port: int):
                     border_style="red",
                 )
             )
+            return None
 
     finally:
         await client.disconnect()
@@ -291,7 +301,7 @@ async def _step_navigate(port: int):
 
 async def _step_console_logs(port: int):
     """Step 3: Console log capture demonstration."""
-    _print_step_header(3, 5, "Console Log Capture")
+    _print_step_header(3, 6, "Console Log Capture")
 
     console.print(
         "\n[cyan]Now let's generate some console logs and capture them.[/cyan]\n"
@@ -380,9 +390,7 @@ async def _step_console_logs(port: int):
 
             console.print()
             console.print(table)
-            console.print(
-                f"\n[green]✓ Captured {len(logs)} console logs[/green]"
-            )
+            console.print(f"\n[green]✓ Captured {len(logs)} console logs[/green]")
         else:
             console.print(
                 Panel(
@@ -400,13 +408,177 @@ async def _step_console_logs(port: int):
         await client.disconnect()
 
 
-async def _step_dom_interaction(port: int):
-    """Step 4: DOM interaction demonstration."""
-    _print_step_header(4, 5, "DOM Interaction")
+async def _step_content_extraction(port: int):
+    """Step 4: Content extraction demonstration."""
+    _print_step_header(4, 6, "Content Extraction")
 
     console.print(
-        "\n[cyan]MCP Browser can also interact with page elements.[/cyan]\n"
+        "\n[cyan]MCP Browser can extract page content in multiple ways.[/cyan]\n"
     )
+
+    # Present extraction mode choices
+    console.print("Choose extraction mode:")
+    console.print("  [1] Readable content - Main text/article (Readability)")
+    console.print("  [2] Semantic DOM - Structure (headings, links, forms)")
+    console.print("  [3] Both")
+    console.print("  [4] Skip this step")
+
+    choice = Prompt.ask("\nSelect option", choices=["1", "2", "3", "4"], default="1")
+
+    if choice == "4":
+        console.print("\n[dim]Skipping content extraction[/dim]")
+        return
+
+    client = BrowserClient(port=port)
+    if not await client.connect():
+        sys.exit(1)
+
+    try:
+        # Extract readable content
+        if choice in ["1", "3"]:
+            console.print("\n[cyan]→ Extracting readable content...[/cyan]")
+
+            request_id = f"demo_extract_{int(time.time() * 1000)}"
+            await client.websocket.send(
+                json.dumps(
+                    {
+                        "type": "extract_content",
+                        "requestId": request_id,
+                    }
+                )
+            )
+
+            # Wait for response
+            try:
+                for _ in range(5):
+                    response = await asyncio.wait_for(
+                        client.websocket.recv(), timeout=3.0
+                    )
+                    data = json.loads(response)
+
+                    if data.get("type") in ("connection_ack", "server_info_response"):
+                        continue
+
+                    if data.get("type") == "content":
+                        content = data.get("content", {})
+                        title = content.get("title", "No title")
+                        text = content.get("textContent", "")
+                        excerpt = content.get("excerpt", "")
+
+                        # Truncate text for display
+                        display_text = excerpt if excerpt else text[:500]
+                        if len(text) > 500 and not excerpt:
+                            display_text += "..."
+
+                        console.print(
+                            Panel(
+                                f"[bold]Title:[/bold] {title}\n\n"
+                                f"[bold]Content:[/bold]\n{display_text}",
+                                title="Readable Content",
+                                border_style="green",
+                            )
+                        )
+                        break
+            except asyncio.TimeoutError:
+                console.print(
+                    "[yellow]⚠ Timeout waiting for content extraction[/yellow]"
+                )
+
+        # Extract semantic DOM
+        if choice in ["2", "3"]:
+            console.print("\n[cyan]→ Extracting semantic DOM...[/cyan]")
+
+            request_id = f"demo_semantic_{int(time.time() * 1000)}"
+            await client.websocket.send(
+                json.dumps(
+                    {
+                        "type": "extract_semantic_dom",
+                        "requestId": request_id,
+                        "include_headings": True,
+                        "include_links": True,
+                        "include_forms": True,
+                        "include_landmarks": True,
+                    }
+                )
+            )
+
+            # Wait for response
+            try:
+                for _ in range(5):
+                    response = await asyncio.wait_for(
+                        client.websocket.recv(), timeout=3.0
+                    )
+                    data = json.loads(response)
+
+                    if data.get("type") in ("connection_ack", "server_info_response"):
+                        continue
+
+                    if data.get("type") == "semantic_dom":
+                        semantic = data.get("semantic", {})
+                        headings = semantic.get("headings", [])
+                        links = semantic.get("links", [])
+                        forms = semantic.get("forms", [])
+                        landmarks = semantic.get("landmarks", [])
+
+                        # Build summary
+                        summary_parts = []
+                        if headings:
+                            summary_parts.append(
+                                f"[cyan]Headings:[/cyan] {len(headings)}"
+                            )
+                        if links:
+                            summary_parts.append(f"[cyan]Links:[/cyan] {len(links)}")
+                        if forms:
+                            summary_parts.append(f"[cyan]Forms:[/cyan] {len(forms)}")
+                        if landmarks:
+                            summary_parts.append(
+                                f"[cyan]Landmarks:[/cyan] {len(landmarks)}"
+                            )
+
+                        # Show sample headings
+                        headings_text = ""
+                        if headings:
+                            headings_text = "\n\n[bold]Sample Headings:[/bold]\n"
+                            for h in headings[:5]:
+                                level = h.get("level", "h1")
+                                text = h.get("text", "")[:50]
+                                headings_text += f"  {level}: {text}\n"
+
+                        # Show sample links
+                        links_text = ""
+                        if links:
+                            links_text = "\n[bold]Sample Links:[/bold]\n"
+                            for link in links[:5]:
+                                text = link.get("text", "")[:40]
+                                href = link.get("href", "")[:40]
+                                links_text += f"  {text} → {href}\n"
+
+                        console.print(
+                            Panel(
+                                " • ".join(summary_parts) + headings_text + links_text,
+                                title="Semantic DOM Structure",
+                                border_style="blue",
+                            )
+                        )
+                        break
+            except asyncio.TimeoutError:
+                console.print(
+                    "[yellow]⚠ Timeout waiting for semantic DOM extraction[/yellow]"
+                )
+
+    finally:
+        await client.disconnect()
+
+
+async def _step_dom_interaction(port: int) -> Optional[str]:
+    """Step 5: DOM interaction demonstration.
+
+    Returns:
+        The current URL if detected
+    """
+    _print_step_header(5, 6, "DOM Interaction")
+
+    console.print("\n[cyan]MCP Browser can also interact with page elements.[/cyan]\n")
 
     console.print(
         Panel(
@@ -416,64 +588,139 @@ async def _step_dom_interaction(port: int):
             "  • [cyan]Submit forms[/cyan] - Submit form data\n"
             "  • [cyan]Get element info[/cyan] - Retrieve element properties\n"
             "  • [cyan]Wait for elements[/cyan] - Wait for elements to appear\n"
-            "  • [cyan]Select options[/cyan] - Choose from dropdown menus\n\n"
-            "[dim]To try these features, navigate to a page with forms and elements.[/dim]",
+            "  • [cyan]Select options[/cyan] - Choose from dropdown menus",
             title="DOM Control Features",
             border_style="blue",
         )
     )
+
+    # Ask user if they want to try DOM interaction
+    console.print("\n[cyan]Would you like to try a DOM interaction demo?[/cyan]")
+    console.print("  [1] Yes - Demo form filling (httpbin forms)")
+    console.print("  [2] Yes - Demo element inspection")
+    console.print("  [3] No - Skip this step")
+
+    choice = Prompt.ask("\nSelect option", choices=["1", "2", "3"], default="2")
+
+    if choice == "3":
+        console.print("\n[dim]Skipping DOM interaction[/dim]")
+        return None
 
     client = BrowserClient(port=port)
     if not await client.connect():
         sys.exit(1)
 
     try:
-        # Try to get element info from current page
-        console.print("\n[cyan]→ Inspecting page structure...[/cyan]")
-
-        request_id = f"demo_element_{int(time.time() * 1000)}"
-        await client.websocket.send(
-            json.dumps(
-                {
-                    "type": "get_element",
-                    "requestId": request_id,
-                    "selector": "h1",  # Try to find an h1 element
-                }
-            )
-        )
-
-        # Wait for response
-        element_found = False
-        try:
-            for _ in range(3):
-                response = await asyncio.wait_for(client.websocket.recv(), timeout=2.0)
-                data = json.loads(response)
-
-                if data.get("type") in ("connection_ack", "server_info_response"):
-                    continue
-
-                if data.get("type") == "element_info":
-                    element_found = True
-                    element_text = data.get("text", "")
-                    console.print(
-                        f"[green]✓ Found page heading: [/green][cyan]{element_text[:50]}[/cyan]"
-                    )
-                    break
-        except asyncio.TimeoutError:
-            pass
-
-        if not element_found:
+        if choice == "1":
+            # Demo form filling
+            console.print("\n[cyan]→ Demonstrating form filling...[/cyan]")
             console.print(
-                "[dim]Page inspection completed (no h1 element found)[/dim]"
+                "[dim]Note: This works best on httpbin.org/forms/post[/dim]\n"
             )
+
+            # Try to fill a form field
+            request_id = f"demo_fill_{int(time.time() * 1000)}"
+            await client.websocket.send(
+                json.dumps(
+                    {
+                        "type": "fill_field",
+                        "requestId": request_id,
+                        "selector": 'input[name="custname"]',
+                        "value": "MCP Browser Demo User",
+                    }
+                )
+            )
+
+            # Wait for response
+            try:
+                for _ in range(3):
+                    response = await asyncio.wait_for(
+                        client.websocket.recv(), timeout=2.0
+                    )
+                    data = json.loads(response)
+
+                    if data.get("type") in ("connection_ack", "server_info_response"):
+                        continue
+
+                    if data.get("type") == "fill_result":
+                        success = data.get("success", False)
+                        if success:
+                            console.print(
+                                Panel(
+                                    "[green]✓ Form field filled successfully![/green]\n\n"
+                                    "Filled customer name field with 'MCP Browser Demo User'",
+                                    title="Form Interaction",
+                                    border_style="green",
+                                )
+                            )
+                        else:
+                            error = data.get("error", "Unknown error")
+                            console.print(
+                                f"[yellow]⚠ Could not fill form: {error}[/yellow]\n"
+                                "[dim]Make sure you're on httpbin.org/forms/post[/dim]"
+                            )
+                        break
+            except asyncio.TimeoutError:
+                console.print(
+                    "[yellow]⚠ Timeout waiting for form fill response[/yellow]"
+                )
+
+        else:
+            # Demo element inspection
+            console.print("\n[cyan]→ Inspecting page structure...[/cyan]")
+
+            request_id = f"demo_element_{int(time.time() * 1000)}"
+            await client.websocket.send(
+                json.dumps(
+                    {
+                        "type": "get_element",
+                        "requestId": request_id,
+                        "selector": "h1",
+                    }
+                )
+            )
+
+            # Wait for response
+            element_found = False
+            try:
+                for _ in range(3):
+                    response = await asyncio.wait_for(
+                        client.websocket.recv(), timeout=2.0
+                    )
+                    data = json.loads(response)
+
+                    if data.get("type") in ("connection_ack", "server_info_response"):
+                        continue
+
+                    if data.get("type") == "element_info":
+                        element_found = True
+                        element_text = data.get("text", "")
+                        tag_name = data.get("tagName", "h1")
+                        console.print(
+                            Panel(
+                                f"[green]✓ Found page element![/green]\n\n"
+                                f"Tag: [cyan]{tag_name}[/cyan]\n"
+                                f"Text: [cyan]{element_text[:80]}[/cyan]",
+                                title="Element Info",
+                                border_style="green",
+                            )
+                        )
+                        break
+            except asyncio.TimeoutError:
+                pass
+
+            if not element_found:
+                console.print("[yellow]⚠ No h1 element found on current page[/yellow]")
 
     finally:
         await client.disconnect()
 
+    return None
+
 
 def _show_summary():
-    """Step 5: Show summary and next steps."""
-    _print_step_header(5, 5, "Demo Complete!")
+    """Step 6: Show summary and next steps."""
+    _print_step_header(6, 6, "Demo Complete!")
 
     console.print(
         Panel.fit(
@@ -483,6 +730,7 @@ def _show_summary():
             "  ✓ Verifying server and extension connection\n"
             "  ✓ Navigating to web pages programmatically\n"
             "  ✓ Capturing and viewing console logs\n"
+            "  ✓ Extracting page content (readable & semantic)\n"
             "  ✓ Interacting with DOM elements\n\n"
             "[bold cyan]Useful next commands:[/bold cyan]\n"
             "  • [cyan]mcp-browser status[/cyan] - Check current status\n"
