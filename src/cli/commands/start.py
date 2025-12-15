@@ -66,6 +66,10 @@ def start(ctx, port, background, daemon):
 
     # Handle background mode
     if background:
+        # Clean up any unregistered/orphaned servers first (keeps registered ones)
+        from ..utils.daemon import cleanup_unregistered_servers
+        cleanup_unregistered_servers()
+
         # Check if server already running for this project
         is_running, existing_pid, existing_port = get_server_status()
 

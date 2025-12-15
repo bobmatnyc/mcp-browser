@@ -211,7 +211,10 @@ def cleanup_stale_servers() -> int:
                     )
                     if proc_result.returncode == 0:
                         cmd = proc_result.stdout.lower()
-                        if "mcp-browser" in cmd or "mcp_browser" in cmd:
+                        # Check for mcp-browser package name OR module-based server start
+                        is_mcp_browser = "mcp-browser" in cmd or "mcp_browser" in cmd
+                        is_module_server = "src.cli.main" in cmd and "start" in cmd
+                        if is_mcp_browser or is_module_server:
                             # Kill the process
                             os.kill(pid, 15)  # SIGTERM
                             time.sleep(0.3)
@@ -227,6 +230,59 @@ def cleanup_stale_servers() -> int:
 
     # Clear the registry after cleanup
     save_server_registry({"servers": []})
+
+    return killed
+
+
+def cleanup_unregistered_servers() -> int:
+    """Kill mcp-browser processes that are NOT in the registry.
+
+    This is useful for cleaning up orphaned processes without
+    affecting legitimate registered servers.
+
+    Returns:
+        Number of processes killed
+    """
+    killed = 0
+    registry = read_service_registry()
+    registered_pids = {s.get("pid") for s in registry.get("servers", [])}
+
+    # Find all processes listening on our port range
+    for port in range(PORT_RANGE_START, PORT_RANGE_END + 1):
+        try:
+            result = subprocess.run(
+                ["lsof", "-ti", f":{port}"], capture_output=True, text=True, timeout=2
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                pid_str = result.stdout.strip().split()[0]
+                pid = int(pid_str)
+
+                # Skip if this process is registered
+                if pid in registered_pids:
+                    continue
+
+                # Check if it's an mcp-browser process
+                try:
+                    proc_result = subprocess.run(
+                        ["ps", "-p", str(pid), "-o", "command="],
+                        capture_output=True,
+                        text=True,
+                        timeout=2,
+                    )
+                    if proc_result.returncode == 0:
+                        cmd = proc_result.stdout.lower()
+                        is_mcp_browser = "mcp-browser" in cmd or "mcp_browser" in cmd
+                        is_module_server = "src.cli.main" in cmd and "start" in cmd
+                        if is_mcp_browser or is_module_server:
+                            os.kill(pid, 15)  # SIGTERM
+                            time.sleep(0.3)
+                            if is_process_running(pid):
+                                os.kill(pid, 9)  # SIGKILL
+                            killed += 1
+                except (subprocess.TimeoutExpired, subprocess.SubprocessError):
+                    pass
+        except (subprocess.TimeoutExpired, subprocess.SubprocessError, ValueError):
+            pass
 
     return killed
 
