@@ -570,7 +570,10 @@ async def _check_console_log_capture() -> dict:
                         data = json.loads(response)
 
                         # Skip connection_ack and other handshake messages
-                        if data.get("type") in ("connection_ack", "server_info_response"):
+                        if data.get("type") in (
+                            "connection_ack",
+                            "server_info_response",
+                        ):
                             continue
 
                         if data.get("type") == "logs":
@@ -669,11 +672,16 @@ async def _check_browser_control() -> dict:
                         data = json.loads(response)
 
                         # Skip connection_ack and other handshake messages
-                        if data.get("type") in ("connection_ack", "server_info_response"):
+                        if data.get("type") in (
+                            "connection_ack",
+                            "server_info_response",
+                        ):
                             continue
 
                         if data.get("type") == "capabilities":
-                            return data.get("capabilities", []), data.get("controlMethod")
+                            return data.get("capabilities", []), data.get(
+                                "controlMethod"
+                            )
                         elif data.get("type") == "error":
                             return [], None
 

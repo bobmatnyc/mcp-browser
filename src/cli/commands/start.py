@@ -68,6 +68,7 @@ def start(ctx, port, background, daemon):
     if background:
         # Clean up any unregistered/orphaned servers first (keeps registered ones)
         from ..utils.daemon import cleanup_unregistered_servers
+
         cleanup_unregistered_servers()
 
         # Check if server already running for this project
