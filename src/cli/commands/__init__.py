@@ -2,7 +2,6 @@
 
 from .browser import browser
 from .connect import connect
-from .dashboard import dashboard
 from .doctor import doctor
 from .extension import extension
 from .init import init
@@ -20,7 +19,6 @@ __all__ = [
     "stop",
     "status",
     "doctor",
-    "dashboard",
     "tutorial",
     "quickstart",
     "setup",

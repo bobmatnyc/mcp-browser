@@ -229,10 +229,8 @@ def install(local: bool, force: bool):
                 "2. Enable [cyan]Developer mode[/cyan] (top-right toggle)\n"
                 "3. Click [cyan]Load unpacked[/cyan]\n"
                 f"4. Select: [cyan]{destination}[/cyan]\n\n"
-                "[bold]Or use the dashboard:[/bold]\n"
-                "1. Start server: [cyan]mcp-browser start[/cyan]\n"
-                "2. Open: [cyan]http://localhost:8080[/cyan]\n"
-                "3. Click [cyan]Install Extension[/cyan] button",
+                "[bold]Start the server:[/bold]\n"
+                "  [cyan]mcp-browser start[/cyan]",
                 title="Success",
                 border_style="green",
             )

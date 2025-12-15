@@ -168,7 +168,7 @@ def quickstart(ctx):
 
     if Confirm.ask("\nStart the MCP Browser server now?"):
         console.print("\n[green]✨ Setup complete![/green]")
-        console.print("\nStarting server with dashboard...")
+        console.print("\nStarting server...")
         console.print("[dim]Press Ctrl+C to stop the server[/dim]\n")
 
         # Import here to avoid circular dependency
@@ -179,15 +179,12 @@ def quickstart(ctx):
         server = BrowserMCPServer(config=config, mcp_mode=False)
 
         try:
-            asyncio.run(server.run_server_with_dashboard())
+            asyncio.run(server.run_server())
         except KeyboardInterrupt:
             console.print("\n[yellow]Server stopped by user[/yellow]")
     else:
         console.print("\n[green]✨ Setup complete![/green]")
         console.print("\n[bold]Next steps:[/bold]")
         console.print("  1. Run [cyan]mcp-browser start[/cyan] to start the server")
-        console.print(
-            "  2. Open [link=http://localhost:8080]http://localhost:8080[/link] in your browser"
-        )
-        console.print("  3. Install the Chrome extension from the dashboard")
-        console.print("  4. Configure Claude Code to use MCP Browser")
+        console.print("  2. Load Chrome extension from mcp-browser-extensions/chrome/")
+        console.print("  3. Configure Claude Code to use MCP Browser")

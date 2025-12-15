@@ -18,7 +18,6 @@ from ...services import (
     StorageService,
     WebSocketService,
 )
-from ...services.dashboard_service import DashboardService
 from ...services.dom_interaction_service import DOMInteractionService
 from ...services.storage_service import StorageConfig
 from .validation import CONFIG_FILE, DATA_DIR, LOG_DIR
@@ -197,19 +196,6 @@ class BrowserMCPServer:
             )
 
         self.container.register("mcp_service", create_mcp_service)
-
-        # Register dashboard service with dependencies
-        async def create_dashboard_service(c):
-            websocket = await c.get("websocket_service")
-            browser = await c.get("browser_service")
-            storage = await c.get("storage_service")
-            return DashboardService(
-                websocket_service=websocket,
-                browser_service=browser,
-                storage_service=storage,
-            )
-
-        self.container.register("dashboard_service", create_dashboard_service)
 
         # Register AppleScript service (macOS only)
         if sys.platform == "darwin":
@@ -494,29 +480,3 @@ class BrowserMCPServer:
 
             traceback.print_exc(file=sys.stderr)
 
-    async def run_server_with_dashboard(self) -> None:
-        """Run the server with dashboard enabled."""
-        await self.start()
-
-        # Start dashboard service
-        try:
-            dashboard = await self.container.get("dashboard_service")
-            await dashboard.start(port=8080)
-            if not self.mcp_mode:
-                logger.info("Dashboard available at http://localhost:8080")
-        except Exception as e:
-            logger.error(f"Failed to start dashboard: {e}")
-
-        # Keep running until interrupted
-        try:
-            while self.running:
-                await asyncio.sleep(1)
-        except asyncio.CancelledError:
-            pass
-        finally:
-            try:
-                dashboard = await self.container.get("dashboard_service")
-                await dashboard.stop()
-            except Exception:
-                pass
-            await self.stop()

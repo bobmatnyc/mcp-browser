@@ -17,7 +17,6 @@ from .._version import __version__
 from .commands import (
     browser,
     connect,
-    dashboard,
     doctor,
     extension,
     init,
@@ -57,7 +56,7 @@ def cli(ctx, version, debug, config):
     Quick Start:
       1. Run 'mcp-browser quickstart' for interactive setup
       2. Or manually: 'mcp-browser init' then 'mcp-browser start'
-      3. Install Chrome extension from the dashboard
+      3. Install Chrome extension manually or use extension command
 
     \b
     For detailed help on any command, use:
@@ -180,11 +179,10 @@ def reference():
   [cyan]quickstart[/cyan]  - Interactive setup wizard
   [cyan]setup[/cyan]       - Complete installation (config + MCP + extension)
   [cyan]init[/cyan]        - Initialize extension
-  [cyan]start[/cyan]       - Start server + dashboard
+  [cyan]start[/cyan]       - Start server
   [cyan]stop[/cyan]        - Stop server for current project
   [cyan]status[/cyan]      - Check installation status
   [cyan]doctor[/cyan]      - Diagnose & fix issues
-  [cyan]dashboard[/cyan]   - Run dashboard only
   [cyan]tutorial[/cyan]    - Interactive tutorial
   [cyan]install[/cyan]     - Install MCP config for Claude
   [cyan]uninstall[/cyan]   - Remove MCP config from Claude
@@ -195,7 +193,7 @@ def reference():
 [bold]Quick Start:[/bold]
   1. pip install mcp-browser
   2. mcp-browser quickstart
-  3. Install Chrome extension from dashboard
+  3. Install Chrome extension using extension command
 
 [bold]Common Options:[/bold]
   --help         Show help for any command
@@ -204,13 +202,10 @@ def reference():
 
 [bold]Start Options:[/bold]
   --port 8880           Specific WebSocket port
-  --no-dashboard        Skip dashboard
-  --dashboard-port 3000 Custom dashboard port
 
 [bold]Chrome Extension:[/bold]
   • Start server: mcp-browser start
-  • Open: http://localhost:8080
-  • Click "Install Extension"
+  • Load extension from mcp-browser-extensions/chrome/
 
 [bold]Browser Testing Commands:[/bold]
   mcp-browser browser navigate <url>
@@ -235,8 +230,7 @@ def reference():
   mcp-browser status        Check status
 
 [bold]Port Ranges:[/bold]
-  WebSocket: 8875-8895 (auto-select)
-  Dashboard: 8080 (default)
+  WebSocket: 8851-8899 (auto-select)
 
 [bold]Get Help:[/bold]
   mcp-browser COMMAND --help
@@ -285,7 +279,7 @@ def completion(shell):
     bash_completion = """
 _mcp_browser_completions() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
-    local commands="quickstart init start stop status doctor dashboard tutorial install uninstall extension browser mcp version completion --help --version"
+    local commands="quickstart init start stop status doctor tutorial install uninstall extension browser mcp version completion --help --version"
     COMPREPLY=( $(compgen -W "${commands}" -- ${cur}) )
 }
 complete -F _mcp_browser_completions mcp-browser
@@ -301,7 +295,6 @@ _mcp_browser() {
         'stop:Stop server for current project'
         'status:Show status'
         'doctor:Diagnose issues'
-        'dashboard:Run dashboard'
         'tutorial:Interactive tutorial'
         'install:Install MCP config for Claude'
         'uninstall:Remove MCP config from Claude'
@@ -322,7 +315,6 @@ complete -c mcp-browser -n "__fish_use_subcommand" -a start -d "Start server"
 complete -c mcp-browser -n "__fish_use_subcommand" -a stop -d "Stop server for current project"
 complete -c mcp-browser -n "__fish_use_subcommand" -a status -d "Show status"
 complete -c mcp-browser -n "__fish_use_subcommand" -a doctor -d "Diagnose issues"
-complete -c mcp-browser -n "__fish_use_subcommand" -a dashboard -d "Run dashboard"
 complete -c mcp-browser -n "__fish_use_subcommand" -a tutorial -d "Interactive tutorial"
 complete -c mcp-browser -n "__fish_use_subcommand" -a install -d "Install MCP config for Claude"
 complete -c mcp-browser -n "__fish_use_subcommand" -a uninstall -d "Remove MCP config from Claude"
@@ -357,7 +349,6 @@ cli.add_command(start)
 cli.add_command(stop)
 cli.add_command(status)
 cli.add_command(doctor)
-cli.add_command(dashboard)
 cli.add_command(tutorial)
 cli.add_command(install)
 cli.add_command(uninstall)

@@ -340,7 +340,7 @@ def click_element(selector: str, port: int):
     Examples:
       mcp-browser browser control click "#submit-button"
       mcp-browser browser control click "button.login"
-      mcp-browser browser control click "a[href='/dashboard']"
+      mcp-browser browser control click "a[href='/home']"
     """
     asyncio.run(_click_command(selector, port))
 

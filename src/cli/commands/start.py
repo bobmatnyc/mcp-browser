@@ -25,39 +25,30 @@ from ..utils.daemon import (
     type=int,
     help="WebSocket port (default: auto 8851-8899)",
 )
-@click.option(
-    "--dashboard/--no-dashboard", default=True, help="Enable/disable dashboard"
-)
-@click.option(
-    "--dashboard-port", default=8080, type=int, help="Dashboard port (default: 8080)"
-)
 @click.option("--background", "-b", is_flag=True, help="Run server in background")
 @click.option(
     "--daemon", is_flag=True, hidden=True, help="Run as daemon (internal use)"
 )
 @click.pass_context
-def start(ctx, port, dashboard, dashboard_port, background, daemon):
+def start(ctx, port, background, daemon):
     """🚀 Start the MCP Browser server.
 
     \b
-    Starts the MCP Browser server with WebSocket listener and optional dashboard.
+    Starts the MCP Browser server with WebSocket listener.
     The server will:
       • Listen for browser connections on WebSocket (ports 8851-8899)
       • Store console logs with automatic rotation
       • Provide MCP tools for Claude Code
-      • Serve dashboard for monitoring (if enabled)
 
     \b
     Examples:
       mcp-browser start                    # Start with defaults
-      mcp-browser start --no-dashboard     # Start without dashboard
       mcp-browser start --port 8880        # Use specific port
       mcp-browser start --background       # Run in background
 
     \b
     Default settings:
       WebSocket: Auto-select from ports 8851-8899
-      Dashboard: http://localhost:8080
       Data storage: ~/.mcp-browser/data/ or ./.mcp-browser/data/
       Log rotation: 50MB per file, 7-day retention
 
@@ -148,7 +139,6 @@ def start(ctx, port, dashboard, dashboard_port, background, daemon):
             Panel.fit(
                 f"[bold green]Starting MCP Browser Server v{__version__}[/bold green]\n\n"
                 f"WebSocket: Ports {config.get('websocket', {}).get('port_range', [8851, 8899]) if config else [8851, 8899]}\n"
-                f"Dashboard: {'Enabled' if dashboard else 'Disabled'} (port {dashboard_port})\n"
                 f"Data: {DATA_DIR}\n"
                 f"Project: {project_path}",
                 title="Server Starting",
@@ -174,10 +164,7 @@ def start(ctx, port, dashboard, dashboard_port, background, daemon):
     signal.signal(signal.SIGTERM, signal_handler)
 
     try:
-        if dashboard:
-            asyncio.run(server.run_server_with_dashboard())
-        else:
-            asyncio.run(server.run_server())
+        asyncio.run(server.run_server())
     except KeyboardInterrupt:
         if not daemon:
             console.print("\n[yellow]Server stopped by user[/yellow]")

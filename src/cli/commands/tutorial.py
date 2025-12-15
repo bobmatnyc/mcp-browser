@@ -54,14 +54,12 @@ Start the MCP Browser server:
 $ mcp-browser start
 
 This will:
-• Start WebSocket server (auto-selects port 8875-8895)
-• Launch dashboard at http://localhost:8080
+• Start WebSocket server (auto-selects port 8851-8899)
 • Begin listening for browser connections
 
 Options:
-• --no-dashboard: Skip dashboard
 • --port 8880: Use specific WebSocket port
-• --debug: Enable debug logging
+• --background: Run in background
 """,
     },
     {
@@ -69,16 +67,14 @@ Options:
         "content": """
 Install the Chrome extension:
 
-1. Start the server: `mcp-browser start`
-2. Open dashboard: http://localhost:8080
-3. Click "Install Extension" button
-4. Or manually:
-   a. Open Chrome Extensions (chrome://extensions)
-   b. Enable "Developer mode"
-   c. Click "Load unpacked"
-   d. Select mcp-browser-extensions/chrome folder
-
-5. Verify connection in extension popup (puzzle icon)
+1. Initialize extension: `mcp-browser init`
+2. This creates mcp-browser-extensions/chrome folder
+3. Open Chrome Extensions (chrome://extensions)
+4. Enable "Developer mode"
+5. Click "Load unpacked"
+6. Select mcp-browser-extensions/chrome folder
+7. Start the server: `mcp-browser start`
+8. Verify connection in extension popup (puzzle icon)
 """,
     },
     {
@@ -89,7 +85,7 @@ Once connected, the extension captures all console output:
 1. Open any website
 2. Open DevTools Console (F12)
 3. Type: console.log('Hello from MCP!')
-4. Check dashboard to see captured message
+4. Use MCP tools to query logs via Claude
 
 Captured data includes:
 • Message content
