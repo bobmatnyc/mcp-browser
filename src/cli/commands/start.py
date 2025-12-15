@@ -119,7 +119,10 @@ def start(ctx, port, background, daemon):
 
     # Suppress output in daemon mode
     if not daemon:
-        # Check if server already running for this project (foreground mode)
+        # Clean up any stale servers before starting (foreground mode)
+        from ..utils.daemon import cleanup_stale_servers, stop_daemon
+
+        # Check if server already running for this project
         is_running, existing_pid, existing_port = get_server_status()
         if is_running:
             console.print(
@@ -128,12 +131,23 @@ def start(ctx, port, background, daemon):
                     f"PID: {existing_pid}\n"
                     f"Port: {existing_port}\n"
                     f"Project: {project_path}\n\n"
-                    f"[dim]Stop it with 'mcp-browser stop' first[/dim]",
-                    title="Already Running",
+                    f"[blue]Stopping existing server...[/blue]",
+                    title="Stopping Existing Server",
                     border_style="yellow",
                 )
             )
-            sys.exit(1)
+            stop_daemon()
+            import time
+
+            time.sleep(0.5)  # Give it time to clean up
+        else:
+            # Clean up any stale processes that might be lingering
+            killed = cleanup_stale_servers()
+            if killed > 0:
+                console.print(f"[dim]Cleaned up {killed} stale server(s)[/dim]")
+                import time
+
+                time.sleep(0.5)
 
         console.print(
             Panel.fit(

@@ -233,6 +233,15 @@ class BrowserMCPServer:
             logger.info(f"Starting MCP Browser Server v{__version__}...")
         self.start_time = datetime.now()
 
+        # Register early with placeholder port to prevent race conditions
+        # This claims the project slot immediately before websocket starts
+        if not self.mcp_mode:
+            from .daemon import add_project_server
+
+            project_path = os.getcwd()
+            # Use port 0 as placeholder - will be updated after websocket starts
+            add_project_server(os.getpid(), 0, project_path)
+
         # Get services
         storage = await self.container.get("storage_service")
         websocket = await self.container.get("websocket_service")
@@ -285,11 +294,12 @@ class BrowserMCPServer:
         if not self.mcp_mode:
             logger.info("MCP Browser Server started successfully")
 
-        # Write service info to registry (for daemon tracking)
+        # Update service info in registry with actual port (replaces placeholder)
         if self.websocket_port and not self.mcp_mode:
-            from .daemon import write_service_info
+            from .daemon import add_project_server
 
-            write_service_info(os.getpid(), self.websocket_port)
+            project_path = os.getcwd()
+            add_project_server(os.getpid(), self.websocket_port, project_path)
 
         # Show status
         await self.show_status()
@@ -483,4 +493,3 @@ class BrowserMCPServer:
             import traceback
 
             traceback.print_exc(file=sys.stderr)
-

@@ -505,7 +505,7 @@ async def _check_browser_extension_connection() -> dict:
 
         # Count ESTABLISHED connections (excluding the LISTEN entry which is the server itself)
         lines = result.stdout.strip().split("\n")
-        established_connections = [l for l in lines if "ESTABLISHED" in l]
+        established_connections = [line for line in lines if "ESTABLISHED" in line]
 
         if established_connections:
             return {
