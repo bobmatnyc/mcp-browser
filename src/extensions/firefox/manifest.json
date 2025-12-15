@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "MCP Browser",
-  "version": "2.2.1",
+  "version": "2.2.24",
   "description": "Captures browser console logs and sends them to local MCP server",
   "permissions": [
     "activeTab",
