@@ -564,14 +564,22 @@ async def _check_console_log_capture() -> dict:
                 )
 
                 try:
-                    response = await asyncio.wait_for(ws.recv(), timeout=3.0)
-                    data = json.loads(response)
+                    # Server sends connection_ack first, then our response
+                    for _ in range(3):  # Try up to 3 messages
+                        response = await asyncio.wait_for(ws.recv(), timeout=3.0)
+                        data = json.loads(response)
 
-                    if data.get("type") == "logs":
-                        logs = data.get("logs", [])
-                        return logs, None
-                    elif data.get("type") == "error":
-                        return [], data.get("message", "Unknown error")
+                        # Skip connection_ack and other handshake messages
+                        if data.get("type") in ("connection_ack", "server_info_response"):
+                            continue
+
+                        if data.get("type") == "logs":
+                            logs = data.get("logs", [])
+                            return logs, None
+                        elif data.get("type") == "error":
+                            return [], data.get("message", "Unknown error")
+
+                    return [], "No logs response received"
                 except asyncio.TimeoutError:
                     return [], "Timeout waiting for response"
 
@@ -655,13 +663,21 @@ async def _check_browser_control() -> dict:
                 )
 
                 try:
-                    response = await asyncio.wait_for(ws.recv(), timeout=3.0)
-                    data = json.loads(response)
+                    # Server sends connection_ack first, then our response
+                    for _ in range(3):  # Try up to 3 messages
+                        response = await asyncio.wait_for(ws.recv(), timeout=3.0)
+                        data = json.loads(response)
 
-                    if data.get("type") == "capabilities":
-                        return data.get("capabilities", []), data.get("controlMethod")
-                    elif data.get("type") == "error":
-                        return [], None
+                        # Skip connection_ack and other handshake messages
+                        if data.get("type") in ("connection_ack", "server_info_response"):
+                            continue
+
+                        if data.get("type") == "capabilities":
+                            return data.get("capabilities", []), data.get("controlMethod")
+                        elif data.get("type") == "error":
+                            return [], None
+
+                    return [], None
                 except asyncio.TimeoutError:
                     return [], None
 
