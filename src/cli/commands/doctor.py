@@ -321,16 +321,15 @@ def _check_port_availability() -> dict:
 def _check_extension_package() -> dict:
     """Check extension availability.
 
-    The extension should be loaded from the cloned mcp-browser repo,
-    not from this project's directories.
+    Checks for extensions in the local project directories.
     """
     # Check if we're inside the mcp-browser project (has extension source)
     project_root = Path(__file__).parent.parent.parent.parent
     possible_dirs = [
-        # Primary: mcp-browser-extension/ in project root
-        Path.cwd() / "mcp-browser-extension",
-        project_root / "mcp-browser-extension",
-        # Alternative: src/extensions/chrome
+        # Primary: mcp-browser-extensions/chrome/ (deployed via make ext-deploy)
+        Path.cwd() / "mcp-browser-extensions" / "chrome",
+        project_root / "mcp-browser-extensions" / "chrome",
+        # Alternative: src/extensions/chrome (source)
         Path.cwd() / "src" / "extensions" / "chrome",
         project_root / "src" / "extensions" / "chrome",
     ]
@@ -485,7 +484,7 @@ async def _start_server_for_doctor() -> dict:
 
 
 async def _check_browser_extension_connection() -> dict:
-    """Check if browser extension is connected to the server."""
+    """Check if browser extension is connected to the server via HTTP API."""
     is_running, _, port = get_server_status()
 
     if not is_running:
@@ -496,96 +495,93 @@ async def _check_browser_extension_connection() -> dict:
         }
 
     try:
-        import websockets
+        import aiohttp
 
-        connected_tabs = []
-        extension_version = None
-        tab_url = None
-        tab_title = None
+        # The dashboard runs on port 8080 by default
+        dashboard_port = 8080
+        url = f"http://localhost:{dashboard_port}/api/status"
 
-        async def check_extension():
-            nonlocal connected_tabs, extension_version, tab_url, tab_title
-            uri = f"ws://localhost:{port}"
-            async with websockets.connect(uri, open_timeout=3.0) as ws:
-                # Send a status request
-                await ws.send(
-                    json.dumps(
-                        {
-                            "type": "get_status",
-                            "requestId": f"doctor_{int(time.time() * 1000)}",
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=3)) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        extension_connected = data.get("extension", {}).get("connected", False)
+                        ws_port = data.get("websocket", {}).get("port")
+                        log_count = data.get("logs", {}).get("total", 0)
+
+                        if extension_connected:
+                            message = f"Connected on port {ws_port}"
+                            if log_count > 0:
+                                message += f", {log_count} logs captured"
+                            return {
+                                "name": "Browser Extension",
+                                "status": "pass",
+                                "message": message,
+                            }
+                        else:
+                            return {
+                                "name": "Browser Extension",
+                                "status": "warning",
+                                "message": "No extension connection detected",
+                                "fix": "Open extension popup and click 'Connect' on a backend",
+                            }
+                    else:
+                        return {
+                            "name": "Browser Extension",
+                            "status": "warning",
+                            "message": f"Dashboard API returned status {resp.status}",
+                            "fix": "Restart server with dashboard enabled",
                         }
-                    )
-                )
+            except aiohttp.ClientError as e:
+                # Dashboard might not be running - try WebSocket fallback
+                return await _check_extension_via_websocket(port)
 
-                # Wait for response with timeout
-                try:
-                    response = await asyncio.wait_for(ws.recv(), timeout=3.0)
-                    data = json.loads(response)
-
-                    if data.get("type") == "status":
-                        connected_tabs = data.get("connectedTabs", [])
-                        extension_version = data.get("extensionVersion")
-                        # Get URL from first connected tab
-                        if connected_tabs:
-                            first_tab = connected_tabs[0]
-                            tab_url = first_tab.get("url", first_tab.get("tabUrl"))
-                            tab_title = first_tab.get(
-                                "title", first_tab.get("tabTitle")
-                            )
-                        return True
-                    elif data.get("type") == "error":
-                        return False
-                except asyncio.TimeoutError:
-                    return False
-
-            return False
-
-        result = await check_extension()
-
-        if result and connected_tabs:
-            tab_count = len(connected_tabs)
-            version_info = f" (v{extension_version})" if extension_version else ""
-
-            # Build detailed message
-            message = f"Connected{version_info}, {tab_count} active tab(s)"
-            if tab_url:
-                # Truncate URL if too long
-                display_url = tab_url if len(tab_url) < 50 else tab_url[:47] + "..."
-                message += f"\n    → Tab: {display_url}"
-            elif tab_title:
-                display_title = (
-                    tab_title if len(tab_title) < 50 else tab_title[:47] + "..."
-                )
-                message += f"\n    → Tab: {display_title}"
-
-            return {
-                "name": "Browser Extension",
-                "status": "pass",
-                "message": message,
-                "tab_url": tab_url,
-                "tab_title": tab_title,
-            }
-        elif result:
-            return {
-                "name": "Browser Extension",
-                "status": "warning",
-                "message": "Server responding but no tabs connected",
-                "fix": "Open extension popup and click 'Connect' on a backend",
-            }
-        else:
-            return {
-                "name": "Browser Extension",
-                "status": "warning",
-                "message": "No extension connection detected",
-                "fix": "Load extension and connect to server",
-            }
-
+    except ImportError:
+        return {
+            "name": "Browser Extension",
+            "status": "warning",
+            "message": "aiohttp not available for HTTP check",
+            "fix": "Install aiohttp: pip install aiohttp",
+        }
     except Exception as e:
         return {
             "name": "Browser Extension",
             "status": "warning",
             "message": f"Could not verify extension: {e}",
             "fix": "Ensure extension is loaded and connected",
+        }
+
+
+async def _check_extension_via_websocket(port: int) -> dict:
+    """Fallback: Check extension connection by counting WebSocket connections."""
+    try:
+        import websockets
+
+        # Simply try to connect - if there's already a browser extension connected,
+        # the server will have multiple connections
+        async def test_connection():
+            uri = f"ws://localhost:{port}"
+            async with websockets.connect(uri, open_timeout=2.0) as ws:
+                # Connection successful - server is accepting connections
+                # We can't tell if browser extension is connected this way
+                # but at least we know server is responding
+                return True
+
+        await test_connection()
+
+        return {
+            "name": "Browser Extension",
+            "status": "warning",
+            "message": "Server accepting connections (dashboard not available for detailed check)",
+            "fix": "Start server with dashboard: mcp-browser start --dashboard",
+        }
+    except Exception as e:
+        return {
+            "name": "Browser Extension",
+            "status": "warning",
+            "message": f"WebSocket check failed: {e}",
+            "fix": "Ensure server is running and extension is connected",
         }
 
 

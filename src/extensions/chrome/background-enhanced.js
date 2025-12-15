@@ -3030,7 +3030,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     const detailedStatus = {
       port: firstConnection?.port || connectionStatus.port || null,
-      connectionState: firstConnection ? (firstConnection.connectionReady ? 'connected' : 'connecting') : 'disconnected',
+      connectionState: firstConnection ? (firstConnection.ready ? 'connected' : 'connecting') : 'disconnected',
       retryCount: firstConnection?.reconnectAttempts || reconnectAttempts || 0,
       projectName: firstConnection?.projectName || connectionStatus.projectName || null,
       serverPid: firstConnection?.serverPid || null,
