@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mcp-browser"
 version = "2.2.24"
-description = "Browser console log capture and control via MCP for Claude Code"
+description = "Browser control and console log capture for AI coding assistants via MCP"
 readme = "README.md"
 authors = [
     { name = "MCP Browser Team", email = "support@mcp-browser.dev" }
