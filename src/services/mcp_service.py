@@ -1,12 +1,34 @@
 """MCP server implementation."""
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from mcp.server import Server
 from mcp.types import ImageContent, TextContent, Tool
 
 logger = logging.getLogger(__name__)
+
+# CDP port that should not be used with mcp-browser
+CDP_PORT = 9222
+
+
+def _get_daemon_port() -> Optional[int]:
+    """Get the port of the running mcp-browser daemon from registry.
+
+    Returns:
+        Port number if daemon is running, None otherwise
+    """
+    try:
+        from ..cli.utils.daemon import is_process_running, read_service_registry
+
+        registry = read_service_registry()
+        for server in registry.get("servers", []):
+            if is_process_running(server.get("pid")):
+                return server.get("port")
+        return None
+    except Exception as e:
+        logger.debug(f"Could not read daemon registry: {e}")
+        return None
 
 
 class MCPService:
@@ -34,6 +56,7 @@ class MCPService:
         self.dom_interaction_service = dom_interaction_service
         self.browser_controller = browser_controller
         self.capability_detector = capability_detector
+        self._cached_daemon_port: Optional[int] = None
         # Initialize server with version info
         self.server = Server(
             name="mcp-browser",
@@ -57,14 +80,14 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number",
+                                "description": "Browser port (optional, auto-detected from running daemon)",
                             },
                             "url": {
                                 "type": "string",
                                 "description": "URL to navigate to",
                             },
                         },
-                        "required": ["port", "url"],
+                        "required": ["url"],
                     },
                 ),
                 Tool(
@@ -75,7 +98,7 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number",
+                                "description": "Browser port (optional, auto-detected from running daemon)",
                             },
                             "last_n": {
                                 "type": "integer",
@@ -91,7 +114,7 @@ class MCPService:
                                 "description": "Filter by log levels",
                             },
                         },
-                        "required": ["port"],
+                        "required": [],
                     },
                 ),
                 Tool(
@@ -102,14 +125,14 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number",
+                                "description": "Browser port (optional, auto-detected from running daemon)",
                             },
                             "url": {
                                 "type": "string",
                                 "description": "Optional URL to navigate to before screenshot",
                             },
                         },
-                        "required": ["port"],
+                        "required": [],
                     },
                 ),
                 Tool(
@@ -120,7 +143,7 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number",
+                                "description": "Browser port (optional, auto-detected from running daemon)",
                             },
                             "selector": {
                                 "type": "string",
@@ -140,7 +163,7 @@ class MCPService:
                                 "default": 0,
                             },
                         },
-                        "required": ["port"],
+                        "required": [],
                     },
                 ),
                 Tool(
@@ -151,7 +174,7 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number",
+                                "description": "Browser port (optional, auto-detected from running daemon)",
                             },
                             "selector": {
                                 "type": "string",
@@ -171,7 +194,7 @@ class MCPService:
                                 "default": 0,
                             },
                         },
-                        "required": ["port", "value"],
+                        "required": ["value"],
                     },
                 ),
                 Tool(
@@ -182,7 +205,7 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number",
+                                "description": "Browser port (optional, auto-detected from running daemon)",
                             },
                             "form_data": {
                                 "type": "object",
@@ -195,7 +218,7 @@ class MCPService:
                                 "default": False,
                             },
                         },
-                        "required": ["port", "form_data"],
+                        "required": ["form_data"],
                     },
                 ),
                 Tool(
@@ -206,7 +229,7 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number",
+                                "description": "Browser port (optional, auto-detected from running daemon)",
                             },
                             "selector": {
                                 "type": "string",
@@ -217,7 +240,7 @@ class MCPService:
                                 "description": "XPath expression for form",
                             },
                         },
-                        "required": ["port"],
+                        "required": [],
                     },
                 ),
                 Tool(
@@ -228,7 +251,7 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number",
+                                "description": "Browser port (optional, auto-detected from running daemon)",
                             },
                             "selector": {
                                 "type": "string",
@@ -243,7 +266,7 @@ class MCPService:
                                 "description": "Text content to match",
                             },
                         },
-                        "required": ["port"],
+                        "required": [],
                     },
                 ),
                 Tool(
@@ -254,7 +277,7 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number",
+                                "description": "Browser port (optional, auto-detected from running daemon)",
                             },
                             "selector": {
                                 "type": "string",
@@ -266,7 +289,7 @@ class MCPService:
                                 "default": 5000,
                             },
                         },
-                        "required": ["port", "selector"],
+                        "required": ["selector"],
                     },
                 ),
                 Tool(
@@ -277,7 +300,7 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number",
+                                "description": "Browser port (optional, auto-detected from running daemon)",
                             },
                             "selector": {
                                 "type": "string",
@@ -296,7 +319,7 @@ class MCPService:
                                 "description": "Option index",
                             },
                         },
-                        "required": ["port", "selector"],
+                        "required": ["selector"],
                     },
                 ),
                 Tool(
@@ -307,14 +330,14 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number",
+                                "description": "Browser port (optional, auto-detected from running daemon)",
                             },
                             "tab_id": {
                                 "type": "integer",
                                 "description": "Optional specific tab ID to extract from",
                             },
                         },
-                        "required": ["port"],
+                        "required": [],
                     },
                 ),
                 Tool(
@@ -325,7 +348,7 @@ class MCPService:
                         "properties": {
                             "port": {
                                 "type": "integer",
-                                "description": "Browser port number",
+                                "description": "Browser port (optional, auto-detected from running daemon)",
                             },
                             "tab_id": {
                                 "type": "integer",
@@ -352,7 +375,7 @@ class MCPService:
                                 "description": "Max characters per text field (default: 100)",
                             },
                         },
-                        "required": ["port"],
+                        "required": [],
                     },
                 ),
                 Tool(
@@ -401,6 +424,54 @@ class MCPService:
             else:
                 return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
+    def _resolve_port(self, port: Optional[int]) -> tuple[Optional[int], Optional[str]]:
+        """Resolve the port to use, with validation.
+
+        Args:
+            port: Port provided by the user (may be None)
+
+        Returns:
+            Tuple of (resolved_port, warning_message)
+            - resolved_port: The port to use (from argument or daemon registry)
+            - warning_message: Optional warning if CDP port was used
+        """
+        warning = None
+
+        # Warn if CDP port is used (common mistake)
+        if port == CDP_PORT:
+            warning = (
+                f"Warning: Port {CDP_PORT} is the Chrome DevTools Protocol port, "
+                f"not the mcp-browser daemon port. "
+            )
+            # Try to get the correct daemon port
+            daemon_port = self._cached_daemon_port or _get_daemon_port()
+            if daemon_port:
+                self._cached_daemon_port = daemon_port
+                warning += f"Using daemon port {daemon_port} instead."
+                return daemon_port, warning
+            else:
+                warning += "No running daemon found. Start with: mcp-browser start"
+                return None, warning
+
+        # If port provided, use it
+        if port is not None:
+            return port, None
+
+        # No port provided - get from daemon registry
+        if self._cached_daemon_port:
+            return self._cached_daemon_port, None
+
+        daemon_port = _get_daemon_port()
+        if daemon_port:
+            self._cached_daemon_port = daemon_port
+            return daemon_port, None
+
+        # No daemon running
+        return (
+            None,
+            "No port specified and no running daemon found. Start with: mcp-browser start",
+        )
+
     async def _handle_navigate(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle browser navigation with automatic AppleScript fallback.
 
@@ -410,8 +481,12 @@ class MCPService:
         Returns:
             List of text content responses
         """
-        port = arguments.get("port")
         url = arguments.get("url")
+
+        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
+        port, port_warning = self._resolve_port(arguments.get("port"))
+        if port is None:
+            return [TextContent(type="text", text=port_warning or "No port available")]
 
         # Try BrowserController first for automatic fallback support
         if self.browser_controller:
@@ -472,7 +547,11 @@ class MCPService:
         Returns:
             List of text content responses
         """
-        port = arguments.get("port")
+        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
+        port, port_warning = self._resolve_port(arguments.get("port"))
+        if port is None:
+            return [TextContent(type="text", text=port_warning or "No port available")]
+
         last_n = arguments.get("last_n", 100)
         level_filter = arguments.get("level_filter")
 
@@ -518,7 +597,11 @@ class MCPService:
         Returns:
             List of image or text content responses
         """
-        port = arguments.get("port")
+        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
+        port, port_warning = self._resolve_port(arguments.get("port"))
+        if port is None:
+            return [TextContent(type="text", text=port_warning or "No port available")]
+
         url = arguments.get("url")
 
         # Try extension-based screenshot first
@@ -563,7 +646,11 @@ class MCPService:
                 TextContent(type="text", text="DOM interaction service not available")
             ]
 
-        port = arguments.get("port")
+        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
+        port, port_warning = self._resolve_port(arguments.get("port"))
+        if port is None:
+            return [TextContent(type="text", text=port_warning or "No port available")]
+
         result = await self.dom_interaction_service.click(
             port=port,
             selector=arguments.get("selector"),
@@ -603,7 +690,11 @@ class MCPService:
                 TextContent(type="text", text="DOM interaction service not available")
             ]
 
-        port = arguments.get("port")
+        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
+        port, port_warning = self._resolve_port(arguments.get("port"))
+        if port is None:
+            return [TextContent(type="text", text=port_warning or "No port available")]
+
         value = arguments.get("value")
         result = await self.dom_interaction_service.fill_field(
             port=port,
@@ -641,7 +732,11 @@ class MCPService:
                 TextContent(type="text", text="DOM interaction service not available")
             ]
 
-        port = arguments.get("port")
+        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
+        port, port_warning = self._resolve_port(arguments.get("port"))
+        if port is None:
+            return [TextContent(type="text", text=port_warning or "No port available")]
+
         form_data = arguments.get("form_data", {})
         submit = arguments.get("submit", False)
 
@@ -679,7 +774,11 @@ class MCPService:
                 TextContent(type="text", text="DOM interaction service not available")
             ]
 
-        port = arguments.get("port")
+        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
+        port, port_warning = self._resolve_port(arguments.get("port"))
+        if port is None:
+            return [TextContent(type="text", text=port_warning or "No port available")]
+
         result = await self.dom_interaction_service.submit_form(
             port=port, selector=arguments.get("selector"), xpath=arguments.get("xpath")
         )
@@ -708,7 +807,11 @@ class MCPService:
                 TextContent(type="text", text="DOM interaction service not available")
             ]
 
-        port = arguments.get("port")
+        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
+        port, port_warning = self._resolve_port(arguments.get("port"))
+        if port is None:
+            return [TextContent(type="text", text=port_warning or "No port available")]
+
         result = await self.dom_interaction_service.get_element(
             port=port,
             selector=arguments.get("selector"),
@@ -757,7 +860,11 @@ class MCPService:
                 TextContent(type="text", text="DOM interaction service not available")
             ]
 
-        port = arguments.get("port")
+        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
+        port, port_warning = self._resolve_port(arguments.get("port"))
+        if port is None:
+            return [TextContent(type="text", text=port_warning or "No port available")]
+
         selector = arguments.get("selector")
         timeout = arguments.get("timeout", 5000)
 
@@ -798,7 +905,11 @@ class MCPService:
                 TextContent(type="text", text="DOM interaction service not available")
             ]
 
-        port = arguments.get("port")
+        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
+        port, port_warning = self._resolve_port(arguments.get("port"))
+        if port is None:
+            return [TextContent(type="text", text=port_warning or "No port available")]
+
         result = await self.dom_interaction_service.select_option(
             port=port,
             selector=arguments.get("selector"),
@@ -837,7 +948,11 @@ class MCPService:
         if not self.browser_service:
             return [TextContent(type="text", text="Browser service not available")]
 
-        port = arguments.get("port")
+        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
+        port, port_warning = self._resolve_port(arguments.get("port"))
+        if port is None:
+            return [TextContent(type="text", text=port_warning or "No port available")]
+
         tab_id = arguments.get("tab_id")
 
         result = await self.browser_service.extract_content(port=port, tab_id=tab_id)
@@ -912,7 +1027,11 @@ class MCPService:
         if not self.browser_service:
             return [TextContent(type="text", text="Browser service not available")]
 
-        port = arguments.get("port")
+        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
+        port, port_warning = self._resolve_port(arguments.get("port"))
+        if port is None:
+            return [TextContent(type="text", text=port_warning or "No port available")]
+
         tab_id = arguments.get("tab_id")
         options = {
             "include_headings": arguments.get("include_headings", True),
