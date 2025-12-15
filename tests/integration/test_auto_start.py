@@ -10,7 +10,6 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from cli.utils.daemon import (
     ensure_server_running,
     get_server_status,
-    clear_service_info,
 )
 
 

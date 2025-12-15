@@ -4,7 +4,7 @@
 import subprocess
 import sys
 import time
-from pathlib import Path
+
 
 def run_cmd(cmd: list[str], description: str) -> tuple[bool, str]:
     """Run command and return success status and output."""

@@ -2,10 +2,12 @@
 """Test browser control functionality through MCP Browser server."""
 
 import asyncio
-import websockets
 import json
 import sys
 from datetime import datetime
+
+import websockets
+
 
 async def test_browser_control():
     """Test browser control commands via WebSocket."""

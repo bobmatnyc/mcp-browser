@@ -11,8 +11,8 @@ project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 # Use absolute imports matching the package structure
-from src.services.browser_service import BrowserService
-from src.models.browser_state import BrowserState
+from src.models.browser_state import BrowserState  # noqa: E402
+from src.services.browser_service import BrowserService  # noqa: E402
 
 
 async def test_semantic_dom():
@@ -43,7 +43,7 @@ async def test_semantic_dom():
         print(f"  1. Ensure mcp-browser server is running on port {test_port}:")
         print(f"     mcp-browser serve --port {test_port}")
         print()
-        print(f"  2. Launch browser with extension:")
+        print("  2. Launch browser with extension:")
         print(f"     mcp-browser launch --port {test_port}")
         print()
         print("  3. Navigate to a test page, e.g.:")
