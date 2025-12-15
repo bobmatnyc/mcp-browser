@@ -50,10 +50,10 @@ def create_default_config():
     "--verbose", "-v", is_flag=True, help="Show detailed diagnostic information"
 )
 @click.option(
-    "--start", "-s", is_flag=True, help="Auto-start server if not running"
+    "--no-start", is_flag=True, help="Don't auto-start server (default: auto-start)"
 )
 @click.pass_context
-def doctor(ctx, fix, verbose, start):
+def doctor(ctx, fix, verbose, no_start):
     """🩺 Diagnose and fix common MCP Browser issues.
 
     \b
@@ -61,7 +61,7 @@ def doctor(ctx, fix, verbose, start):
       • Configuration files and directories
       • Python dependencies
       • MCP installer availability
-      • Server status and ports
+      • Server status and ports (auto-starts if needed)
       • Extension package
       • Claude MCP integration
       • WebSocket connectivity
@@ -71,10 +71,10 @@ def doctor(ctx, fix, verbose, start):
 
     \b
     Examples:
-      mcp-browser doctor         # Run diagnostic
-      mcp-browser doctor --start # Auto-start server if needed
-      mcp-browser doctor --fix   # Auto-fix issues
-      mcp-browser doctor -v      # Verbose output
+      mcp-browser doctor           # Run diagnostic (auto-starts server)
+      mcp-browser doctor --no-start # Skip auto-start
+      mcp-browser doctor --fix     # Auto-fix issues
+      mcp-browser doctor -v        # Verbose output
 
     \b
     Common issues and solutions:
@@ -83,10 +83,12 @@ def doctor(ctx, fix, verbose, start):
       • "Chrome not detected" - Install Chrome or Chromium
       • "Permission denied" - Check directory permissions
     """
+    # Auto-start is default (unless --no-start is passed)
+    start = not no_start
     asyncio.run(_doctor_command(fix, verbose, start))
 
 
-async def _doctor_command(fix: bool, verbose: bool, start: bool = False):
+async def _doctor_command(fix: bool, verbose: bool, start: bool = True):
     """Execute doctor diagnostic checks."""
     console.print(
         Panel.fit(
