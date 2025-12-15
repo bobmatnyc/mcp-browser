@@ -8,7 +8,7 @@ version = "2.2.24"
 description = "Browser control and console log capture for AI coding assistants via MCP"
 readme = "README.md"
 authors = [
-    { name = "MCP Browser Team", email = "support@mcp-browser.dev" }
+    { name = "Bob Matsuoka", email = "bob@matsuoka.com" }
 ]
 license = { text = "MIT" }
 requires-python = ">=3.10"
