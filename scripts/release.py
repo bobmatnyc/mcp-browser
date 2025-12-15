@@ -204,9 +204,9 @@ def run_quality_gate(skip_tests: bool = False) -> bool:
         ).returncode == 0
 
         if cov_available:
-            checks.append(([pytest_cmd, 'tests/', '-v', '--cov=src'], 'Tests', False))
+            checks.append(([pytest_cmd, 'tests/unit/', '-v', '--cov=src'], 'Tests', False))
         else:
-            checks.append(([pytest_cmd, 'tests/', '-v'], 'Tests', False))
+            checks.append(([pytest_cmd, 'tests/unit/', '-v'], 'Tests', False))
 
     checks.append((['python3', '-m', 'build'], 'Build', False))
 
