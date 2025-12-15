@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.29] - 2025-12-15
+
+### Removed
+- **BREAKING**: Removed Playwright dependency entirely to fix catastrophic memory leak
+- Removed `screenshot_service.py` - Playwright-based screenshot service
+- Removed CDP (Chrome DevTools Protocol) support from `browser_controller.py`
+- Removed Playwright browser installation from quickstart wizard
+- Removed Playwright validation checks
+
+### Fixed
+- **CRITICAL**: Fixed Mach port exhaustion on macOS caused by Playwright browser instances
+  - Playwright browser instances were creating Mach ports for IPC
+  - Ports weren't being cleaned up when browsers close
+  - Accumulated in launchservicesd until system hit port limit
+  - Chrome crash handler crashed repeatedly (87 times in 90 seconds)
+  - Eventually triggered pkill affecting other apps (iTerm2)
+
+### Changed
+- Screenshots now work exclusively via browser extension (not Playwright)
+- Browser control limited to extension and AppleScript fallback (no CDP)
+
+### Note
+Users upgrading from previous versions should run `mcp-browser uninstall --playwright` to clean up Playwright browser cache and free disk space (~100MB+).
+
+## [2.2.28] - 2025-12-15
+
+### Added
+- Auto-detect daemon port for all MCP tools - port parameter now optional
+- Warn and auto-correct when CDP port 9222 is mistakenly used
+- Cache resolved daemon port for performance
+
 ## [2.2.27] - 2025-12-15
 
 
