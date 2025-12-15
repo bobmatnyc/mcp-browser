@@ -1692,7 +1692,7 @@ class BrowserController:
         """Check if extension is connected on port.
 
         Args:
-            port: Port number to check
+            port: Port number to check (may be server port or client port)
 
         Returns:
             True if extension is connected
@@ -1704,7 +1704,13 @@ class BrowserController:
             return False
 
         try:
+            # Try exact port match first
             connection = await self.browser_service.browser_state.get_connection(port)
+
+            # If no exact match and port is in server range, try any active connection
+            if connection is None and 8851 <= port <= 8895:
+                connection = await self.browser_service.browser_state.get_any_active_connection()
+
             return connection is not None and connection.websocket is not None
         except Exception as e:
             logger.debug(f"Error checking extension connection: {e}")
