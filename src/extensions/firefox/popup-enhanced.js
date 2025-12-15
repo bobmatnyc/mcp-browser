@@ -12,6 +12,25 @@ let isUpdating = false; // Prevent concurrent updates
 let errorDebounceTimer = null; // Debounce error messages
 
 /**
+ * Check if URL is a restricted page where extension cannot operate
+ */
+function isRestrictedPage(url) {
+  if (!url) return true;
+  const restrictedPrefixes = [
+    'chrome://',
+    'chrome-extension://',
+    'about:',
+    'edge://',
+    'brave://',
+    'opera://',
+    'vivaldi://',
+    'moz-extension://',
+    'file://'  // Local files also restricted by default
+  ];
+  return restrictedPrefixes.some(prefix => url.startsWith(prefix));
+}
+
+/**
  * Load dashboard state
  */
 async function loadDashboard() {
@@ -124,6 +143,17 @@ async function updateCurrentTabStatus(tabId) {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     const currentTab = tabs[0];
 
+    // Check if this is a restricted page
+    if (currentTab && isRestrictedPage(currentTab.url)) {
+      tabStatusIndicator.className = 'status-indicator warning';
+      tabStatusText.textContent = 'Restricted page';
+      if (tabInfoElement) {
+        tabInfoElement.textContent = 'Cannot connect on browser internal pages';
+        tabInfoElement.style.display = 'block';
+      }
+      return;
+    }
+
     // Get tab connections
     const tabConnectionsResponse = await sendMessage({ type: 'get_tab_connections' });
     const tabConnections = tabConnectionsResponse?.tabConnections || [];
@@ -178,6 +208,13 @@ async function updateBackendList(status) {
   // Get current tab to check if connected
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
   const currentTab = tabs[0];
+
+  // Don't show backend list on restricted pages
+  if (currentTab && isRestrictedPage(currentTab.url)) {
+    backendListContainer.style.display = 'none';
+    return;
+  }
+
   let isCurrentTabConnected = false;
 
   if (currentTab) {
