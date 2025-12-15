@@ -19,7 +19,9 @@ MAJOR, MINOR, PATCH = VERSION_INFO
 
 # Project metadata
 __title__ = "mcp-browser"
-__description__ = "Browser control and console log capture for AI coding assistants via MCP"
+__description__ = (
+    "Browser control and console log capture for AI coding assistants via MCP"
+)
 __author__ = "Bob Matsuoka"
 __author_email__ = "bob@matsuoka.com"
 __license__ = "MIT"

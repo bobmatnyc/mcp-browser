@@ -166,7 +166,10 @@ def extension():
 
 @extension.command()
 @click.option(
-    "--local", "-l", is_flag=True, help="Install to current directory (./mcp-browser-extensions/)"
+    "--local",
+    "-l",
+    is_flag=True,
+    help="Install to current directory (./mcp-browser-extensions/)",
 )
 @click.option("--force", "-f", is_flag=True, help="Overwrite existing installation")
 def install(local: bool, force: bool):
@@ -240,7 +243,10 @@ def install(local: bool, force: bool):
 
 @extension.command()
 @click.option(
-    "--local", "-l", is_flag=True, help="Update local installation (./mcp-browser-extensions/)"
+    "--local",
+    "-l",
+    is_flag=True,
+    help="Update local installation (./mcp-browser-extensions/)",
 )
 def update(local: bool):
     """🔄 Update Chrome extension files.

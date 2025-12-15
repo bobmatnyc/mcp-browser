@@ -48,7 +48,9 @@ def read_service_registry() -> dict:
                                 "pid": data["pid"],
                                 "port": data["port"],
                                 "project_path": data.get("project_path", ""),
-                                "started_at": data.get("started_at", datetime.now().isoformat()),
+                                "started_at": data.get(
+                                    "started_at", datetime.now().isoformat()
+                                ),
                             }
                         ]
                     }
@@ -104,12 +106,14 @@ def add_project_server(pid: int, port: int, project_path: str) -> None:
     ]
 
     # Add new entry
-    registry["servers"].append({
-        "pid": pid,
-        "port": port,
-        "project_path": project_path,
-        "started_at": datetime.now().isoformat(),
-    })
+    registry["servers"].append(
+        {
+            "pid": pid,
+            "port": port,
+            "project_path": project_path,
+            "started_at": datetime.now().isoformat(),
+        }
+    )
 
     save_server_registry(registry)
 
@@ -191,10 +195,7 @@ def cleanup_stale_servers() -> int:
         try:
             # Use lsof to find process on port
             result = subprocess.run(
-                ["lsof", "-ti", f":{port}"],
-                capture_output=True,
-                text=True,
-                timeout=2
+                ["lsof", "-ti", f":{port}"], capture_output=True, text=True, timeout=2
             )
             if result.returncode == 0 and result.stdout.strip():
                 pid_str = result.stdout.strip().split()[0]
@@ -206,7 +207,7 @@ def cleanup_stale_servers() -> int:
                         ["ps", "-p", str(pid), "-o", "command="],
                         capture_output=True,
                         text=True,
-                        timeout=2
+                        timeout=2,
                     )
                     if proc_result.returncode == 0:
                         cmd = proc_result.stdout.lower()

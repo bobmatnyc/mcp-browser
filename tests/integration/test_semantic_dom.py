@@ -111,7 +111,9 @@ async def test_semantic_dom():
                 action = form.get("action", "")
                 method = form.get("method", "")
                 fields = form.get("fields", [])
-                print(f"     - Action: {action}, Method: {method}, Fields: {len(fields)}")
+                print(
+                    f"     - Action: {action}, Method: {method}, Fields: {len(fields)}"
+                )
         print()
 
         print("-" * 80)
@@ -153,13 +155,15 @@ async def test_semantic_dom_with_options():
         "include_landmarks": True,
         "include_links": False,  # Exclude links
         "include_forms": False,  # Exclude forms
-        "max_text_length": 50    # Shorter text
+        "max_text_length": 50,  # Shorter text
     }
 
     print(f"Options: {json.dumps(options, indent=2)}")
     print()
 
-    result = await browser.extract_semantic_dom(port=test_port, options=options, timeout=15.0)
+    result = await browser.extract_semantic_dom(
+        port=test_port, options=options, timeout=15.0
+    )
 
     if result.get("success"):
         dom = result.get("dom", {})
@@ -193,7 +197,9 @@ async def main():
     print("TEST SUMMARY")
     print("=" * 80)
     print(f"Test 1 (Default options): {'✓ PASSED' if test1_passed else '✗ FAILED'}")
-    print(f"Test 2 (Custom options): {'✓ PASSED' if test2_passed else '✗ SKIPPED' if not test1_passed else '✗ FAILED'}")
+    print(
+        f"Test 2 (Custom options): {'✓ PASSED' if test2_passed else '✗ SKIPPED' if not test1_passed else '✗ FAILED'}"
+    )
     print("=" * 80)
     print()
 

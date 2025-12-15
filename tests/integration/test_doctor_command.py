@@ -18,9 +18,9 @@ RESET = "\033[0m"
 
 def print_test(name: str):
     """Print test name."""
-    print(f"\n{BLUE}{'='*60}{RESET}")
+    print(f"\n{BLUE}{'=' * 60}{RESET}")
     print(f"{BLUE}TEST: {name}{RESET}")
-    print(f"{BLUE}{'='*60}{RESET}")
+    print(f"{BLUE}{'=' * 60}{RESET}")
 
 
 def print_success(msg: str):
@@ -284,7 +284,10 @@ def test_no_auto_start():
         text=True,
     )
 
-    if "not running" in status_result.stdout.lower() or "stopped" in status_result.stdout.lower():
+    if (
+        "not running" in status_result.stdout.lower()
+        or "stopped" in status_result.stdout.lower()
+    ):
         print_success("Doctor did NOT auto-start server (correct behavior)")
         return True
     else:
@@ -294,9 +297,9 @@ def test_no_auto_start():
 
 def main():
     """Run all tests."""
-    print(f"\n{BLUE}{'='*60}{RESET}")
+    print(f"\n{BLUE}{'=' * 60}{RESET}")
     print(f"{BLUE}MCP Browser Doctor Command Test Suite{RESET}")
-    print(f"{BLUE}{'='*60}{RESET}")
+    print(f"{BLUE}{'=' * 60}{RESET}")
 
     tests = [
         ("Basic Execution", test_basic_execution),
@@ -321,9 +324,9 @@ def main():
             results.append((name, False))
 
     # Print summary
-    print(f"\n{BLUE}{'='*60}{RESET}")
+    print(f"\n{BLUE}{'=' * 60}{RESET}")
     print(f"{BLUE}TEST SUMMARY{RESET}")
-    print(f"{BLUE}{'='*60}{RESET}\n")
+    print(f"{BLUE}{'=' * 60}{RESET}\n")
 
     passed = sum(1 for _, result in results if result)
     total = len(results)

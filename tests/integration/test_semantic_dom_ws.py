@@ -31,7 +31,9 @@ async def test_semantic_dom_via_websocket():
 
             response = await websocket.recv()
             server_info = json.loads(response)
-            print(f"   Server: {server_info.get('project_name')} v{server_info.get('version')}")
+            print(
+                f"   Server: {server_info.get('project_name')} v{server_info.get('version')}"
+            )
             print(f"   Project: {server_info.get('project_id')}")
             print(f"   Capabilities: {server_info.get('capabilities')}")
             print()
@@ -49,8 +51,8 @@ async def test_semantic_dom_via_websocket():
                     "include_landmarks": True,
                     "include_links": True,
                     "include_forms": True,
-                    "max_text_length": 100
-                }
+                    "max_text_length": 100,
+                },
             }
 
             await websocket.send(json.dumps(request))
@@ -71,13 +73,17 @@ async def test_semantic_dom_via_websocket():
                     if remaining <= 0:
                         raise asyncio.TimeoutError()
 
-                    response_data = await asyncio.wait_for(websocket.recv(), timeout=remaining)
+                    response_data = await asyncio.wait_for(
+                        websocket.recv(), timeout=remaining
+                    )
                     response = json.loads(response_data)
                     msg_type = response.get("type")
 
                     # Skip server_info_response, we're looking for semantic_dom_extracted
                     if msg_type == "server_info_response":
-                        print(f"   (Received {msg_type}, waiting for semantic_dom_extracted...)")
+                        print(
+                            f"   (Received {msg_type}, waiting for semantic_dom_extracted...)"
+                        )
                         continue
 
                     # Found our response
@@ -113,7 +119,9 @@ async def test_semantic_dom_via_websocket():
                         landmarks = dom.get("landmarks", [])
                         print(f"   Landmarks: {len(landmarks)}")
                         for lm in landmarks[:3]:
-                            print(f"     - {lm.get('role')}: {lm.get('label', '(no label)')}")
+                            print(
+                                f"     - {lm.get('role')}: {lm.get('label', '(no label)')}"
+                            )
                         print()
 
                         links = dom.get("links", [])

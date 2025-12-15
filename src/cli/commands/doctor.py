@@ -508,10 +508,14 @@ async def _check_browser_extension_connection() -> dict:
             uri = f"ws://localhost:{port}"
             async with websockets.connect(uri, open_timeout=3.0) as ws:
                 # Send a status request
-                await ws.send(json.dumps({
-                    "type": "get_status",
-                    "requestId": f"doctor_{int(time.time() * 1000)}"
-                }))
+                await ws.send(
+                    json.dumps(
+                        {
+                            "type": "get_status",
+                            "requestId": f"doctor_{int(time.time() * 1000)}",
+                        }
+                    )
+                )
 
                 # Wait for response with timeout
                 try:
@@ -525,7 +529,9 @@ async def _check_browser_extension_connection() -> dict:
                         if connected_tabs:
                             first_tab = connected_tabs[0]
                             tab_url = first_tab.get("url", first_tab.get("tabUrl"))
-                            tab_title = first_tab.get("title", first_tab.get("tabTitle"))
+                            tab_title = first_tab.get(
+                                "title", first_tab.get("tabTitle")
+                            )
                         return True
                     elif data.get("type") == "error":
                         return False
@@ -547,7 +553,9 @@ async def _check_browser_extension_connection() -> dict:
                 display_url = tab_url if len(tab_url) < 50 else tab_url[:47] + "..."
                 message += f"\n    → Tab: {display_url}"
             elif tab_title:
-                display_title = tab_title if len(tab_title) < 50 else tab_title[:47] + "..."
+                display_title = (
+                    tab_title if len(tab_title) < 50 else tab_title[:47] + "..."
+                )
                 message += f"\n    → Tab: {display_title}"
 
             return {
@@ -599,11 +607,15 @@ async def _check_console_log_capture() -> dict:
             uri = f"ws://localhost:{port}"
             async with websockets.connect(uri, open_timeout=3.0) as ws:
                 # Request console logs
-                await ws.send(json.dumps({
-                    "type": "get_logs",
-                    "requestId": f"doctor_logs_{int(time.time() * 1000)}",
-                    "lastN": 10
-                }))
+                await ws.send(
+                    json.dumps(
+                        {
+                            "type": "get_logs",
+                            "requestId": f"doctor_logs_{int(time.time() * 1000)}",
+                            "lastN": 10,
+                        }
+                    )
+                )
 
                 try:
                     response = await asyncio.wait_for(ws.recv(), timeout=3.0)
@@ -640,7 +652,9 @@ async def _check_console_log_capture() -> dict:
                 level = log.get("level", "log")
                 levels[level] = levels.get(level, 0) + 1
 
-            level_summary = ", ".join(f"{count} {level}" for level, count in levels.items())
+            level_summary = ", ".join(
+                f"{count} {level}" for level, count in levels.items()
+            )
             message += f"\n    → Types: {level_summary}"
 
             # Show most recent log entry (truncated)
@@ -649,7 +663,9 @@ async def _check_console_log_capture() -> dict:
                 log_msg = recent.get("message", recent.get("text", ""))
                 if log_msg:
                     display_msg = log_msg if len(log_msg) < 40 else log_msg[:37] + "..."
-                    message += f"\n    → Latest: [{recent.get('level', 'log')}] {display_msg}"
+                    message += (
+                        f"\n    → Latest: [{recent.get('level', 'log')}] {display_msg}"
+                    )
 
         return {
             "name": "Console Log Capture",
@@ -683,10 +699,14 @@ async def _check_browser_control() -> dict:
             uri = f"ws://localhost:{port}"
             async with websockets.connect(uri, open_timeout=3.0) as ws:
                 # Request capabilities
-                await ws.send(json.dumps({
-                    "type": "get_capabilities",
-                    "requestId": f"doctor_caps_{int(time.time() * 1000)}"
-                }))
+                await ws.send(
+                    json.dumps(
+                        {
+                            "type": "get_capabilities",
+                            "requestId": f"doctor_caps_{int(time.time() * 1000)}",
+                        }
+                    )
+                )
 
                 try:
                     response = await asyncio.wait_for(ws.recv(), timeout=3.0)
