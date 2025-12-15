@@ -308,7 +308,7 @@ def start_daemon(
         if not os.path.exists(mcp_browser_path):
             return False, None, None
 
-    cmd = [mcp_browser_path, "start", "--port", str(port), "--daemon"]
+    cmd = [mcp_browser_path, "start", "--port", str(port), "--daemon", "--dashboard"]
 
     try:
         process = subprocess.Popen(
