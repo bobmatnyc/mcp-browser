@@ -17,6 +17,7 @@ from .._version import __version__
 from .commands import (
     browser,
     connect,
+    demo,
     doctor,
     extension,
     init,
@@ -184,6 +185,7 @@ def reference():
   [cyan]status[/cyan]      - Check installation status
   [cyan]doctor[/cyan]      - Diagnose & fix issues
   [cyan]tutorial[/cyan]    - Interactive tutorial
+  [cyan]demo[/cyan]        - Interactive feature demonstration
   [cyan]install[/cyan]     - Install MCP config for Claude
   [cyan]uninstall[/cyan]   - Remove MCP config from Claude
   [cyan]extension[/cyan]   - Manage Chrome extension
@@ -279,7 +281,7 @@ def completion(shell):
     bash_completion = """
 _mcp_browser_completions() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
-    local commands="quickstart init start stop status doctor tutorial install uninstall extension browser mcp version completion --help --version"
+    local commands="quickstart init start stop status doctor tutorial demo install uninstall extension browser mcp version completion --help --version"
     COMPREPLY=( $(compgen -W "${commands}" -- ${cur}) )
 }
 complete -F _mcp_browser_completions mcp-browser
@@ -296,6 +298,7 @@ _mcp_browser() {
         'status:Show status'
         'doctor:Diagnose issues'
         'tutorial:Interactive tutorial'
+        'demo:Interactive feature demonstration'
         'install:Install MCP config for Claude'
         'uninstall:Remove MCP config from Claude'
         'extension:Manage Chrome extension'
@@ -316,6 +319,7 @@ complete -c mcp-browser -n "__fish_use_subcommand" -a stop -d "Stop server for c
 complete -c mcp-browser -n "__fish_use_subcommand" -a status -d "Show status"
 complete -c mcp-browser -n "__fish_use_subcommand" -a doctor -d "Diagnose issues"
 complete -c mcp-browser -n "__fish_use_subcommand" -a tutorial -d "Interactive tutorial"
+complete -c mcp-browser -n "__fish_use_subcommand" -a demo -d "Interactive feature demonstration"
 complete -c mcp-browser -n "__fish_use_subcommand" -a install -d "Install MCP config for Claude"
 complete -c mcp-browser -n "__fish_use_subcommand" -a uninstall -d "Remove MCP config from Claude"
 complete -c mcp-browser -n "__fish_use_subcommand" -a extension -d "Manage Chrome extension"
@@ -350,6 +354,7 @@ cli.add_command(stop)
 cli.add_command(status)
 cli.add_command(doctor)
 cli.add_command(tutorial)
+cli.add_command(demo)
 cli.add_command(install)
 cli.add_command(uninstall)
 cli.add_command(extension)

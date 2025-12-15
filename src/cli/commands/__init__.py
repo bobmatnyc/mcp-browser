@@ -2,6 +2,7 @@
 
 from .browser import browser
 from .connect import connect
+from .demo import demo
 from .doctor import doctor
 from .extension import extension
 from .init import init
@@ -27,4 +28,5 @@ __all__ = [
     "extension",
     "browser",
     "connect",
+    "demo",
 ]
