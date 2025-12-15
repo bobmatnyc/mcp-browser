@@ -235,3 +235,4 @@ docs/research/
 .claude/
 uv.lock
 mcp-browser-extensions/
+.claude-mpm/correlations/
