@@ -2676,6 +2676,55 @@ async function executeCommandOnTab(tabId, data, connection = null) {
         }
         break;
 
+      case 'capture_screenshot':
+        // Capture screenshot using browser.tabs.captureVisibleTab
+        console.log(`[MCP Browser] Capturing screenshot for request ${data.requestId}`);
+        try {
+          // Use browser.tabs.captureVisibleTab to capture the current window (Firefox API)
+          browser.tabs.captureVisibleTab(null, { format: 'png' }).then((dataUrl) => {
+            // dataUrl is "data:image/png;base64,..." - extract just the base64 part
+            const base64Data = dataUrl.replace(/^data:image\/png;base64,/, '');
+
+            const response = {
+              type: 'screenshot_captured',
+              requestId: data.requestId,
+              success: true,
+              data: base64Data,
+              mimeType: 'image/png'
+            };
+
+            if (connection && connection.ws && connection.ws.readyState === WebSocket.OPEN) {
+              connection.ws.send(JSON.stringify(response));
+              console.log(`[MCP Browser] Sent screenshot_captured response for request ${data.requestId}`);
+            } else {
+              console.error(`[MCP Browser] No active connection to send screenshot for request ${data.requestId}`);
+            }
+          }).catch((error) => {
+            console.error('[MCP Browser] Screenshot capture failed:', error.message);
+            const errorResponse = {
+              type: 'screenshot_captured',
+              requestId: data.requestId,
+              success: false,
+              error: error.message
+            };
+            if (connection && connection.ws && connection.ws.readyState === WebSocket.OPEN) {
+              connection.ws.send(JSON.stringify(errorResponse));
+            }
+          });
+        } catch (e) {
+          console.error('[MCP Browser] Screenshot capture exception:', e);
+          const errorResponse = {
+            type: 'screenshot_captured',
+            requestId: data.requestId,
+            success: false,
+            error: e.message
+          };
+          if (connection && connection.ws && connection.ws.readyState === WebSocket.OPEN) {
+            connection.ws.send(JSON.stringify(errorResponse));
+          }
+        }
+        break;
+
       case 'query_logs':
         // Query console logs - this would need to be implemented in content script
         console.log(`[MCP Browser] Query logs requested`);

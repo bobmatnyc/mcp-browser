@@ -414,6 +414,7 @@ class WebSocketService:
                 "dom_response",
                 "page_content",
                 "semantic_dom_extracted",
+                "screenshot_captured",
             ]
             if message_type in response_messages:
                 logger.info(f"Broadcasting response message: {message_type}")
@@ -440,6 +441,7 @@ class WebSocketService:
                 "dom_command",
                 "extract_content",
                 "extract_semantic_dom",
+                "capture_screenshot",
             ]
             if message_type in browser_commands:
                 logger.info(f"Broadcasting browser command: {message_type}")

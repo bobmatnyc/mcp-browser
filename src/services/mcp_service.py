@@ -510,7 +510,7 @@ class MCPService:
     async def _handle_screenshot(
         self, arguments: Dict[str, Any]
     ) -> List[ImageContent | TextContent]:
-        """Handle screenshot capture.
+        """Handle screenshot capture - try extension first, then Playwright fallback.
 
         Args:
             arguments: Tool arguments
@@ -521,23 +521,33 @@ class MCPService:
         port = arguments.get("port")
         url = arguments.get("url")
 
-        if not self.screenshot_service:
-            return [TextContent(type="text", text="Screenshot service not available")]
+        # Try extension-based screenshot first
+        if self.browser_service:
+            result = await self.browser_service.capture_screenshot_via_extension(port)
+            if result and result.get("success"):
+                return [
+                    ImageContent(
+                        type="image", data=result["data"], mimeType="image/png"
+                    )
+                ]
 
-        screenshot_base64 = await self.screenshot_service.capture_screenshot(
-            port=port, url=url
-        )
+        # Fall back to Playwright screenshot service
+        if self.screenshot_service:
+            screenshot_base64 = await self.screenshot_service.capture_screenshot(
+                port=port, url=url
+            )
+            if screenshot_base64:
+                return [
+                    ImageContent(
+                        type="image", data=screenshot_base64, mimeType="image/png"
+                    )
+                ]
 
-        if screenshot_base64:
-            return [
-                ImageContent(type="image", data=screenshot_base64, mimeType="image/png")
-            ]
-        else:
-            return [
-                TextContent(
-                    type="text", text=f"Failed to capture screenshot for port {port}"
-                )
-            ]
+        return [
+            TextContent(
+                type="text", text=f"Failed to capture screenshot for port {port}"
+            )
+        ]
 
     async def _handle_click(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle element click.

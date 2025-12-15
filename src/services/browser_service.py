@@ -432,6 +432,78 @@ class BrowserService:
                 future.set_result(response)
                 logger.info(f"Received semantic DOM for request {request_id}")
 
+    async def capture_screenshot_via_extension(
+        self, port: int, timeout: float = 10.0
+    ) -> Dict[str, Any]:
+        """Capture screenshot via browser extension.
+
+        Args:
+            port: Port number
+            timeout: Timeout for capture operation
+
+        Returns:
+            Dict with success, data (base64), and mimeType or error
+        """
+        connection = await self.browser_state.get_connection(port)
+
+        if not connection or not connection.websocket:
+            return {"success": False, "error": "No active browser connection"}
+
+        try:
+            import uuid
+
+            request_id = str(uuid.uuid4())
+
+            response_future = asyncio.Future()
+            self._pending_requests[request_id] = {
+                "future": response_future,
+                "created_at": datetime.now(),
+            }
+
+            await connection.websocket.send(
+                json.dumps(
+                    {
+                        "type": "capture_screenshot",
+                        "requestId": request_id,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
+            )
+
+            try:
+                result = await asyncio.wait_for(response_future, timeout=timeout)
+                return result
+            except asyncio.TimeoutError:
+                return {
+                    "success": False,
+                    "error": f"Screenshot timed out after {timeout}s",
+                }
+            finally:
+                self._pending_requests.pop(request_id, None)
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def handle_screenshot_captured(self, data: Dict[str, Any]) -> None:
+        """Handle screenshot captured response from extension.
+
+        Args:
+            data: Response data including screenshot base64 data
+        """
+        request_id = data.get("requestId")
+        if request_id and request_id in self._pending_requests:
+            request_data = self._pending_requests[request_id]
+            future = request_data["future"]
+            if not future.done():
+                future.set_result(data)
+                logger.info(
+                    f"Received screenshot_captured response for request {request_id}"
+                )
+        else:
+            logger.warning(
+                f"Received screenshot_captured response for unknown request: {request_id}"
+            )
+
     async def _cleanup_pending_requests(self) -> None:
         """Clean up orphaned or expired pending requests.
 

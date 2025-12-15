@@ -273,6 +273,9 @@ class BrowserMCPServer:
         websocket.register_message_handler(
             "semantic_dom_extracted", browser.handle_semantic_dom_extracted
         )
+        websocket.register_message_handler(
+            "screenshot_captured", browser.handle_screenshot_captured
+        )
 
         # Register query_logs handler for get_logs message type
         # The websocket service will call this with extracted parameters
