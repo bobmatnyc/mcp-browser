@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.30] - 2025-12-15
+
+### Added
+- Playwright cache cleanup step in quickstart wizard
+- Auto-detects legacy Playwright browser cache and offers to remove it
+- Shows cache size and explains why cleanup is safe (Playwright removed in v2.2.29)
+
 ## [2.2.29] - 2025-12-15
 
 ### Removed
