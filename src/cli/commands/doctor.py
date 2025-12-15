@@ -484,10 +484,10 @@ async def _start_server_for_doctor() -> dict:
 
 
 async def _check_browser_extension_connection() -> dict:
-    """Check if browser extension is connected to the server via HTTP API."""
-    is_running, _, port = get_server_status()
+    """Check if browser extension is connected to the server."""
+    is_running, pid, port = get_server_status()
 
-    if not is_running:
+    if not is_running or port is None:
         return {
             "name": "Browser Extension",
             "status": "warning",
@@ -495,54 +495,38 @@ async def _check_browser_extension_connection() -> dict:
         }
 
     try:
-        import aiohttp
+        import subprocess
 
-        # The dashboard runs on port 8080 by default
-        dashboard_port = 8080
-        url = f"http://localhost:{dashboard_port}/api/status"
+        # Check for ESTABLISHED connections to the WebSocket port
+        result = subprocess.run(
+            ["lsof", "-i", f":{port}"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
 
-        async with aiohttp.ClientSession() as session:
-            try:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=3)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        extension_connected = data.get("extension", {}).get("connected", False)
-                        ws_port = data.get("websocket", {}).get("port")
-                        log_count = data.get("logs", {}).get("total", 0)
+        # Count ESTABLISHED connections (excluding the LISTEN entry which is the server itself)
+        lines = result.stdout.strip().split("\n")
+        established_connections = [l for l in lines if "ESTABLISHED" in l]
 
-                        if extension_connected:
-                            message = f"Connected on port {ws_port}"
-                            if log_count > 0:
-                                message += f", {log_count} logs captured"
-                            return {
-                                "name": "Browser Extension",
-                                "status": "pass",
-                                "message": message,
-                            }
-                        else:
-                            return {
-                                "name": "Browser Extension",
-                                "status": "warning",
-                                "message": "No extension connection detected",
-                                "fix": "Open extension popup and click 'Connect' on a backend",
-                            }
-                    else:
-                        return {
-                            "name": "Browser Extension",
-                            "status": "warning",
-                            "message": f"Dashboard API returned status {resp.status}",
-                            "fix": "Restart server with dashboard enabled",
-                        }
-            except aiohttp.ClientError as e:
-                # Dashboard might not be running - try WebSocket fallback
-                return await _check_extension_via_websocket(port)
-
-    except ImportError:
+        if established_connections:
+            return {
+                "name": "Browser Extension",
+                "status": "pass",
+                "message": f"Extension connected on port {port} ({len(established_connections)} active connection(s))",
+            }
+        else:
+            return {
+                "name": "Browser Extension",
+                "status": "warning",
+                "message": f"No extension connection detected on port {port}",
+                "fix": "Open extension popup and click 'Connect' on a backend",
+            }
+    except subprocess.TimeoutExpired:
         return {
             "name": "Browser Extension",
             "status": "warning",
-            "message": "aiohttp not available for HTTP check",
-            "fix": "Install aiohttp: pip install aiohttp",
+            "message": "Connection check timed out",
         }
     except Exception as e:
         return {
@@ -550,38 +534,6 @@ async def _check_browser_extension_connection() -> dict:
             "status": "warning",
             "message": f"Could not verify extension: {e}",
             "fix": "Ensure extension is loaded and connected",
-        }
-
-
-async def _check_extension_via_websocket(port: int) -> dict:
-    """Fallback: Check extension connection by counting WebSocket connections."""
-    try:
-        import websockets
-
-        # Simply try to connect - if there's already a browser extension connected,
-        # the server will have multiple connections
-        async def test_connection():
-            uri = f"ws://localhost:{port}"
-            async with websockets.connect(uri, open_timeout=2.0) as ws:
-                # Connection successful - server is accepting connections
-                # We can't tell if browser extension is connected this way
-                # but at least we know server is responding
-                return True
-
-        await test_connection()
-
-        return {
-            "name": "Browser Extension",
-            "status": "warning",
-            "message": "Server accepting connections (dashboard not available for detailed check)",
-            "fix": "Start server with dashboard: mcp-browser start --dashboard",
-        }
-    except Exception as e:
-        return {
-            "name": "Browser Extension",
-            "status": "warning",
-            "message": f"WebSocket check failed: {e}",
-            "fix": "Ensure server is running and extension is connected",
         }
 
 
