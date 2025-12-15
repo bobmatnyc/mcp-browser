@@ -219,10 +219,16 @@ ext-deploy: ## Deploy extensions from source to mcp-browser-extensions/
 	@cp -r src/extensions/chrome mcp-browser-extensions/chrome
 	@cp -r src/extensions/firefox mcp-browser-extensions/firefox
 	@if [ -d src/extensions/safari ]; then cp -r src/extensions/safari mcp-browser-extensions/safari; fi
-	@echo "$(GREEN)✓ Extensions deployed to mcp-browser-extensions/$(NC)"
+	@VERSION=$$(grep -m1 '__version__' src/_version.py | cut -d'"' -f2); \
+	TIMESTAMP=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
+	echo "mcp-browser extension v$$VERSION" > mcp-browser-extensions/VERSION.txt; \
+	echo "Deployed: $$TIMESTAMP" >> mcp-browser-extensions/VERSION.txt; \
+	echo "Source: src/extensions/" >> mcp-browser-extensions/VERSION.txt; \
+	echo "$(GREEN)✓ Extensions deployed to mcp-browser-extensions/ (v$$VERSION)$(NC)"
 	@echo "  - Chrome:  mcp-browser-extensions/chrome/"
 	@echo "  - Firefox: mcp-browser-extensions/firefox/"
 	@test -d mcp-browser-extensions/safari && echo "  - Safari:  mcp-browser-extensions/safari/" || true
+	@cat mcp-browser-extensions/VERSION.txt
 
 # ============================================================================
 # Docker Development

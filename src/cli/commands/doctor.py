@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import time
 from pathlib import Path
 
 import click
@@ -128,7 +129,21 @@ async def _doctor_command(fix: bool, verbose: bool):
     ws_result = await _check_websocket_connectivity()
     results.append(ws_result)
 
-    # Test 9: System Requirements (if verbose)
+    # Test 9: Browser Extension Connection (if server running)
+    console.print("[cyan]→ Checking browser extension connection...[/cyan]")
+    ext_result = await _check_browser_extension_connection()
+    results.append(ext_result)
+
+    # Test 10: Console Log Capture (if extension connected)
+    if ext_result.get("status") == "pass":
+        console.print("[cyan]→ Testing console log capture...[/cyan]")
+        results.append(await _check_console_log_capture())
+
+        # Test 11: Browser Control (if extension connected)
+        console.print("[cyan]→ Testing browser control...[/cyan]")
+        results.append(await _check_browser_control())
+
+    # Test 12: System Requirements (if verbose)
     if verbose:
         console.print("[cyan]→ Checking system requirements...[/cyan]")
         results.append(await _check_system_requirements())
@@ -415,6 +430,209 @@ async def _check_system_requirements() -> dict:
         "status": "pass",
         "message": "All system requirements met",
     }
+
+
+async def _check_browser_extension_connection() -> dict:
+    """Check if browser extension is connected to the server."""
+    is_running, _, port = get_server_status()
+
+    if not is_running:
+        return {
+            "name": "Browser Extension",
+            "status": "warning",
+            "message": "Server not running, cannot check extension",
+        }
+
+    try:
+        import websockets
+
+        connected_tabs = []
+        extension_version = None
+
+        async def check_extension():
+            nonlocal connected_tabs, extension_version
+            uri = f"ws://localhost:{port}"
+            async with websockets.connect(uri, open_timeout=3.0) as ws:
+                # Send a status request
+                await ws.send(json.dumps({
+                    "type": "get_status",
+                    "requestId": f"doctor_{int(time.time() * 1000)}"
+                }))
+
+                # Wait for response with timeout
+                try:
+                    response = await asyncio.wait_for(ws.recv(), timeout=3.0)
+                    data = json.loads(response)
+
+                    if data.get("type") == "status":
+                        connected_tabs = data.get("connectedTabs", [])
+                        extension_version = data.get("extensionVersion")
+                        return True
+                    elif data.get("type") == "error":
+                        return False
+                except asyncio.TimeoutError:
+                    return False
+
+            return False
+
+        result = await check_extension()
+
+        if result and connected_tabs:
+            tab_count = len(connected_tabs)
+            version_info = f" (v{extension_version})" if extension_version else ""
+            return {
+                "name": "Browser Extension",
+                "status": "pass",
+                "message": f"Connected{version_info}, {tab_count} active tab(s)",
+            }
+        elif result:
+            return {
+                "name": "Browser Extension",
+                "status": "warning",
+                "message": "Server responding but no tabs connected",
+                "fix": "Open extension popup and click 'Scan for Backends'",
+            }
+        else:
+            return {
+                "name": "Browser Extension",
+                "status": "warning",
+                "message": "No extension connection detected",
+                "fix": "Load extension and connect to server",
+            }
+
+    except Exception as e:
+        return {
+            "name": "Browser Extension",
+            "status": "warning",
+            "message": f"Could not verify extension: {e}",
+            "fix": "Ensure extension is loaded and connected",
+        }
+
+
+async def _check_console_log_capture() -> dict:
+    """Test console log capture functionality."""
+    is_running, _, port = get_server_status()
+
+    if not is_running:
+        return {
+            "name": "Console Log Capture",
+            "status": "warning",
+            "message": "Server not running",
+        }
+
+    try:
+        import websockets
+
+        async def test_logs():
+            uri = f"ws://localhost:{port}"
+            async with websockets.connect(uri, open_timeout=3.0) as ws:
+                # Request console logs
+                await ws.send(json.dumps({
+                    "type": "get_logs",
+                    "requestId": f"doctor_logs_{int(time.time() * 1000)}",
+                    "lastN": 10
+                }))
+
+                try:
+                    response = await asyncio.wait_for(ws.recv(), timeout=3.0)
+                    data = json.loads(response)
+
+                    if data.get("type") == "logs":
+                        logs = data.get("logs", [])
+                        return len(logs), None
+                    elif data.get("type") == "error":
+                        return 0, data.get("message", "Unknown error")
+                except asyncio.TimeoutError:
+                    return 0, "Timeout waiting for response"
+
+            return 0, "Connection closed"
+
+        log_count, error = await test_logs()
+
+        if error:
+            return {
+                "name": "Console Log Capture",
+                "status": "warning",
+                "message": f"Log capture not working: {error}",
+                "fix": "Ensure tab is connected via extension",
+            }
+
+        return {
+            "name": "Console Log Capture",
+            "status": "pass",
+            "message": f"Working ({log_count} recent logs)",
+        }
+
+    except Exception as e:
+        return {
+            "name": "Console Log Capture",
+            "status": "warning",
+            "message": f"Could not test: {e}",
+        }
+
+
+async def _check_browser_control() -> dict:
+    """Test browser control capabilities."""
+    is_running, _, port = get_server_status()
+
+    if not is_running:
+        return {
+            "name": "Browser Control",
+            "status": "warning",
+            "message": "Server not running",
+        }
+
+    try:
+        import websockets
+
+        capabilities = []
+
+        async def test_control():
+            uri = f"ws://localhost:{port}"
+            async with websockets.connect(uri, open_timeout=3.0) as ws:
+                # Request capabilities
+                await ws.send(json.dumps({
+                    "type": "get_capabilities",
+                    "requestId": f"doctor_caps_{int(time.time() * 1000)}"
+                }))
+
+                try:
+                    response = await asyncio.wait_for(ws.recv(), timeout=3.0)
+                    data = json.loads(response)
+
+                    if data.get("type") == "capabilities":
+                        return data.get("capabilities", []), data.get("controlMethod")
+                    elif data.get("type") == "error":
+                        return [], None
+                except asyncio.TimeoutError:
+                    return [], None
+
+            return [], None
+
+        caps, method = await test_control()
+
+        if caps:
+            cap_str = ", ".join(caps[:3])
+            method_str = f" via {method}" if method else ""
+            return {
+                "name": "Browser Control",
+                "status": "pass",
+                "message": f"Available{method_str}: {cap_str}",
+            }
+        else:
+            return {
+                "name": "Browser Control",
+                "status": "warning",
+                "message": "No browser control available",
+                "fix": "Connect extension or launch Chrome with --remote-debugging-port",
+            }
+
+    except Exception as e:
+        return {
+            "name": "Browser Control",
+            "status": "warning",
+            "message": f"Could not test: {e}",
+        }
 
 
 def _display_results(results: list, verbose: bool):
