@@ -616,11 +616,26 @@ async def _step_dom_interaction(port: int) -> Optional[str]:
 
     try:
         if choice == "1":
-            # Demo form filling
-            console.print("\n[cyan]→ Demonstrating form filling...[/cyan]")
-            console.print(
-                "[dim]Note: This works best on httpbin.org/forms/post[/dim]\n"
+            # Demo form filling - navigate to httpbin forms first
+            console.print("\n[cyan]→ Navigating to httpbin.org/forms/post...[/cyan]")
+
+            # Navigate to form page
+            nav_request_id = f"demo_nav_{int(time.time() * 1000)}"
+            await client.websocket.send(
+                json.dumps(
+                    {
+                        "type": "navigate",
+                        "requestId": nav_request_id,
+                        "url": "https://httpbin.org/forms/post",
+                    }
+                )
             )
+
+            # Wait for navigation and page load
+            await asyncio.sleep(2.0)
+            console.print("[green]✓ Page loaded[/green]\n")
+
+            console.print("[cyan]→ Demonstrating form filling...[/cyan]")
 
             # Try to fill a form field
             request_id = f"demo_fill_{int(time.time() * 1000)}"
