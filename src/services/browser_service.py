@@ -176,6 +176,31 @@ class BrowserService:
                 "DOM response received but no DOM interaction service available"
             )
 
+    async def _get_connection_with_fallback(
+        self, port: int
+    ) -> Optional[Any]:  # Returns BrowserConnection
+        """Get connection by port, with fallback to any active connection.
+
+        Args:
+            port: Port number (may be server port or client port)
+
+        Returns:
+            BrowserConnection if found, None otherwise
+        """
+        # Try exact port match first
+        connection = await self.browser_state.get_connection(port)
+
+        # If no exact match and port looks like a server port (8851-8895),
+        # fall back to any active connection
+        if not connection and 8851 <= port <= 8895:
+            connection = await self.browser_state.get_any_active_connection()
+            if connection:
+                logger.debug(
+                    f"Port {port} is server port, using client port {connection.port}"
+                )
+
+        return connection
+
     async def send_dom_command(
         self, port: int, command: Dict[str, Any], tab_id: Optional[int] = None
     ) -> bool:
@@ -189,10 +214,10 @@ class BrowserService:
         Returns:
             True if command was sent successfully
         """
-        connection = await self.browser_state.get_connection(port)
+        connection = await self._get_connection_with_fallback(port)
 
         if not connection or not connection.websocket:
-            logger.warning(f"No active browser connection on port {port}")
+            logger.warning(f"No active browser connection for port {port}")
             return False
 
         try:
@@ -229,10 +254,10 @@ class BrowserService:
         Returns:
             True if navigation command was sent successfully
         """
-        connection = await self.browser_state.get_connection(port)
+        connection = await self._get_connection_with_fallback(port)
 
         if not connection or not connection.websocket:
-            logger.warning(f"No active browser connection on port {port}")
+            logger.warning(f"No active browser connection for port {port}")
             return False
 
         try:
@@ -301,10 +326,10 @@ class BrowserService:
         Returns:
             Dict containing extracted content or error information
         """
-        connection = await self.browser_state.get_connection(port)
+        connection = await self._get_connection_with_fallback(port)
 
         if not connection or not connection.websocket:
-            logger.warning(f"No active browser connection on port {port}")
+            logger.warning(f"No active browser connection for port {port}")
             return {"success": False, "error": "No active browser connection"}
 
         try:
@@ -360,7 +385,7 @@ class BrowserService:
         timeout: float = 10.0,
     ) -> Dict[str, Any]:
         """Extract semantic DOM structure from browser tab."""
-        connection = await self.browser_state.get_connection(port)
+        connection = await self._get_connection_with_fallback(port)
 
         if not connection or not connection.websocket:
             return {"success": False, "error": "No active browser connection"}
@@ -444,7 +469,7 @@ class BrowserService:
         Returns:
             Dict with success, data (base64), and mimeType or error
         """
-        connection = await self.browser_state.get_connection(port)
+        connection = await self._get_connection_with_fallback(port)
 
         if not connection or not connection.websocket:
             return {"success": False, "error": "No active browser connection"}

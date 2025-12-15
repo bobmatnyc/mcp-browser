@@ -115,6 +115,21 @@ class BrowserState:
             if port in self.connections:
                 self.connections[port].url = url
 
+    async def get_any_active_connection(self) -> Optional[BrowserConnection]:
+        """Get any active connection (fallback when server port is used instead of client port).
+
+        This is useful when MCP tools pass the server port (8851-8895) but connections
+        are keyed by the client's ephemeral port (e.g., 57803).
+
+        Returns:
+            First active connection found, or None if no active connections exist
+        """
+        async with self._lock:
+            for conn in self.connections.values():
+                if conn.is_active:
+                    return conn
+            return None
+
     async def get_active_connections(self) -> Dict[int, BrowserConnection]:
         """Get all active connections.
 

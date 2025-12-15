@@ -337,7 +337,7 @@ class DOMInteractionService:
         self._pending_requests[request_id] = future
 
         # Send get tabs command
-        connection = await self.browser_service.browser_state.get_connection(port)
+        connection = await self.browser_service._get_connection_with_fallback(port)
         if not connection or not connection.websocket:
             return []
 
@@ -371,7 +371,7 @@ class DOMInteractionService:
         self._pending_requests[request_id] = future
 
         # Send activate tab command
-        connection = await self.browser_service.browser_state.get_connection(port)
+        connection = await self.browser_service._get_connection_with_fallback(port)
         if not connection or not connection.websocket:
             return False
 
@@ -413,11 +413,11 @@ class DOMInteractionService:
         if not self.browser_service:
             return {"success": False, "error": "Browser service not available"}
 
-        connection = await self.browser_service.browser_state.get_connection(port)
+        connection = await self.browser_service._get_connection_with_fallback(port)
         if not connection or not connection.websocket:
             return {
                 "success": False,
-                "error": f"No active browser connection on port {port}",
+                "error": f"No active browser connection for port {port}",
             }
 
         # Generate request ID
