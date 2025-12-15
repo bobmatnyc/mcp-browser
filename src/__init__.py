@@ -7,7 +7,6 @@ from .models import BrowserConnection, BrowserState, ConsoleLevel, ConsoleMessag
 from .services import (
     BrowserService,
     MCPService,
-    ScreenshotService,
     StorageService,
     WebSocketService,
 )
@@ -18,7 +17,6 @@ __all__ = [
     "WebSocketService",
     "BrowserService",
     "MCPService",
-    "ScreenshotService",
     # Models
     "ConsoleMessage",
     "ConsoleLevel",

@@ -132,39 +132,8 @@ def quickstart(ctx):
     else:
         console.print("  [dim]✓ Configuration exists[/dim]")
 
-    # Step 5: Install Playwright browsers if needed
-    console.print("\n[bold]Step 5: Setting up Playwright (for screenshots)...[/bold]")
-
-    try:
-        import importlib.util
-
-        playwright_spec = importlib.util.find_spec("playwright")
-        if playwright_spec is None:
-            raise ImportError("playwright not found")
-
-        if Confirm.ask("\nInstall Playwright browsers for screenshot support?"):
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                transient=True,
-            ) as progress:
-                progress.add_task("Installing Playwright browsers...", total=None)
-                subprocess.run(
-                    [sys.executable, "-m", "playwright", "install", "chromium"],
-                    check=True,
-                )
-            console.print("  [green]✓[/green] Playwright browsers installed")
-    except ImportError:
-        console.print(
-            "  [yellow]⚠[/yellow] Playwright not installed (screenshots won't work)"
-        )
-    except Exception as e:
-        console.print(
-            f"  [yellow]⚠[/yellow] Could not install Playwright browsers: {e}"
-        )
-
-    # Step 6: Start server
-    console.print("\n[bold]Step 6: Starting the server...[/bold]")
+    # Step 5: Start server
+    console.print("\n[bold]Step 5: Starting the server...[/bold]")
 
     if Confirm.ask("\nStart the MCP Browser server now?"):
         console.print("\n[green]✨ Setup complete![/green]")

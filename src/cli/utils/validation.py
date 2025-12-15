@@ -61,14 +61,6 @@ async def check_system_requirements() -> List[Tuple[str, bool, str]]:
             pass
     checks.append(("Node.js (optional)", node_found, node_version))
 
-    # Playwright browsers
-    playwright_ok = False
-    try:
-        playwright_ok = True
-    except Exception:
-        pass
-    checks.append(("Playwright", playwright_ok, "For screenshots"))
-
     # Port availability
     from .daemon import PORT_RANGE_END, PORT_RANGE_START
 

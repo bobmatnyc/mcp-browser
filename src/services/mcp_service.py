@@ -1,4 +1,12 @@
-"""MCP server implementation."""
+"""MCP server implementation with consolidated tools.
+
+This module provides 5 consolidated MCP tools for browser control:
+- browser_action: navigate, click, fill, select, wait
+- browser_query: logs, element, capabilities
+- browser_screenshot: capture screenshots
+- browser_form: fill_form (multi-field), submit_form
+- browser_extract: content, semantic_dom
+"""
 
 import logging
 from typing import Any, Dict, List, Optional
@@ -32,12 +40,19 @@ def _get_daemon_port() -> Optional[int]:
 
 
 class MCPService:
-    """MCP server for browser tools."""
+    """MCP server for browser tools with consolidated tool set.
+
+    Provides 5 tools instead of 13 for improved LLM efficiency:
+    - browser_action: navigate, click, fill, select, wait
+    - browser_query: logs, element, capabilities
+    - browser_screenshot: capture screenshots
+    - browser_form: fill_form, submit_form
+    - browser_extract: content, semantic_dom
+    """
 
     def __init__(
         self,
         browser_service=None,
-        screenshot_service=None,
         dom_interaction_service=None,
         browser_controller=None,
         capability_detector=None,
@@ -46,13 +61,11 @@ class MCPService:
 
         Args:
             browser_service: Browser service for navigation and logs
-            screenshot_service: Screenshot service for captures
             dom_interaction_service: DOM interaction service for element manipulation
             browser_controller: Optional BrowserController for AppleScript fallback
             capability_detector: Optional CapabilityDetector for capability reporting
         """
         self.browser_service = browser_service
-        self.screenshot_service = screenshot_service
         self.dom_interaction_service = dom_interaction_service
         self.browser_controller = browser_controller
         self.capability_detector = capability_detector
@@ -60,49 +73,107 @@ class MCPService:
         # Initialize server with version info
         self.server = Server(
             name="mcp-browser",
-            version="1.0.3",
-            instructions="Browser control and console log capture for web automation",
+            version="2.0.0",  # Major version bump for consolidated tools
+            instructions="Browser control and console log capture for web automation. "
+                        "Uses 5 consolidated tools for efficient interaction.",
         )
         self._setup_tools()
 
     def _setup_tools(self) -> None:
-        """Set up MCP tools."""
+        """Set up consolidated MCP tools (5 tools instead of 13)."""
 
         @self.server.list_tools()
         async def handle_list_tools() -> list[Tool]:
             """List available tools."""
             return [
+                # Tool 1: browser_action - navigate, click, fill, select, wait
                 Tool(
-                    name="browser_navigate",
-                    description="Navigate browser to a specific URL",
+                    name="browser_action",
+                    description="Perform browser actions: navigate to URL, click elements, "
+                                "fill single form field, select dropdown option, or wait for element",
                     inputSchema={
                         "type": "object",
                         "properties": {
+                            "action": {
+                                "type": "string",
+                                "enum": ["navigate", "click", "fill", "select", "wait"],
+                                "description": "Action to perform",
+                            },
                             "port": {
                                 "type": "integer",
                                 "description": "Browser port (optional, auto-detected from running daemon)",
                             },
+                            # navigate params
                             "url": {
                                 "type": "string",
-                                "description": "URL to navigate to",
+                                "description": "[navigate] URL to navigate to",
+                            },
+                            # click/fill/select/wait params
+                            "selector": {
+                                "type": "string",
+                                "description": "[click/fill/select/wait] CSS selector for element",
+                            },
+                            "xpath": {
+                                "type": "string",
+                                "description": "[click/fill/select] XPath expression for element",
+                            },
+                            "text": {
+                                "type": "string",
+                                "description": "[click] Text content to match for clicking",
+                            },
+                            "index": {
+                                "type": "integer",
+                                "description": "[click/fill] Element index if multiple matches",
+                                "default": 0,
+                            },
+                            # fill params
+                            "value": {
+                                "type": "string",
+                                "description": "[fill] Value to fill in the field",
+                            },
+                            # select params
+                            "option_value": {
+                                "type": "string",
+                                "description": "[select] Option value attribute to select",
+                            },
+                            "option_text": {
+                                "type": "string",
+                                "description": "[select] Option text content to select",
+                            },
+                            "option_index": {
+                                "type": "integer",
+                                "description": "[select] Option index to select",
+                            },
+                            # wait params
+                            "timeout": {
+                                "type": "integer",
+                                "description": "[wait] Timeout in milliseconds",
+                                "default": 5000,
                             },
                         },
-                        "required": ["url"],
+                        "required": ["action"],
                     },
                 ),
+                # Tool 2: browser_query - logs, element, capabilities
                 Tool(
-                    name="browser_query_logs",
-                    description="Query console logs from browser",
+                    name="browser_query",
+                    description="Query browser state: get console logs, element info, or capabilities",
                     inputSchema={
                         "type": "object",
                         "properties": {
+                            "query": {
+                                "type": "string",
+                                "enum": ["logs", "element", "capabilities"],
+                                "description": "Type of query to perform",
+                            },
                             "port": {
                                 "type": "integer",
                                 "description": "Browser port (optional, auto-detected from running daemon)",
                             },
+                            # logs params
                             "last_n": {
                                 "type": "integer",
-                                "description": "Number of recent logs to return",
+                                "description": "[logs] Number of recent logs to return",
                                 "default": 100,
                             },
                             "level_filter": {
@@ -111,12 +182,26 @@ class MCPService:
                                     "type": "string",
                                     "enum": ["debug", "info", "log", "warn", "error"],
                                 },
-                                "description": "Filter by log levels",
+                                "description": "[logs] Filter by log levels",
+                            },
+                            # element params
+                            "selector": {
+                                "type": "string",
+                                "description": "[element] CSS selector for the element",
+                            },
+                            "xpath": {
+                                "type": "string",
+                                "description": "[element] XPath expression for the element",
+                            },
+                            "text": {
+                                "type": "string",
+                                "description": "[element] Text content to match",
                             },
                         },
-                        "required": [],
+                        "required": ["query"],
                     },
                 ),
+                # Tool 3: browser_screenshot - standalone for visual feedback
                 Tool(
                     name="browser_screenshot",
                     description="Capture a screenshot of browser viewport",
@@ -135,199 +220,58 @@ class MCPService:
                         "required": [],
                     },
                 ),
+                # Tool 4: browser_form - fill_form (multi-field), submit
                 Tool(
-                    name="browser_click",
-                    description="Click an element on the page",
+                    name="browser_form",
+                    description="Form operations: fill multiple fields at once or submit form",
                     inputSchema={
                         "type": "object",
                         "properties": {
+                            "action": {
+                                "type": "string",
+                                "enum": ["fill", "submit"],
+                                "description": "Form action to perform",
+                            },
                             "port": {
                                 "type": "integer",
                                 "description": "Browser port (optional, auto-detected from running daemon)",
                             },
-                            "selector": {
-                                "type": "string",
-                                "description": "CSS selector for the element",
-                            },
-                            "xpath": {
-                                "type": "string",
-                                "description": "XPath expression for the element",
-                            },
-                            "text": {
-                                "type": "string",
-                                "description": "Text content to match",
-                            },
-                            "index": {
-                                "type": "integer",
-                                "description": "Element index if multiple matches",
-                                "default": 0,
-                            },
-                        },
-                        "required": [],
-                    },
-                ),
-                Tool(
-                    name="browser_fill_field",
-                    description="Fill a form field with a value",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "port": {
-                                "type": "integer",
-                                "description": "Browser port (optional, auto-detected from running daemon)",
-                            },
-                            "selector": {
-                                "type": "string",
-                                "description": "CSS selector for the field",
-                            },
-                            "xpath": {
-                                "type": "string",
-                                "description": "XPath expression for the field",
-                            },
-                            "value": {
-                                "type": "string",
-                                "description": "Value to fill in the field",
-                            },
-                            "index": {
-                                "type": "integer",
-                                "description": "Field index if multiple matches",
-                                "default": 0,
-                            },
-                        },
-                        "required": ["value"],
-                    },
-                ),
-                Tool(
-                    name="browser_fill_form",
-                    description="Fill multiple form fields at once",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "port": {
-                                "type": "integer",
-                                "description": "Browser port (optional, auto-detected from running daemon)",
-                            },
+                            # fill params
                             "form_data": {
                                 "type": "object",
-                                "description": "Object mapping selectors to values",
+                                "description": "[fill] Object mapping selectors to values",
                                 "additionalProperties": {"type": "string"},
                             },
                             "submit": {
                                 "type": "boolean",
-                                "description": "Submit form after filling",
+                                "description": "[fill] Submit form after filling",
                                 "default": False,
                             },
-                        },
-                        "required": ["form_data"],
-                    },
-                ),
-                Tool(
-                    name="browser_submit_form",
-                    description="Submit a form",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "port": {
-                                "type": "integer",
-                                "description": "Browser port (optional, auto-detected from running daemon)",
-                            },
+                            # submit params
                             "selector": {
                                 "type": "string",
-                                "description": "CSS selector for form or form element",
+                                "description": "[submit] CSS selector for form or form element",
                             },
                             "xpath": {
                                 "type": "string",
-                                "description": "XPath expression for form",
+                                "description": "[submit] XPath expression for form",
                             },
                         },
-                        "required": [],
+                        "required": ["action"],
                     },
                 ),
+                # Tool 5: browser_extract - content, semantic_dom
                 Tool(
-                    name="browser_get_element",
-                    description="Get information about an element",
+                    name="browser_extract",
+                    description="Extract page content: readable article content or semantic DOM structure",
                     inputSchema={
                         "type": "object",
                         "properties": {
-                            "port": {
-                                "type": "integer",
-                                "description": "Browser port (optional, auto-detected from running daemon)",
-                            },
-                            "selector": {
+                            "extract": {
                                 "type": "string",
-                                "description": "CSS selector for the element",
+                                "enum": ["content", "semantic_dom"],
+                                "description": "Type of extraction: content (readable article) or semantic_dom (structure)",
                             },
-                            "xpath": {
-                                "type": "string",
-                                "description": "XPath expression for the element",
-                            },
-                            "text": {
-                                "type": "string",
-                                "description": "Text content to match",
-                            },
-                        },
-                        "required": [],
-                    },
-                ),
-                Tool(
-                    name="browser_wait_for_element",
-                    description="Wait for an element to appear on the page",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "port": {
-                                "type": "integer",
-                                "description": "Browser port (optional, auto-detected from running daemon)",
-                            },
-                            "selector": {
-                                "type": "string",
-                                "description": "CSS selector for the element",
-                            },
-                            "timeout": {
-                                "type": "integer",
-                                "description": "Timeout in milliseconds",
-                                "default": 5000,
-                            },
-                        },
-                        "required": ["selector"],
-                    },
-                ),
-                Tool(
-                    name="browser_select_option",
-                    description="Select an option from a dropdown",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "port": {
-                                "type": "integer",
-                                "description": "Browser port (optional, auto-detected from running daemon)",
-                            },
-                            "selector": {
-                                "type": "string",
-                                "description": "CSS selector for select element",
-                            },
-                            "option_value": {
-                                "type": "string",
-                                "description": "Option value attribute",
-                            },
-                            "option_text": {
-                                "type": "string",
-                                "description": "Option text content",
-                            },
-                            "option_index": {
-                                "type": "integer",
-                                "description": "Option index",
-                            },
-                        },
-                        "required": ["selector"],
-                    },
-                ),
-                Tool(
-                    name="browser_extract_content",
-                    description="Extract readable content from the current page using Mozilla's Readability",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
                             "port": {
                                 "type": "integer",
                                 "description": "Browser port (optional, auto-detected from running daemon)",
@@ -336,55 +280,29 @@ class MCPService:
                                 "type": "integer",
                                 "description": "Optional specific tab ID to extract from",
                             },
-                        },
-                        "required": [],
-                    },
-                ),
-                Tool(
-                    name="browser_extract_semantic_dom",
-                    description="Extract semantic DOM structure (headings, landmarks, links, forms) for quick page understanding",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "port": {
-                                "type": "integer",
-                                "description": "Browser port (optional, auto-detected from running daemon)",
-                            },
-                            "tab_id": {
-                                "type": "integer",
-                                "description": "Optional specific tab ID",
-                            },
+                            # semantic_dom params
                             "include_headings": {
                                 "type": "boolean",
-                                "description": "Extract h1-h6 headings (default: true)",
+                                "description": "[semantic_dom] Extract h1-h6 headings (default: true)",
                             },
                             "include_landmarks": {
                                 "type": "boolean",
-                                "description": "Extract ARIA landmarks and HTML5 sectioning (default: true)",
+                                "description": "[semantic_dom] Extract ARIA landmarks (default: true)",
                             },
                             "include_links": {
                                 "type": "boolean",
-                                "description": "Extract links with text (default: true)",
+                                "description": "[semantic_dom] Extract links with text (default: true)",
                             },
                             "include_forms": {
                                 "type": "boolean",
-                                "description": "Extract forms and fields (default: true)",
+                                "description": "[semantic_dom] Extract forms and fields (default: true)",
                             },
                             "max_text_length": {
                                 "type": "integer",
-                                "description": "Max characters per text field (default: 100)",
+                                "description": "[semantic_dom] Max characters per text field (default: 100)",
                             },
                         },
-                        "required": [],
-                    },
-                ),
-                Tool(
-                    name="get_capabilities",
-                    description="Get current browser control capabilities and available methods",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {},
-                        "required": [],
+                        "required": ["extract"],
                     },
                 ),
             ]
@@ -393,34 +311,18 @@ class MCPService:
         async def handle_call_tool(
             name: str, arguments: dict
         ) -> list[TextContent | ImageContent]:
-            """Handle tool calls."""
+            """Handle tool calls with routing to consolidated handlers."""
 
-            if name == "browser_navigate":
-                return await self._handle_navigate(arguments)
-            elif name == "browser_query_logs":
-                return await self._handle_query_logs(arguments)
+            if name == "browser_action":
+                return await self._handle_browser_action(arguments)
+            elif name == "browser_query":
+                return await self._handle_browser_query(arguments)
             elif name == "browser_screenshot":
                 return await self._handle_screenshot(arguments)
-            elif name == "browser_click":
-                return await self._handle_click(arguments)
-            elif name == "browser_fill_field":
-                return await self._handle_fill_field(arguments)
-            elif name == "browser_fill_form":
-                return await self._handle_fill_form(arguments)
-            elif name == "browser_submit_form":
-                return await self._handle_submit_form(arguments)
-            elif name == "browser_get_element":
-                return await self._handle_get_element(arguments)
-            elif name == "browser_wait_for_element":
-                return await self._handle_wait_for_element(arguments)
-            elif name == "browser_select_option":
-                return await self._handle_select_option(arguments)
-            elif name == "browser_extract_content":
-                return await self._handle_extract_content(arguments)
-            elif name == "browser_extract_semantic_dom":
-                return await self._handle_extract_semantic_dom(arguments)
-            elif name == "get_capabilities":
-                return await self._handle_get_capabilities(arguments)
+            elif name == "browser_form":
+                return await self._handle_browser_form(arguments)
+            elif name == "browser_extract":
+                return await self._handle_browser_extract(arguments)
             else:
                 return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
@@ -472,18 +374,43 @@ class MCPService:
             "No port specified and no running daemon found. Start with: mcp-browser start",
         )
 
-    async def _handle_navigate(self, arguments: Dict[str, Any]) -> List[TextContent]:
-        """Handle browser navigation with automatic AppleScript fallback.
+    # ========================================================================
+    # Consolidated Handler: browser_action (navigate, click, fill, select, wait)
+    # ========================================================================
 
-        Args:
-            arguments: Tool arguments
+    async def _handle_browser_action(
+        self, arguments: Dict[str, Any]
+    ) -> List[TextContent]:
+        """Handle browser_action tool - consolidated actions.
 
-        Returns:
-            List of text content responses
+        Actions: navigate, click, fill, select, wait
         """
-        url = arguments.get("url")
+        action = arguments.get("action")
 
-        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
+        if action == "navigate":
+            return await self._action_navigate(arguments)
+        elif action == "click":
+            return await self._action_click(arguments)
+        elif action == "fill":
+            return await self._action_fill(arguments)
+        elif action == "select":
+            return await self._action_select(arguments)
+        elif action == "wait":
+            return await self._action_wait(arguments)
+        else:
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Unknown action: {action}. Valid: navigate, click, fill, select, wait",
+                )
+            ]
+
+    async def _action_navigate(self, arguments: Dict[str, Any]) -> List[TextContent]:
+        """Handle navigation action."""
+        url = arguments.get("url")
+        if not url:
+            return [TextContent(type="text", text="Error: 'url' is required for navigate action")]
+
         port, port_warning = self._resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
@@ -498,155 +425,41 @@ class MCPService:
                     return [
                         TextContent(
                             type="text",
-                            text=f"Successfully navigated to {url} using AppleScript fallback.\n\n"
-                            f"Note: Console log capture requires the browser extension.\n"
-                            f"Install extension: mcp-browser quickstart",
+                            text=f"Navigated to {url} using AppleScript fallback.\n"
+                            f"Note: Console log capture requires the browser extension.",
                         )
                     ]
                 else:
                     return [
                         TextContent(
                             type="text",
-                            text=f"Successfully navigated browser on port {port} to {url}",
+                            text=f"Navigated to {url} on port {port}",
                         )
                     ]
             else:
                 error_msg = result.get("error", "Unknown error")
-                return [
-                    TextContent(type="text", text=f"Failed to navigate: {error_msg}")
-                ]
+                return [TextContent(type="text", text=f"Navigation failed: {error_msg}")]
 
-        # Fallback to direct browser_service (legacy path)
+        # Fallback to direct browser_service
         if not self.browser_service:
             return [TextContent(type="text", text="Browser service not available")]
 
         success = await self.browser_service.navigate_browser(port, url)
-
         if success:
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Successfully navigated browser on port {port} to {url}",
-                )
-            ]
+            return [TextContent(type="text", text=f"Navigated to {url} on port {port}")]
         else:
             return [
                 TextContent(
                     type="text",
-                    text=f"Failed to navigate browser on port {port}. "
-                    f"No active connection found.",
+                    text=f"Navigation failed on port {port}. No active connection.",
                 )
             ]
 
-    async def _handle_query_logs(self, arguments: Dict[str, Any]) -> List[TextContent]:
-        """Handle log query.
-
-        Args:
-            arguments: Tool arguments
-
-        Returns:
-            List of text content responses
-        """
-        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
-        port, port_warning = self._resolve_port(arguments.get("port"))
-        if port is None:
-            return [TextContent(type="text", text=port_warning or "No port available")]
-
-        last_n = arguments.get("last_n", 100)
-        level_filter = arguments.get("level_filter")
-
-        if not self.browser_service:
-            return [TextContent(type="text", text="Browser service not available")]
-
-        messages = await self.browser_service.query_logs(
-            port=port, last_n=last_n, level_filter=level_filter
-        )
-
-        if not messages:
-            return [
-                TextContent(type="text", text=f"No console logs found for port {port}")
-            ]
-
-        # Format messages
-        log_lines = []
-        for msg in messages:
-            timestamp = msg.timestamp.strftime("%H:%M:%S.%f")[:-3]
-            level = msg.level.value.upper()
-            log_lines.append(f"[{timestamp}] [{level}] {msg.message}")
-
-            if msg.stack_trace:
-                log_lines.append(f"  Stack: {msg.stack_trace[:200]}")
-
-        log_text = "\n".join(log_lines)
-
-        return [
-            TextContent(
-                type="text",
-                text=f"Console logs from port {port} (last {len(messages)} messages):\n\n{log_text}",
-            )
-        ]
-
-    async def _handle_screenshot(
-        self, arguments: Dict[str, Any]
-    ) -> List[ImageContent | TextContent]:
-        """Handle screenshot capture - try extension first, then Playwright fallback.
-
-        Args:
-            arguments: Tool arguments
-
-        Returns:
-            List of image or text content responses
-        """
-        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
-        port, port_warning = self._resolve_port(arguments.get("port"))
-        if port is None:
-            return [TextContent(type="text", text=port_warning or "No port available")]
-
-        url = arguments.get("url")
-
-        # Try extension-based screenshot first
-        if self.browser_service:
-            result = await self.browser_service.capture_screenshot_via_extension(port)
-            if result and result.get("success"):
-                return [
-                    ImageContent(
-                        type="image", data=result["data"], mimeType="image/png"
-                    )
-                ]
-
-        # Fall back to Playwright screenshot service
-        if self.screenshot_service:
-            screenshot_base64 = await self.screenshot_service.capture_screenshot(
-                port=port, url=url
-            )
-            if screenshot_base64:
-                return [
-                    ImageContent(
-                        type="image", data=screenshot_base64, mimeType="image/png"
-                    )
-                ]
-
-        return [
-            TextContent(
-                type="text", text=f"Failed to capture screenshot for port {port}"
-            )
-        ]
-
-    async def _handle_click(self, arguments: Dict[str, Any]) -> List[TextContent]:
-        """Handle element click.
-
-        Args:
-            arguments: Tool arguments
-
-        Returns:
-            List of text content responses
-        """
+    async def _action_click(self, arguments: Dict[str, Any]) -> List[TextContent]:
+        """Handle click action."""
         if not self.dom_interaction_service:
-            return [
-                TextContent(type="text", text="DOM interaction service not available")
-            ]
+            return [TextContent(type="text", text="DOM interaction service not available")]
 
-        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
         port, port_warning = self._resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
@@ -664,38 +477,31 @@ class MCPService:
             return [
                 TextContent(
                     type="text",
-                    text=f"Successfully clicked element: {element_info.get('tagName', 'unknown')} "
-                    f"with text '{element_info.get('text', '')[:50]}'",
+                    text=f"Clicked {element_info.get('tagName', 'element')} "
+                    f"'{element_info.get('text', '')[:50]}'",
                 )
             ]
         else:
             return [
                 TextContent(
                     type="text",
-                    text=f"Failed to click element: {result.get('error', 'Unknown error')}",
+                    text=f"Click failed: {result.get('error', 'Unknown error')}",
                 )
             ]
 
-    async def _handle_fill_field(self, arguments: Dict[str, Any]) -> List[TextContent]:
-        """Handle form field filling.
-
-        Args:
-            arguments: Tool arguments
-
-        Returns:
-            List of text content responses
-        """
+    async def _action_fill(self, arguments: Dict[str, Any]) -> List[TextContent]:
+        """Handle fill action (single field)."""
         if not self.dom_interaction_service:
-            return [
-                TextContent(type="text", text="DOM interaction service not available")
-            ]
+            return [TextContent(type="text", text="DOM interaction service not available")]
 
-        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
+        value = arguments.get("value")
+        if value is None:
+            return [TextContent(type="text", text="Error: 'value' is required for fill action")]
+
         port, port_warning = self._resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
 
-        value = arguments.get("value")
         result = await self.dom_interaction_service.fill_field(
             port=port,
             value=value,
@@ -705,109 +511,155 @@ class MCPService:
         )
 
         if result.get("success"):
-            return [
-                TextContent(
-                    type="text", text=f"Successfully filled field with value: {value}"
-                )
-            ]
+            return [TextContent(type="text", text=f"Filled field with: {value}")]
         else:
             return [
                 TextContent(
                     type="text",
-                    text=f"Failed to fill field: {result.get('error', 'Unknown error')}",
+                    text=f"Fill failed: {result.get('error', 'Unknown error')}",
                 )
             ]
 
-    async def _handle_fill_form(self, arguments: Dict[str, Any]) -> List[TextContent]:
-        """Handle multiple form fields filling.
-
-        Args:
-            arguments: Tool arguments
-
-        Returns:
-            List of text content responses
-        """
+    async def _action_select(self, arguments: Dict[str, Any]) -> List[TextContent]:
+        """Handle select action (dropdown)."""
         if not self.dom_interaction_service:
-            return [
-                TextContent(type="text", text="DOM interaction service not available")
-            ]
+            return [TextContent(type="text", text="DOM interaction service not available")]
 
-        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
+        selector = arguments.get("selector")
+        if not selector:
+            return [TextContent(type="text", text="Error: 'selector' is required for select action")]
+
         port, port_warning = self._resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
 
-        form_data = arguments.get("form_data", {})
-        submit = arguments.get("submit", False)
-
-        result = await self.dom_interaction_service.fill_form(
-            port=port, form_data=form_data, submit=submit
+        result = await self.dom_interaction_service.select_option(
+            port=port,
+            selector=selector,
+            option_value=arguments.get("option_value"),
+            option_text=arguments.get("option_text"),
+            option_index=arguments.get("option_index"),
         )
 
         if result.get("success"):
-            filled_count = len(result.get("fields", {}))
-            submitted = result.get("submitted", False)
-            msg = f"Successfully filled {filled_count} form fields"
-            if submit and submitted:
-                msg += " and submitted the form"
-            return [TextContent(type="text", text=msg)]
-        else:
-            errors = result.get("errors", [])
             return [
                 TextContent(
                     type="text",
-                    text=f"Failed to fill form. Errors: {'; '.join(errors)}",
+                    text=f"Selected: {result.get('selectedText', '')} "
+                    f"(value: {result.get('selectedValue', '')})",
+                )
+            ]
+        else:
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Select failed: {result.get('error', 'Unknown error')}",
                 )
             ]
 
-    async def _handle_submit_form(self, arguments: Dict[str, Any]) -> List[TextContent]:
-        """Handle form submission.
-
-        Args:
-            arguments: Tool arguments
-
-        Returns:
-            List of text content responses
-        """
+    async def _action_wait(self, arguments: Dict[str, Any]) -> List[TextContent]:
+        """Handle wait action."""
         if not self.dom_interaction_service:
-            return [
-                TextContent(type="text", text="DOM interaction service not available")
-            ]
+            return [TextContent(type="text", text="DOM interaction service not available")]
 
-        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
+        selector = arguments.get("selector")
+        if not selector:
+            return [TextContent(type="text", text="Error: 'selector' is required for wait action")]
+
         port, port_warning = self._resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
 
-        result = await self.dom_interaction_service.submit_form(
-            port=port, selector=arguments.get("selector"), xpath=arguments.get("xpath")
+        timeout = arguments.get("timeout", 5000)
+
+        result = await self.dom_interaction_service.wait_for_element(
+            port=port, selector=selector, timeout=timeout
         )
 
         if result.get("success"):
-            return [TextContent(type="text", text="Successfully submitted form")]
+            element_info = result.get("elementInfo", {})
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Element appeared: {element_info.get('tagName', 'element')} "
+                    f"'{selector}'",
+                )
+            ]
         else:
             return [
                 TextContent(
                     type="text",
-                    text=f"Failed to submit form: {result.get('error', 'Unknown error')}",
+                    text=f"Wait timeout ({timeout}ms): {result.get('error', '')}",
                 )
             ]
 
-    async def _handle_get_element(self, arguments: Dict[str, Any]) -> List[TextContent]:
-        """Handle getting element information.
+    # ========================================================================
+    # Consolidated Handler: browser_query (logs, element, capabilities)
+    # ========================================================================
 
-        Args:
-            arguments: Tool arguments
+    async def _handle_browser_query(
+        self, arguments: Dict[str, Any]
+    ) -> List[TextContent]:
+        """Handle browser_query tool - consolidated queries.
 
-        Returns:
-            List of text content responses
+        Queries: logs, element, capabilities
         """
-        if not self.dom_interaction_service:
+        query = arguments.get("query")
+
+        if query == "logs":
+            return await self._query_logs(arguments)
+        elif query == "element":
+            return await self._query_element(arguments)
+        elif query == "capabilities":
+            return await self._query_capabilities(arguments)
+        else:
             return [
-                TextContent(type="text", text="DOM interaction service not available")
+                TextContent(
+                    type="text",
+                    text=f"Unknown query: {query}. Valid: logs, element, capabilities",
+                )
             ]
 
-        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
+    async def _query_logs(self, arguments: Dict[str, Any]) -> List[TextContent]:
+        """Handle logs query."""
+        port, port_warning = self._resolve_port(arguments.get("port"))
+        if port is None:
+            return [TextContent(type="text", text=port_warning or "No port available")]
+
+        last_n = arguments.get("last_n", 100)
+        level_filter = arguments.get("level_filter")
+
+        if not self.browser_service:
+            return [TextContent(type="text", text="Browser service not available")]
+
+        messages = await self.browser_service.query_logs(
+            port=port, last_n=last_n, level_filter=level_filter
+        )
+
+        if not messages:
+            return [TextContent(type="text", text=f"No console logs found for port {port}")]
+
+        # Format messages
+        log_lines = []
+        for msg in messages:
+            timestamp = msg.timestamp.strftime("%H:%M:%S.%f")[:-3]
+            level = msg.level.value.upper()
+            log_lines.append(f"[{timestamp}] [{level}] {msg.message}")
+            if msg.stack_trace:
+                log_lines.append(f"  Stack: {msg.stack_trace[:200]}")
+
+        return [
+            TextContent(
+                type="text",
+                text=f"Console logs (last {len(messages)}):\n\n" + "\n".join(log_lines),
+            )
+        ]
+
+    async def _query_element(self, arguments: Dict[str, Any]) -> List[TextContent]:
+        """Handle element query."""
+        if not self.dom_interaction_service:
+            return [TextContent(type="text", text="DOM interaction service not available")]
+
         port, port_warning = self._resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
@@ -820,22 +672,20 @@ class MCPService:
         )
 
         if result.get("success"):
-            element_info = result.get("elementInfo", {})
-            info_text = (
-                f"Element found: {element_info.get('tagName', 'unknown')}\n"
-                f"  ID: {element_info.get('id', 'none')}\n"
-                f"  Class: {element_info.get('className', 'none')}\n"
-                f"  Text: {element_info.get('text', '')[:100]}\n"
-                f"  Visible: {element_info.get('isVisible', False)}\n"
-                f"  Enabled: {element_info.get('isEnabled', False)}"
+            el = result.get("elementInfo", {})
+            info = (
+                f"Element: {el.get('tagName', 'unknown')}\n"
+                f"  ID: {el.get('id', 'none')}\n"
+                f"  Class: {el.get('className', 'none')}\n"
+                f"  Text: {el.get('text', '')[:100]}\n"
+                f"  Visible: {el.get('isVisible', False)}\n"
+                f"  Enabled: {el.get('isEnabled', False)}"
             )
-
-            if element_info.get("value"):
-                info_text += f"\n  Value: {element_info['value']}"
-            if element_info.get("href"):
-                info_text += f"\n  Href: {element_info['href']}"
-
-            return [TextContent(type="text", text=info_text)]
+            if el.get("value"):
+                info += f"\n  Value: {el['value']}"
+            if el.get("href"):
+                info += f"\n  Href: {el['href']}"
+            return [TextContent(type="text", text=info)]
         else:
             return [
                 TextContent(
@@ -844,111 +694,187 @@ class MCPService:
                 )
             ]
 
-    async def _handle_wait_for_element(
-        self, arguments: Dict[str, Any]
-    ) -> List[TextContent]:
-        """Handle waiting for element.
-
-        Args:
-            arguments: Tool arguments
-
-        Returns:
-            List of text content responses
-        """
-        if not self.dom_interaction_service:
+    async def _query_capabilities(self, arguments: Dict[str, Any]) -> List[TextContent]:
+        """Handle capabilities query."""
+        if not self.capability_detector:
             return [
-                TextContent(type="text", text="DOM interaction service not available")
+                TextContent(
+                    type="text",
+                    text="Capability detection not available",
+                )
             ]
 
-        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
+        try:
+            report = await self.capability_detector.get_capability_report()
+
+            lines = [
+                "# Browser Control Capabilities",
+                "",
+                f"**Summary:** {report['summary']}",
+                "",
+                "## Available",
+            ]
+
+            for cap in report.get("capabilities", []):
+                lines.append(f"- {cap}")
+
+            lines.extend(["", "## Methods", ""])
+            for method_name, method_info in report.get("methods", {}).items():
+                status = "Available" if method_info["available"] else "Unavailable"
+                lines.append(f"**{method_name.title()}**: {status}")
+                lines.append(f"  {method_info['description']}")
+
+            return [TextContent(type="text", text="\n".join(lines))]
+
+        except Exception as e:
+            logger.exception("Failed to get capabilities")
+            return [TextContent(type="text", text=f"Capability check failed: {str(e)}")]
+
+    # ========================================================================
+    # Standalone Handler: browser_screenshot
+    # ========================================================================
+
+    async def _handle_screenshot(
+        self, arguments: Dict[str, Any]
+    ) -> List[ImageContent | TextContent]:
+        """Handle screenshot capture via browser extension."""
         port, port_warning = self._resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
 
-        selector = arguments.get("selector")
-        timeout = arguments.get("timeout", 5000)
+        # Use extension-based screenshot only (no Playwright fallback)
+        if self.browser_service:
+            result = await self.browser_service.capture_screenshot_via_extension(port)
+            if result and result.get("success"):
+                return [
+                    ImageContent(
+                        type="image", data=result["data"], mimeType="image/png"
+                    )
+                ]
 
-        result = await self.dom_interaction_service.wait_for_element(
-            port=port, selector=selector, timeout=timeout
-        )
+        return [
+            TextContent(
+                type="text",
+                text=f"Screenshot capture failed for port {port}. "
+                f"Ensure browser extension is connected.",
+            )
+        ]
 
-        if result.get("success"):
-            element_info = result.get("elementInfo", {})
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Element appeared: {element_info.get('tagName', 'unknown')} "
-                    f"with selector '{selector}'",
-                )
-            ]
+    # ========================================================================
+    # Consolidated Handler: browser_form (fill, submit)
+    # ========================================================================
+
+    async def _handle_browser_form(
+        self, arguments: Dict[str, Any]
+    ) -> List[TextContent]:
+        """Handle browser_form tool - consolidated form operations.
+
+        Actions: fill (multi-field), submit
+        """
+        action = arguments.get("action")
+
+        if action == "fill":
+            return await self._form_fill(arguments)
+        elif action == "submit":
+            return await self._form_submit(arguments)
         else:
             return [
                 TextContent(
                     type="text",
-                    text=f"Element did not appear within {timeout}ms: {result.get('error', '')}",
+                    text=f"Unknown form action: {action}. Valid: fill, submit",
                 )
             ]
 
-    async def _handle_select_option(
-        self, arguments: Dict[str, Any]
-    ) -> List[TextContent]:
-        """Handle dropdown option selection.
-
-        Args:
-            arguments: Tool arguments
-
-        Returns:
-            List of text content responses
-        """
+    async def _form_fill(self, arguments: Dict[str, Any]) -> List[TextContent]:
+        """Handle form fill (multiple fields)."""
         if not self.dom_interaction_service:
-            return [
-                TextContent(type="text", text="DOM interaction service not available")
-            ]
+            return [TextContent(type="text", text="DOM interaction service not available")]
 
-        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
+        form_data = arguments.get("form_data")
+        if not form_data:
+            return [TextContent(type="text", text="Error: 'form_data' is required for fill action")]
+
         port, port_warning = self._resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
 
-        result = await self.dom_interaction_service.select_option(
+        submit = arguments.get("submit", False)
+
+        result = await self.dom_interaction_service.fill_form(
+            port=port, form_data=form_data, submit=submit
+        )
+
+        if result.get("success"):
+            filled = len(result.get("fields", {}))
+            submitted = result.get("submitted", False)
+            msg = f"Filled {filled} fields"
+            if submit and submitted:
+                msg += " and submitted form"
+            return [TextContent(type="text", text=msg)]
+        else:
+            errors = result.get("errors", [])
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Form fill failed: {'; '.join(errors)}",
+                )
+            ]
+
+    async def _form_submit(self, arguments: Dict[str, Any]) -> List[TextContent]:
+        """Handle form submit."""
+        if not self.dom_interaction_service:
+            return [TextContent(type="text", text="DOM interaction service not available")]
+
+        port, port_warning = self._resolve_port(arguments.get("port"))
+        if port is None:
+            return [TextContent(type="text", text=port_warning or "No port available")]
+
+        result = await self.dom_interaction_service.submit_form(
             port=port,
             selector=arguments.get("selector"),
-            option_value=arguments.get("option_value"),
-            option_text=arguments.get("option_text"),
-            option_index=arguments.get("option_index"),
+            xpath=arguments.get("xpath"),
         )
 
         if result.get("success"):
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Selected option: {result.get('selectedText', '')} "
-                    f"(value: {result.get('selectedValue', '')})",
-                )
-            ]
+            return [TextContent(type="text", text="Form submitted")]
         else:
             return [
                 TextContent(
                     type="text",
-                    text=f"Failed to select option: {result.get('error', 'Unknown error')}",
+                    text=f"Submit failed: {result.get('error', 'Unknown error')}",
                 )
             ]
 
-    async def _handle_extract_content(
+    # ========================================================================
+    # Consolidated Handler: browser_extract (content, semantic_dom)
+    # ========================================================================
+
+    async def _handle_browser_extract(
         self, arguments: Dict[str, Any]
     ) -> List[TextContent]:
-        """Handle content extraction using Readability.
+        """Handle browser_extract tool - consolidated extraction.
 
-        Args:
-            arguments: Tool arguments
-
-        Returns:
-            List of text content responses
+        Extractions: content (readable article), semantic_dom (structure)
         """
+        extract = arguments.get("extract")
+
+        if extract == "content":
+            return await self._extract_content(arguments)
+        elif extract == "semantic_dom":
+            return await self._extract_semantic_dom(arguments)
+        else:
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Unknown extract type: {extract}. Valid: content, semantic_dom",
+                )
+            ]
+
+    async def _extract_content(self, arguments: Dict[str, Any]) -> List[TextContent]:
+        """Handle content extraction using Readability."""
         if not self.browser_service:
             return [TextContent(type="text", text="Browser service not available")]
 
-        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
         port, port_warning = self._resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
@@ -959,75 +885,49 @@ class MCPService:
 
         if result.get("success"):
             content = result.get("content", {})
+            lines = [f"# {content.get('title', 'Untitled')}", ""]
 
-            # Format the extracted content for output
-            output_lines = [f"# {content.get('title', 'Untitled')}", ""]
-
-            # Add metadata if available
-            metadata = content.get("metadata", {})
+            # Metadata
             if content.get("byline"):
-                output_lines.append(f"**Author:** {content['byline']}")
-            if metadata.get("publishDate"):
-                output_lines.append(f"**Published:** {metadata['publishDate']}")
+                lines.append(f"**Author:** {content['byline']}")
             if content.get("siteName"):
-                output_lines.append(f"**Source:** {content['siteName']}")
-            if metadata.get("url"):
-                output_lines.append(f"**URL:** {metadata['url']}")
+                lines.append(f"**Source:** {content['siteName']}")
             if content.get("wordCount"):
-                output_lines.append(f"**Word Count:** {content['wordCount']:,}")
-            if content.get("length"):
-                output_lines.append(f"**Reading Time:** ~{content['length']} minutes")
+                lines.append(f"**Words:** {content['wordCount']:,}")
 
-            output_lines.extend(["", "---", ""])
+            lines.extend(["", "---", ""])
 
-            # Add excerpt if available
+            # Excerpt
             if content.get("excerpt"):
-                output_lines.extend(["**Excerpt:**", f"> {content['excerpt']}", ""])
+                lines.extend([f"> {content['excerpt']}", ""])
 
-            # Add main text content
-            output_lines.append("## Content")
-            output_lines.append("")
-
+            # Main text
             text = content.get("textContent", "")
             if text:
-                # Limit text length for LLM consumption
-                max_chars = 50000  # ~12,500 tokens
+                max_chars = 50000
                 if len(text) > max_chars:
-                    text = (
-                        text[:max_chars]
-                        + f"\n\n[Content truncated - {len(text) - max_chars:,} characters omitted]"
-                    )
-                output_lines.append(text)
+                    text = text[:max_chars] + f"\n\n[Truncated {len(text) - max_chars:,} chars]"
+                lines.append(text)
             else:
-                output_lines.append("[No readable content extracted]")
+                lines.append("[No readable content extracted]")
 
-            # Add fallback notice if applicable
             if content.get("fallback"):
-                output_lines.extend(
-                    [
-                        "",
-                        "---",
-                        "*Note: This is a fallback extraction. The page may not be optimized for article reading.*",
-                    ]
-                )
+                lines.extend(["", "---", "*Fallback extraction - page may not be optimized for reading*"])
 
-            return [TextContent(type="text", text="\n".join(output_lines))]
+            return [TextContent(type="text", text="\n".join(lines))]
         else:
             return [
                 TextContent(
                     type="text",
-                    text=f"Failed to extract content: {result.get('error', 'Unknown error')}",
+                    text=f"Content extraction failed: {result.get('error', 'Unknown error')}",
                 )
             ]
 
-    async def _handle_extract_semantic_dom(
-        self, arguments: Dict[str, Any]
-    ) -> List[TextContent]:
+    async def _extract_semantic_dom(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle semantic DOM extraction."""
         if not self.browser_service:
             return [TextContent(type="text", text="Browser service not available")]
 
-        # Resolve port (auto-detect from daemon if not provided, warn if CDP port)
         port, port_warning = self._resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
@@ -1048,24 +948,24 @@ class MCPService:
             output = self._format_semantic_dom(dom, options)
             return [TextContent(type="text", text=output)]
         else:
-            error = result.get("error", "Unknown error")
             return [
                 TextContent(
-                    type="text", text=f"Semantic DOM extraction failed: {error}"
+                    type="text",
+                    text=f"Semantic DOM extraction failed: {result.get('error', 'Unknown error')}",
                 )
             ]
 
     def _format_semantic_dom(self, dom: Dict[str, Any], options: Dict[str, Any]) -> str:
         """Format semantic DOM as readable text output."""
         lines = []
-        lines.append(f"# Semantic Structure: {dom.get('title', 'Untitled')}")
+        lines.append(f"# {dom.get('title', 'Untitled')}")
         lines.append(f"URL: {dom.get('url', 'unknown')}")
         lines.append("")
 
         # Headings
         headings = dom.get("headings", [])
         if headings and options.get("include_headings", True):
-            lines.append("## Document Outline")
+            lines.append("## Outline")
             for h in headings:
                 indent = "  " * (h.get("level", 1) - 1)
                 text = h.get("text", "")[:100]
@@ -1075,47 +975,34 @@ class MCPService:
         # Landmarks
         landmarks = dom.get("landmarks", [])
         if landmarks and options.get("include_landmarks", True):
-            lines.append("## Page Sections")
+            lines.append("## Sections")
             for lm in landmarks:
                 role = lm.get("role", "unknown")
                 label = lm.get("label") or lm.get("tag", "")
-                if label:
-                    lines.append(f"- [{role}] {label}")
-                else:
-                    lines.append(f"- [{role}]")
+                lines.append(f"- [{role}] {label}" if label else f"- [{role}]")
             lines.append("")
 
         # Links
         links = dom.get("links", [])
         if links and options.get("include_links", True):
-            lines.append(f"## Links ({len(links)} total)")
-            # Show first 50 links to avoid overwhelming output
+            lines.append(f"## Links ({len(links)})")
             for link in links[:50]:
-                text = (
-                    link.get("text", "").strip()[:80]
-                    or link.get("ariaLabel", "")
-                    or "[no text]"
-                )
+                text = link.get("text", "").strip()[:80] or link.get("ariaLabel", "") or "[no text]"
                 href = link.get("href", "")
                 lines.append(f"- {text}")
                 if href and not href.startswith("javascript:"):
                     lines.append(f"  → {href[:100]}")
             if len(links) > 50:
-                lines.append(f"  ... and {len(links) - 50} more links")
+                lines.append(f"  ... +{len(links) - 50} more")
             lines.append("")
 
         # Forms
         forms = dom.get("forms", [])
         if forms and options.get("include_forms", True):
-            lines.append(f"## Forms ({len(forms)} total)")
+            lines.append(f"## Forms ({len(forms)})")
             for form in forms:
-                form_name = (
-                    form.get("name")
-                    or form.get("id")
-                    or form.get("ariaLabel")
-                    or "[unnamed form]"
-                )
-                lines.append(f"### {form_name}")
+                name = form.get("name") or form.get("id") or form.get("ariaLabel") or "[unnamed]"
+                lines.append(f"### {name}")
                 if form.get("action"):
                     lines.append(f"  Action: {form.get('action')}")
                 lines.append(f"  Method: {form.get('method', 'GET').upper()}")
@@ -1123,92 +1010,26 @@ class MCPService:
                 if fields:
                     lines.append("  Fields:")
                     for field in fields:
-                        field_type = field.get("type", "text")
-                        name = field.get("name") or field.get("id") or "[unnamed]"
-                        label = (
-                            field.get("label")
-                            or field.get("ariaLabel")
-                            or field.get("placeholder")
-                            or ""
-                        )
-                        required = " (required)" if field.get("required") else ""
+                        ftype = field.get("type", "text")
+                        fname = field.get("name") or field.get("id") or "[unnamed]"
+                        label = field.get("label") or field.get("ariaLabel") or field.get("placeholder") or ""
+                        req = " (required)" if field.get("required") else ""
                         if label:
-                            lines.append(
-                                f"    - {name} ({field_type}): {label}{required}"
-                            )
+                            lines.append(f"    - {fname} ({ftype}): {label}{req}")
                         else:
-                            lines.append(f"    - {name} ({field_type}){required}")
+                            lines.append(f"    - {fname} ({ftype}){req}")
             lines.append("")
 
         return "\n".join(lines)
 
-    async def _handle_get_capabilities(
-        self, arguments: Dict[str, Any]
-    ) -> List[TextContent]:
-        """Handle capability detection request.
-
-        Args:
-            arguments: Tool arguments (empty for this tool)
-
-        Returns:
-            List of text content responses
-        """
-        if not self.capability_detector:
-            return [
-                TextContent(
-                    type="text",
-                    text="Capability detection not available (detector not initialized)",
-                )
-            ]
-
-        try:
-            report = await self.capability_detector.get_capability_report()
-
-            # Format the report nicely
-            output_lines = [
-                "# Browser Control Capabilities",
-                "",
-                f"**Summary:** {report['summary']}",
-                "",
-                "## Available Capabilities",
-                "",
-            ]
-
-            if report["capabilities"]:
-                for cap in report["capabilities"]:
-                    output_lines.append(f"- {cap}")
-            else:
-                output_lines.append("- None")
-
-            output_lines.extend(["", "## Control Methods", ""])
-
-            for method_name, method_info in report["methods"].items():
-                status = "✓ Available" if method_info["available"] else "✗ Unavailable"
-                output_lines.append(f"### {method_name.title()} {status}")
-                output_lines.append(f"*{method_info['description']}*")
-                output_lines.append("")
-                output_lines.append("**Capabilities:**")
-                for cap in method_info["capabilities"]:
-                    output_lines.append(f"- {cap}")
-                output_lines.append("")
-
-            return [TextContent(type="text", text="\n".join(output_lines))]
-
-        except Exception as e:
-            logger.exception("Failed to get capabilities")
-            return [
-                TextContent(
-                    type="text", text=f"Failed to detect capabilities: {str(e)}"
-                )
-            ]
+    # ========================================================================
+    # Server lifecycle methods
+    # ========================================================================
 
     async def start(self) -> None:
         """Start the MCP server."""
-        # Initialize server with options
-        # Note: InitializationOptions configured for mcp-browser v1.0.1
-
         # The actual server start is handled by the stdio transport
-        # Note: No logging here as it could interfere with MCP JSON-RPC
+        pass
 
     async def run_stdio(self) -> None:
         """Run the MCP server with stdio transport."""
@@ -1216,8 +1037,6 @@ class MCPService:
         from mcp.server.stdio import stdio_server
 
         async with stdio_server() as (read_stream, write_stream):
-            # Use the server's create_initialization_options method to properly
-            # register all handlers with correct capabilities
             init_options = self.server.create_initialization_options(
                 notification_options=NotificationOptions(
                     tools_changed=False, prompts_changed=False, resources_changed=False
@@ -1225,11 +1044,10 @@ class MCPService:
                 experimental_capabilities={},
             )
 
-            # Run with stateless=True to avoid initialization state issues
             await self.server.run(
                 read_stream,
                 write_stream,
                 init_options,
                 raise_exceptions=False,
-                stateless=False,  # Keep stateful for now, but could try True if issues persist
+                stateless=False,
             )

@@ -50,7 +50,7 @@ def cli(ctx, version, debug, config):
     MCP Browser creates a bridge between your browser and Claude Code, enabling:
       • Real-time console log capture from any website
       • Browser navigation control via MCP tools
-      • Screenshot capture with Playwright
+      • Screenshot capture via extension
       • Persistent log storage with automatic rotation
 
     \b

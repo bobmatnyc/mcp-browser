@@ -14,7 +14,6 @@ from ...container import ServiceContainer
 from ...services import (
     BrowserService,
     MCPService,
-    ScreenshotService,
     StorageService,
     WebSocketService,
 )
@@ -167,9 +166,6 @@ class BrowserMCPServer:
 
         self.container.register("browser_service", create_browser_service)
 
-        # Register screenshot service
-        self.container.register("screenshot_service", lambda c: ScreenshotService())
-
         # Register capability detector
         async def create_capability_detector(c):
             browser_controller = await c.get("browser_controller")
@@ -183,13 +179,11 @@ class BrowserMCPServer:
         # Register MCP service with dependencies
         async def create_mcp_service(c):
             browser = await c.get("browser_service")
-            screenshot = await c.get("screenshot_service")
             dom_interaction = await c.get("dom_interaction_service")
             browser_controller = await c.get("browser_controller")
             capability_detector = await c.get("capability_detector")
             return MCPService(
                 browser_service=browser,
-                screenshot_service=screenshot,
                 dom_interaction_service=dom_interaction,
                 browser_controller=browser_controller,
                 capability_detector=capability_detector,
@@ -246,7 +240,6 @@ class BrowserMCPServer:
         storage = await self.container.get("storage_service")
         websocket = await self.container.get("websocket_service")
         browser = await self.container.get("browser_service")
-        screenshot = await self.container.get("screenshot_service")
         dom_interaction = await self.container.get("dom_interaction_service")
         # Note: MCP service initialized via container but not used in start phase
 
@@ -290,9 +283,6 @@ class BrowserMCPServer:
         port_log_dir = LOG_DIR / str(self.websocket_port)
         port_log_dir.mkdir(parents=True, exist_ok=True)
 
-        # Start screenshot service
-        await screenshot.start()
-
         self.running = True
         if not self.mcp_mode:
             logger.info("MCP Browser Server started successfully")
@@ -335,12 +325,6 @@ class BrowserMCPServer:
         except Exception as e:
             logger.error(f"Error stopping WebSocket service: {e}")
 
-        try:
-            screenshot = await self.container.get("screenshot_service")
-            await screenshot.stop()
-        except Exception as e:
-            logger.error(f"Error stopping screenshot service: {e}")
-
         self.running = False
         if not self.mcp_mode:
             logger.info("MCP Browser Server stopped successfully")
@@ -354,7 +338,6 @@ class BrowserMCPServer:
         websocket = await self.container.get("websocket_service")
         browser = await self.container.get("browser_service")
         storage = await self.container.get("storage_service")
-        screenshot = await self.container.get("screenshot_service")
 
         print("\n" + "═" * 60)
         print(f"  MCP Browser Server Status (v{__version__})")
@@ -392,14 +375,6 @@ class BrowserMCPServer:
         print(f"  Total Size: {storage_stats['total_size_mb']:.2f} MB")
         print(f"  Log Files: {storage_stats.get('file_count', 0)}")
         print(f"  Retention: {self.config['storage']['retention_days']} days")
-
-        # Screenshot service
-        print("\n📸 Screenshot Service:")
-        screenshot_info = screenshot.get_service_info()
-        status = "✅ Running" if screenshot_info["is_running"] else "⭕ Stopped"
-        print(f"  Status: {status}")
-        if screenshot_info.get("browser_type"):
-            print(f"  Browser: {screenshot_info['browser_type']}")
 
         # MCP Integration
         print("\n🔧 MCP Integration:")
@@ -440,9 +415,6 @@ class BrowserMCPServer:
 
         # Create browser service
         browser = BrowserService(storage_service=storage)
-
-        # Create screenshot service
-        screenshot = ScreenshotService()
 
         # Create DOM interaction service with simple initialization
         dom_interaction = DOMInteractionService(browser_service=browser)
@@ -506,7 +478,6 @@ class BrowserMCPServer:
         # Create MCP service with dependencies
         mcp = MCPService(
             browser_service=browser,
-            screenshot_service=screenshot,
             dom_interaction_service=dom_interaction,
             browser_controller=browser_controller,
             capability_detector=capability_detector,
