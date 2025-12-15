@@ -576,6 +576,7 @@ class BrowserController:
             return await self._extension_only(action, port, **kwargs)
 
         # Try extension first with timeout (if port provided)
+        logger.info(f"execute_action: action={action}, port={port}")
         if port and await self._has_extension_connection(port):
             try:
                 result = await asyncio.wait_for(
@@ -1052,6 +1053,7 @@ class BrowserController:
         - CDP unavailable → Falls back to AppleScript (macOS)
         - All methods unavailable → Returns clear error
         """
+        logger.info(f"navigate() called: url={url}, port={port}, mode={self.mode}")
         # Mode: extension-only
         if self.mode == "extension":
             if not port:
@@ -1701,19 +1703,26 @@ class BrowserController:
         """
         # If no websocket service available, extension cannot be connected
         if not self.websocket:
+            logger.info(f"_has_extension_connection({port}): No websocket service")
             return False
 
         try:
             # Try exact port match first
             connection = await self.browser_service.browser_state.get_connection(port)
+            logger.info(f"_has_extension_connection({port}): Exact match = {connection is not None}")
 
             # If no exact match and port is in server range, try any active connection
             if connection is None and 8851 <= port <= 8895:
                 connection = await self.browser_service.browser_state.get_any_active_connection()
+                logger.info(f"_has_extension_connection({port}): Fallback match = {connection is not None}")
+                if connection:
+                    logger.info(f"_has_extension_connection({port}): Found active connection on port {connection.port}, is_active={connection.is_active}")
 
-            return connection is not None and connection.websocket is not None
+            result = connection is not None and connection.websocket is not None
+            logger.info(f"_has_extension_connection({port}): Final result = {result}")
+            return result
         except Exception as e:
-            logger.debug(f"Error checking extension connection: {e}")
+            logger.info(f"Error checking extension connection: {e}")
             return False
 
     def _select_browser_method(self, port: Optional[int] = None) -> str:
