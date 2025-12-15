@@ -4,8 +4,10 @@ This test demonstrates the fix for the issue where MCP tools pass the WebSocket
 server port (8851-8895) but connections are stored by client ephemeral port.
 """
 
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
+
 from src.services.browser_service import BrowserService
 
 
@@ -26,9 +28,7 @@ async def test_navigation_with_server_port():
 
     client_port = 57803
     await browser_service.browser_state.add_connection(
-        port=client_port,
-        websocket=mock_ws,
-        user_agent="Test Browser"
+        port=client_port, websocket=mock_ws, user_agent="Test Browser"
     )
 
     # MCP tool tries to navigate using server port (8851)
@@ -43,6 +43,7 @@ async def test_navigation_with_server_port():
 
     # Verify correct navigation message was sent
     import json
+
     call_args = mock_ws.send.call_args[0][0]
     message = json.loads(call_args)
 
@@ -62,8 +63,7 @@ async def test_screenshot_with_server_port():
     # Connect with client port
     client_port = 57804
     await browser_service.browser_state.add_connection(
-        port=client_port,
-        websocket=mock_ws
+        port=client_port, websocket=mock_ws
     )
 
     # Try to capture screenshot using server port
@@ -71,6 +71,7 @@ async def test_screenshot_with_server_port():
 
     # Start the async operation (don't wait for response since it's mocked)
     import asyncio
+
     task = asyncio.create_task(
         browser_service.capture_screenshot_via_extension(server_port, timeout=0.5)
     )
@@ -96,10 +97,7 @@ async def test_port_range_fallback():
 
     # Add connection with client port
     mock_ws = AsyncMock()
-    await browser_service.browser_state.add_connection(
-        port=57803,
-        websocket=mock_ws
-    )
+    await browser_service.browser_state.add_connection(port=57803, websocket=mock_ws)
 
     # Server port in range should trigger fallback
     result = await browser_service._get_connection_with_fallback(8860)
@@ -121,15 +119,9 @@ async def test_multiple_connections_fallback():
     mock_ws2 = AsyncMock()
     mock_ws2.send = AsyncMock()
 
-    await browser_service.browser_state.add_connection(
-        port=57803,
-        websocket=mock_ws1
-    )
+    await browser_service.browser_state.add_connection(port=57803, websocket=mock_ws1)
 
-    await browser_service.browser_state.add_connection(
-        port=57804,
-        websocket=mock_ws2
-    )
+    await browser_service.browser_state.add_connection(port=57804, websocket=mock_ws2)
 
     # Disconnect first connection
     first_conn = await browser_service.browser_state.get_connection(57803)

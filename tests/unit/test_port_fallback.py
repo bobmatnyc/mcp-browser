@@ -1,10 +1,11 @@
 """Unit tests for port mismatch fallback logic."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
-from src.models.browser_state import BrowserState, BrowserConnection
+
+import pytest
+
+from src.models.browser_state import BrowserState
 from src.services.browser_service import BrowserService
-from datetime import datetime
 
 
 @pytest.mark.asyncio
@@ -14,10 +15,8 @@ async def test_get_connection_exact_match():
 
     # Add a connection with client port
     mock_ws = MagicMock()
-    connection = await browser_state.add_connection(
-        port=57803,
-        websocket=mock_ws,
-        user_agent="Test Browser"
+    await browser_state.add_connection(
+        port=57803, websocket=mock_ws, user_agent="Test Browser"
     )
 
     # Should find exact match
@@ -36,15 +35,9 @@ async def test_get_any_active_connection():
     mock_ws1 = MagicMock()
     mock_ws2 = MagicMock()
 
-    conn1 = await browser_state.add_connection(
-        port=57803,
-        websocket=mock_ws1
-    )
+    await browser_state.add_connection(port=57803, websocket=mock_ws1)
 
-    conn2 = await browser_state.add_connection(
-        port=57804,
-        websocket=mock_ws2
-    )
+    await browser_state.add_connection(port=57804, websocket=mock_ws2)
 
     # Should get first active connection
     result = await browser_state.get_any_active_connection()
@@ -75,10 +68,7 @@ async def test_browser_service_connection_fallback_exact_match():
 
     # Add connection with client port
     mock_ws = MagicMock()
-    await browser_service.browser_state.add_connection(
-        port=57803,
-        websocket=mock_ws
-    )
+    await browser_service.browser_state.add_connection(port=57803, websocket=mock_ws)
 
     # Exact match should work
     connection = await browser_service._get_connection_with_fallback(57803)
@@ -93,10 +83,7 @@ async def test_browser_service_connection_fallback_server_port():
 
     # Add connection with client port (ephemeral)
     mock_ws = MagicMock()
-    await browser_service.browser_state.add_connection(
-        port=57803,
-        websocket=mock_ws
-    )
+    await browser_service.browser_state.add_connection(port=57803, websocket=mock_ws)
 
     # Server port lookup (8851-8895 range) should fall back
     connection = await browser_service._get_connection_with_fallback(8851)
@@ -124,10 +111,7 @@ async def test_browser_service_navigate_with_fallback():
     mock_ws.send = AsyncMock()
 
     # Add connection with client port
-    await browser_service.browser_state.add_connection(
-        port=57803,
-        websocket=mock_ws
-    )
+    await browser_service.browser_state.add_connection(port=57803, websocket=mock_ws)
 
     # Navigate using server port (should fall back to client port)
     result = await browser_service.navigate_browser(8851, "https://example.com")
@@ -138,6 +122,7 @@ async def test_browser_service_navigate_with_fallback():
     # Verify the message sent
     call_args = mock_ws.send.call_args[0][0]
     import json
+
     message = json.loads(call_args)
     assert message["type"] == "navigate"
     assert message["url"] == "https://example.com"
@@ -153,10 +138,7 @@ async def test_browser_service_navigate_exact_port():
     mock_ws.send = AsyncMock()
 
     # Add connection with client port
-    await browser_service.browser_state.add_connection(
-        port=57803,
-        websocket=mock_ws
-    )
+    await browser_service.browser_state.add_connection(port=57803, websocket=mock_ws)
 
     # Navigate using exact client port
     result = await browser_service.navigate_browser(57803, "https://example.com")
