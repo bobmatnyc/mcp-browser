@@ -5,9 +5,9 @@ import sys
 from pathlib import Path
 
 # Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from cli.utils.daemon import (
+from cli.utils.daemon import (  # noqa: E402
     ensure_server_running,
     get_server_status,
 )

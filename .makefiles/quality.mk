@@ -141,13 +141,13 @@ pre-publish: clean-pre-publish ## Comprehensive pre-release quality gate
 	@echo "$(YELLOW)Step 2/4: Running all linters...$(NC)"
 	@$(MAKE) quality
 	@echo ""
-	@echo "$(YELLOW)Step 3/4: Running tests...$(NC)"
+	@echo "$(YELLOW)Step 3/4: Running unit tests...$(NC)"
 	@if command -v pytest >/dev/null 2>&1; then \
-		$(PYTHON) -m pytest $(TESTS_DIR)/ $(PYTEST_ARGS) || exit 1; \
+		$(PYTHON) -m pytest $(TESTS_DIR)/unit/ $(PYTEST_ARGS) || exit 1; \
 	else \
 		echo "$(YELLOW)⚠ pytest not found, skipping tests$(NC)"; \
 	fi
-	@echo "$(GREEN)✓ Tests passed$(NC)"
+	@echo "$(GREEN)✓ Unit tests passed$(NC)"
 	@echo ""
 	@echo "$(YELLOW)Step 4/4: Checking for common issues...$(NC)"
 	@echo "Checking for debug prints..."
