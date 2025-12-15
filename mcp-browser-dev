@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Change to project root
+cd "$SCRIPT_DIR" || exit 1
+
+# Activate virtual environment if it exists
+if [ -f ".venv/bin/activate" ]; then
+    source .venv/bin/activate
+fi
+
+# Run the CLI from source with all arguments
+python -m src.cli.main "$@"
