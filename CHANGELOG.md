@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.43] - 2025-12-16
+
+### Fixed
+- MCP mode now falls back to ANY running server if project path doesn't match
+  - Claude Code may spawn `mcp-browser mcp` from a different working directory
+  - Previously, extension commands failed because daemon couldn't be found
+  - Now tries exact project match first, then falls back to any running server
+
 ## [2.2.42] - 2025-12-16
 
 ### Fixed

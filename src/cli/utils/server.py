@@ -422,9 +422,24 @@ class BrowserMCPServer:
 
         # Try to connect to running WebSocket daemon for extension communication
         daemon_client = None
-        from .daemon import get_project_server
+        from .daemon import get_project_server, read_service_registry, is_process_running
 
+        # First try to find server for current project
         project_server = get_project_server(os.getcwd())
+
+        # Fallback: if no matching project, try ANY running server
+        # (Claude Code might spawn MCP from different directory)
+        if not project_server:
+            registry = read_service_registry()
+            for server in registry.get("servers", []):
+                if is_process_running(server.get("pid")) and server.get("port"):
+                    project_server = server
+                    logger.info(
+                        f"MCP mode: Using fallback server on port {server.get('port')} "
+                        f"(cwd mismatch: {os.getcwd()} vs {server.get('project_path', 'unknown')})"
+                    )
+                    break
+
         if project_server and project_server.get("port"):
             from ...services.daemon_client import DaemonClient
 
