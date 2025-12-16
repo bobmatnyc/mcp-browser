@@ -348,23 +348,45 @@
 
   /**
    * Show visual green border when tab is being controlled by MCP Browser
+   * Enhanced with thicker border, longer persistence, and smooth fade-out animation
    */
   function showControlBorder() {
-    if (!document.getElementById('mcp-browser-control-border')) {
-      const border = document.createElement('div');
-      border.id = 'mcp-browser-control-border';
-      border.style.cssText = `
-        position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
-        border: 4px solid #4CAF50;
-        box-shadow: inset 0 0 10px rgba(76, 175, 80, 0.5);
-        pointer-events: none;
-        z-index: 2147483647;
-        box-sizing: border-box;
-      `;
-      document.body.appendChild(border);
-      console.log('[MCP Browser] Control border shown');
+    // Remove any existing border first to reset animation
+    const existingBorder = document.getElementById('mcp-browser-control-border');
+    if (existingBorder) {
+      existingBorder.remove();
     }
+
+    // Create new border with enhanced styling
+    const border = document.createElement('div');
+    border.id = 'mcp-browser-control-border';
+    border.style.cssText = `
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      border: 8px solid #4CAF50;
+      box-shadow: inset 0 0 20px rgba(76, 175, 80, 0.7);
+      pointer-events: none;
+      z-index: 2147483647;
+      box-sizing: border-box;
+      opacity: 1;
+      transition: opacity 1500ms ease-out;
+    `;
+    document.body.appendChild(border);
+    console.log('[MCP Browser] Control border shown (enhanced)');
+
+    // Auto-hide after 3 seconds with smooth fade
+    setTimeout(() => {
+      if (border && border.parentNode) {
+        border.style.opacity = '0';
+        // Remove from DOM after fade completes
+        setTimeout(() => {
+          if (border && border.parentNode) {
+            border.remove();
+            console.log('[MCP Browser] Control border faded out');
+          }
+        }, 1500); // Match transition duration
+      }
+    }, 3000); // 3 second persist before fade starts
   }
 
   /**
@@ -373,8 +395,14 @@
   function hideControlBorder() {
     const border = document.getElementById('mcp-browser-control-border');
     if (border) {
-      border.remove();
-      console.log('[MCP Browser] Control border hidden');
+      // Fade out smoothly if still visible
+      border.style.opacity = '0';
+      setTimeout(() => {
+        if (border && border.parentNode) {
+          border.remove();
+          console.log('[MCP Browser] Control border hidden');
+        }
+      }, 1500); // Match transition duration
     }
   }
 
@@ -384,7 +412,17 @@
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     (async () => {
       try {
-        switch (request.type) {
+        // Handle dom_command wrapper - extract the actual command
+        let actualRequest = request;
+        if (actualRequest.type === 'dom_command' && actualRequest.command) {
+          actualRequest = actualRequest.command;
+          // Merge params from nested command structure
+          if (actualRequest.params) {
+            actualRequest = { ...actualRequest, ...actualRequest.params };
+          }
+        }
+
+        switch (actualRequest.type) {
           case 'show_control_border':
             showControlBorder();
             sendResponse({ success: true });
@@ -396,12 +434,12 @@
             break;
 
           case 'navigate':
-            window.location.href = request.url;
+            window.location.href = actualRequest.url;
             sendResponse({ success: true });
             break;
 
           case 'click':
-            const clickElement = domHelpers.getElement(request.params);
+            const clickElement = domHelpers.getElement(actualRequest.params);
             if (!clickElement) {
               sendResponse({ success: false, error: 'Element not found' });
               break;
@@ -418,7 +456,7 @@
             break;
 
           case 'fill':
-            const fillElement = domHelpers.getElement(request.params);
+            const fillElement = domHelpers.getElement(actualRequest.params);
             if (!fillElement) {
               sendResponse({ success: false, error: 'Element not found' });
               break;
@@ -433,14 +471,14 @@
             await new Promise(resolve => setTimeout(resolve, 300));
 
             if (fillElement.tagName.toLowerCase() === 'select') {
-              fillElement.value = request.params.value;
+              fillElement.value = actualRequest.params.value;
               domHelpers.triggerEvent(fillElement, 'change');
             } else {
               fillElement.focus();
               fillElement.value = '';
 
               // Simulate typing for better compatibility
-              for (const char of request.params.value) {
+              for (const char of actualRequest.params.value) {
                 fillElement.value += char;
                 domHelpers.triggerEvent(fillElement, 'input');
                 await new Promise(resolve => setTimeout(resolve, 20));
@@ -457,7 +495,7 @@
             break;
 
           case 'submit':
-            const formElement = domHelpers.getElement(request.params);
+            const formElement = domHelpers.getElement(actualRequest.params);
             if (!formElement) {
               sendResponse({ success: false, error: 'Form not found' });
               break;
@@ -477,7 +515,7 @@
             break;
 
           case 'get_element':
-            const queryElement = domHelpers.getElement(request.params);
+            const queryElement = domHelpers.getElement(actualRequest.params);
             const elementInfo = domHelpers.getElementInfo(queryElement);
 
             sendResponse({
@@ -488,7 +526,7 @@
             break;
 
           case 'get_elements':
-            const { selector, limit = 10 } = request.params;
+            const { selector, limit = 10 } = actualRequest.params;
             const elements = Array.from(document.querySelectorAll(selector))
               .slice(0, limit)
               .map(el => domHelpers.getElementInfo(el));
@@ -503,8 +541,8 @@
           case 'wait_for_element':
             try {
               const element = await domHelpers.waitForElement(
-                request.params.selector,
-                request.params.timeout || 5000
+                actualRequest.params.selector,
+                actualRequest.params.timeout || 5000
               );
 
               sendResponse({
@@ -520,15 +558,15 @@
             break;
 
           case 'select_option':
-            const selectElement = domHelpers.getElement(request.params);
+            const selectElement = domHelpers.getElement(actualRequest.params);
             if (!selectElement || selectElement.tagName.toLowerCase() !== 'select') {
               sendResponse({ success: false, error: 'Select element not found' });
               break;
             }
 
-            const optionValue = request.params.optionValue;
-            const optionText = request.params.optionText;
-            const optionIndex = request.params.optionIndex;
+            const optionValue = actualRequest.params.optionValue;
+            const optionText = actualRequest.params.optionText;
+            const optionIndex = actualRequest.params.optionIndex;
 
             let option;
             if (optionValue !== undefined) {
@@ -557,14 +595,14 @@
             break;
 
           case 'check_checkbox':
-            const checkElement = domHelpers.getElement(request.params);
+            const checkElement = domHelpers.getElement(actualRequest.params);
             if (!checkElement || checkElement.type !== 'checkbox') {
               sendResponse({ success: false, error: 'Checkbox not found' });
               break;
             }
 
-            const shouldCheck = request.params.checked !== undefined
-              ? request.params.checked
+            const shouldCheck = actualRequest.params.checked !== undefined
+              ? actualRequest.params.checked
               : !checkElement.checked;
 
             if (checkElement.checked !== shouldCheck) {
@@ -578,11 +616,11 @@
             break;
 
           case 'scroll_to':
-            const scrollElement = request.params.selector
-              ? domHelpers.getElement(request.params)
+            const scrollElement = actualRequest.params.selector
+              ? domHelpers.getElement(actualRequest.params)
               : null;
 
-            if (request.params.selector && !scrollElement) {
+            if (actualRequest.params.selector && !scrollElement) {
               sendResponse({ success: false, error: 'Element not found' });
               break;
             }
@@ -590,17 +628,71 @@
             if (scrollElement) {
               scrollElement.scrollIntoView({
                 behavior: 'smooth',
-                block: request.params.block || 'center'
+                block: actualRequest.params.block || 'center'
               });
             } else {
               window.scrollTo({
-                top: request.params.top || 0,
-                left: request.params.left || 0,
+                top: actualRequest.params.top || 0,
+                left: actualRequest.params.left || 0,
                 behavior: 'smooth'
               });
             }
 
             sendResponse({ success: true });
+            break;
+
+          case 'get_skeletal_dom':
+            try {
+              // Extract skeletal DOM - key interactive elements only
+              const skeletalDOM = {
+                url: window.location.href,
+                title: document.title,
+                links: Array.from(document.querySelectorAll('a[href]'))
+                  .slice(0, 10)
+                  .map(a => ({
+                    text: a.textContent?.trim().substring(0, 50) || '(no text)',
+                    href: a.href,
+                    isVisible: a.offsetParent !== null
+                  }))
+                  .filter(link => link.isVisible),
+                buttons: Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"]'))
+                  .slice(0, 5)
+                  .map(btn => ({
+                    text: btn.textContent?.trim() || btn.value || '(no text)',
+                    type: btn.tagName.toLowerCase(),
+                    name: btn.name || null,
+                    isVisible: btn.offsetParent !== null
+                  }))
+                  .filter(btn => btn.isVisible),
+                inputs: Array.from(document.querySelectorAll('input:not([type="button"]):not([type="submit"]), textarea'))
+                  .slice(0, 5)
+                  .map(input => ({
+                    type: input.type || 'text',
+                    name: input.name || null,
+                    id: input.id || null,
+                    placeholder: input.placeholder || null,
+                    isVisible: input.offsetParent !== null
+                  }))
+                  .filter(input => input.isVisible),
+                headings: Array.from(document.querySelectorAll('h1, h2, h3'))
+                  .slice(0, 5)
+                  .map(h => ({
+                    level: h.tagName.toLowerCase(),
+                    text: h.textContent?.trim().substring(0, 100) || '(no text)'
+                  }))
+              };
+
+              sendResponse({
+                success: true,
+                skeletal_dom: skeletalDOM
+              });
+            } catch (error) {
+              console.error('[mcp-browser] Skeletal DOM extraction error:', error);
+              sendResponse({
+                success: false,
+                error: error.message || 'Failed to extract skeletal DOM'
+              });
+            }
             break;
 
           case 'extractContent':

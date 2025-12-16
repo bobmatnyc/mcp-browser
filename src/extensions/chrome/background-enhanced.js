@@ -64,6 +64,31 @@ function setIconState(state, titleText) {
   console.log(`[MCP Browser] Icon state changed to: ${state}${titleText ? ` (${titleText})` : ''}`);
 }
 
+/**
+ * Animate icon badge to indicate message activity
+ * Uses badge text pulsing effect for visual feedback
+ */
+let activityAnimationTimeout = null;
+function animateIconActivity(direction = 'send') {
+  // Clear any existing animation timeout
+  if (activityAnimationTimeout) {
+    clearTimeout(activityAnimationTimeout);
+  }
+
+  // Set badge with activity indicator - white background with colored arrow
+  const badgeText = direction === 'send' ? '↑' : '↓';
+  chrome.action.setBadgeText({ text: badgeText });
+  // White/light gray background so colored text stands out
+  chrome.action.setBadgeBackgroundColor({ color: [255, 255, 255, 200] });
+  // Colored text: green for send, blue for receive
+  chrome.action.setBadgeTextColor({ color: direction === 'send' ? '#2E7D32' : '#1565C0' });
+
+  // Clear badge after 600ms (longer visibility)
+  activityAnimationTimeout = setTimeout(() => {
+    chrome.action.setBadgeText({ text: '' });
+  }, 600);
+}
+
 // State management
 let activeServers = new Map(); // port -> server info
 let extensionState = 'starting'; // 'starting', 'scanning', 'idle', 'connected', 'error'
@@ -412,6 +437,8 @@ class WebSocketClient {
     if (this.ws && this.ws.readyState === WebSocket.OPEN && this.connectionReady) {
       try {
         this.ws.send(JSON.stringify(message));
+        // Animate icon to show outgoing message activity
+        animateIconActivity('send');
         return true;
       } catch (e) {
         console.error(`[WebSocketClient] Failed to send message:`, e);
@@ -433,6 +460,11 @@ class WebSocketClient {
   async _handleMessage(event) {
     try {
       const data = JSON.parse(event.data);
+
+      // Animate icon for non-heartbeat messages only (avoid excessive visual noise)
+      if (data.type !== 'pong' && data.type !== 'heartbeat') {
+        animateIconActivity('receive');
+      }
 
       if (data.type === 'connection_ack') {
         await this._handleConnectionAck(data);
@@ -607,6 +639,8 @@ class WebSocketClient {
 
       try {
         this.ws.send(JSON.stringify({ type: 'heartbeat', timestamp: Date.now() }));
+        // Note: Skip animation for heartbeats to avoid excessive visual noise
+        // animateIconActivity('send');
       } catch (e) {
         console.warn(`[WebSocketClient] Heartbeat failed:`, e);
       }
@@ -2184,11 +2218,21 @@ async function scanForServers() {
 
   const servers = [];
 
+  // Scan all ports in parallel for fast discovery
+  const probePromises = [];
   for (let port = PORT_RANGE.start; port <= PORT_RANGE.end; port++) {
-    const serverInfo = await probePort(port);
+    probePromises.push(probePort(port));
+  }
+
+  // Wait for all probes to complete
+  const results = await Promise.all(probePromises);
+
+  // Filter out null results and build server list
+  for (let i = 0; i < results.length; i++) {
+    const serverInfo = results[i];
     if (serverInfo) {
       servers.push(serverInfo);
-      activeServers.set(port, serverInfo);
+      activeServers.set(serverInfo.port, serverInfo);
     }
   }
 
@@ -2706,7 +2750,13 @@ async function executeCommandOnTab(tabId, data, connection = null) {
 
   // Show border flash for browser commands (not for passive commands like get_page_content or query_logs)
   const borderCommands = ['navigate', 'click', 'fill_field', 'scroll'];
-  if (borderCommands.includes(data.type)) {
+  const actionCommandTypes = ['click', 'fill', 'submit', 'scroll_to', 'check_checkbox', 'select_option'];
+
+  // Check if should show border: either direct command or dom_command with action type
+  const shouldShowBorder = borderCommands.includes(data.type) ||
+    (data.type === 'dom_command' && data.command && actionCommandTypes.includes(data.command.type));
+
+  if (shouldShowBorder) {
     chrome.tabs.sendMessage(tabId, { type: 'show_control_border' }, (response) => {
       if (chrome.runtime.lastError) {
         console.debug(`[MCP Browser] Could not show border on tab ${tabId}:`, chrome.runtime.lastError.message);
@@ -3115,12 +3165,60 @@ async function executeCommandOnTab(tabId, data, connection = null) {
         console.log(`[MCP Browser] Query logs requested`);
         break;
 
+      case 'dom_command':
+        // Forward DOM command to content script
+        console.log(`[MCP Browser] Forwarding DOM command: ${data.command?.type} (request ${data.requestId})`);
+        try {
+          chrome.tabs.sendMessage(tabId, data, (response) => {
+            if (chrome.runtime.lastError) {
+              console.error(`[MCP Browser] Failed to send DOM command to tab ${tabId}:`, chrome.runtime.lastError.message);
+              // Send error response back to server
+              const errorResponse = {
+                type: 'dom_command_response',
+                requestId: data.requestId,
+                response: {
+                  success: false,
+                  error: chrome.runtime.lastError.message
+                }
+              };
+              if (connection && connection.ws && connection.ws.readyState === WebSocket.OPEN) {
+                connection.ws.send(JSON.stringify(errorResponse));
+              }
+            } else if (response) {
+              // Forward response back to server with requestId
+              const serverResponse = {
+                type: 'dom_command_response',
+                requestId: data.requestId,
+                response: response
+              };
+              if (connection && connection.ws && connection.ws.readyState === WebSocket.OPEN) {
+                connection.ws.send(JSON.stringify(serverResponse));
+                console.log(`[MCP Browser] Sent dom_command_response for request ${data.requestId}`);
+              }
+            }
+          });
+        } catch (e) {
+          console.error('[MCP Browser] DOM command failed:', e);
+          const errorResponse = {
+            type: 'dom_command_response',
+            requestId: data.requestId,
+            response: {
+              success: false,
+              error: e.message
+            }
+          };
+          if (connection && connection.ws && connection.ws.readyState === WebSocket.OPEN) {
+            connection.ws.send(JSON.stringify(errorResponse));
+          }
+        }
+        break;
+
       default:
         console.log(`[MCP Browser] Unknown message type: ${data.type}`);
   }
 
   // Hide border after command completes (2000ms delay for visibility)
-  if (borderCommands.includes(data.type)) {
+  if (shouldShowBorder) {
     setTimeout(() => {
       chrome.tabs.sendMessage(tabId, { type: 'hide_control_border' }, (response) => {
         if (chrome.runtime.lastError) {

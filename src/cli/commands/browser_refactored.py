@@ -3,7 +3,9 @@
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
+from rich.tree import Tree
 
 from ..utils.browser_client import BrowserClient
 
@@ -11,6 +13,66 @@ console = Console()
 
 if TYPE_CHECKING:
     KwargsDict = Dict[str, Any]
+
+
+def display_skeletal_dom(skeletal_data: Dict[str, Any]) -> None:
+    """Display skeletal DOM in a readable format.
+
+    Args:
+        skeletal_data: Skeletal DOM data from browser (may be wrapped in response)
+    """
+    # Unwrap nested response structure if present
+    # Response format: {type: "dom_command_response", requestId: "...", response: {success, skeletal_dom}}
+    if "response" in skeletal_data and isinstance(skeletal_data["response"], dict):
+        skeletal_data = skeletal_data["response"]
+
+    if not skeletal_data.get("success"):
+        console.print(
+            f"[yellow]⚠ Could not fetch page structure: {skeletal_data.get('error', 'Unknown error')}[/yellow]"
+        )
+        return
+
+    dom = skeletal_data.get("skeletal_dom", {})
+    if not dom:
+        console.print("[yellow]⚠ No page structure data available[/yellow]")
+        return
+
+    # Create tree structure
+    tree = Tree(f"[bold blue]📄 {dom.get('title', 'Untitled Page')}[/bold blue]")
+    tree.add(f"[dim]🔗 {dom.get('url', 'Unknown URL')}[/dim]")
+
+    # Add headings
+    headings = dom.get("headings", [])
+    if headings:
+        heading_node = tree.add("[bold cyan]Headings[/bold cyan]")
+        for h in headings:
+            heading_node.add(f"[{h['level']}] {h['text']}")
+
+    # Add inputs
+    inputs = dom.get("inputs", [])
+    if inputs:
+        input_node = tree.add("[bold green]Input Fields[/bold green]")
+        for inp in inputs:
+            input_label = inp.get("placeholder") or inp.get("name") or inp.get("id") or "(unnamed)"
+            input_node.add(f"[{inp['type']}] {input_label}")
+
+    # Add buttons
+    buttons = dom.get("buttons", [])
+    if buttons:
+        button_node = tree.add("[bold yellow]Buttons[/bold yellow]")
+        for btn in buttons:
+            button_node.add(f"[{btn['type']}] {btn['text']}")
+
+    # Add links
+    links = dom.get("links", [])
+    if links:
+        link_node = tree.add(f"[bold magenta]Links (showing {len(links)})[/bold magenta]")
+        for link in links[:5]:  # Show first 5
+            link_node.add(f"{link['text']} → [dim]{link['href']}[/dim]")
+        if len(links) > 5:
+            link_node.add(f"[dim]... and {len(links) - 5} more[/dim]")
+
+    console.print(Panel(tree, title="[bold]Page Structure[/bold]", border_style="blue"))
 
 
 # Interactive Command Handlers
@@ -63,13 +125,26 @@ class NavigateHandler(InteractiveCommandHandler):
 
     async def execute(self, client: BrowserClient, parts: List[str]) -> Dict[str, Any]:
         url = parts[1]
-        return await client.navigate(url, wait=0)
+        result = await client.navigate(url, wait=0)
+
+        # Wait briefly for page to load, then fetch skeletal DOM
+        if result.get("success"):
+            import asyncio
+            await asyncio.sleep(1.5)  # Give page time to load
+            result["skeletal_dom"] = await client.get_skeletal_dom()
+
+        return result
 
     def display_result(self, result: Dict[str, Any], **kwargs: Any) -> None:
         parts = kwargs.get("parts", [])
         url = parts[1] if len(parts) > 1 else "unknown"
         if result["success"]:
             console.print(f"[green]✓ Navigated to {url}[/green]")
+
+            # Display skeletal DOM if available
+            skeletal_dom = result.get("skeletal_dom")
+            if skeletal_dom:
+                display_skeletal_dom(skeletal_dom)
         else:
             console.print(f"[red]✗ Failed: {result.get('error')}[/red]")
 
@@ -84,13 +159,26 @@ class ClickHandler(InteractiveCommandHandler):
 
     async def execute(self, client: BrowserClient, parts: List[str]) -> Dict[str, Any]:
         selector = parts[1]
-        return await client.click_element(selector)
+        result = await client.click_element(selector)
+
+        # Wait briefly for any page changes, then fetch skeletal DOM
+        if result.get("success"):
+            import asyncio
+            await asyncio.sleep(0.8)  # Give time for page updates
+            result["skeletal_dom"] = await client.get_skeletal_dom()
+
+        return result
 
     def display_result(self, result: Dict[str, Any], **kwargs: Any) -> None:
         parts = kwargs.get("parts", [])
         selector = parts[1] if len(parts) > 1 else "unknown"
         if result["success"]:
             console.print(f"[green]✓ Clicked {selector}[/green]")
+
+            # Display skeletal DOM if available
+            skeletal_dom = result.get("skeletal_dom")
+            if skeletal_dom:
+                display_skeletal_dom(skeletal_dom)
         else:
             console.print(f"[red]✗ Failed: {result.get('error')}[/red]")
 
@@ -106,7 +194,15 @@ class FillHandler(InteractiveCommandHandler):
     async def execute(self, client: BrowserClient, parts: List[str]) -> Dict[str, Any]:
         selector = parts[1]
         value = " ".join(parts[2:])
-        return await client.fill_field(selector, value)
+        result = await client.fill_field(selector, value)
+
+        # Wait briefly, then fetch skeletal DOM to show current state
+        if result.get("success"):
+            import asyncio
+            await asyncio.sleep(0.5)
+            result["skeletal_dom"] = await client.get_skeletal_dom()
+
+        return result
 
     def display_result(self, result: Dict[str, Any], **kwargs: Any) -> None:
         parts = kwargs.get("parts", [])
@@ -114,6 +210,11 @@ class FillHandler(InteractiveCommandHandler):
         value = " ".join(parts[2:]) if len(parts) > 2 else ""
         if result["success"]:
             console.print(f"[green]✓ Filled {selector} with '{value}'[/green]")
+
+            # Display skeletal DOM if available
+            skeletal_dom = result.get("skeletal_dom")
+            if skeletal_dom:
+                display_skeletal_dom(skeletal_dom)
         else:
             console.print(f"[red]✗ Failed: {result.get('error')}[/red]")
 

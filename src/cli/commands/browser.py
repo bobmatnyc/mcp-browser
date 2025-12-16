@@ -20,6 +20,58 @@ from .browser_refactored import (
 console = Console()
 
 
+def _display_skeletal_dom(skeletal: Dict[str, Any]) -> None:
+    """Display skeletal DOM in a readable tree format."""
+    # Unwrap nested response if present
+    if "response" in skeletal and isinstance(skeletal["response"], dict):
+        skeletal = skeletal["response"]
+    dom = skeletal.get("skeletal_dom", {})
+    if not dom:
+        return
+
+    from rich.tree import Tree
+
+    title = dom.get("title", "Unknown Page")
+    url = dom.get("url", "")
+
+    tree = Tree(f"[bold]📄 {title}[/bold]")
+    tree.add(f"[dim]🔗 {url}[/dim]")
+
+    # Headings
+    headings = dom.get("headings", [])
+    if headings:
+        h_branch = tree.add("[cyan]Headings[/cyan]")
+        for h in headings[:5]:
+            h_branch.add(f"[{h.get('tag', 'h?')}] {h.get('text', '')[:50]}")
+
+    # Inputs
+    inputs = dom.get("inputs", [])
+    if inputs:
+        i_branch = tree.add("[yellow]Inputs[/yellow]")
+        for inp in inputs[:5]:
+            name = inp.get("name") or inp.get("id") or inp.get("type", "?")
+            i_branch.add(f"[input] {name}")
+
+    # Buttons
+    buttons = dom.get("buttons", [])
+    if buttons:
+        b_branch = tree.add("[green]Buttons[/green]")
+        for btn in buttons[:5]:
+            b_branch.add(f"[button] {btn.get('text', '')[:30]}")
+
+    # Links
+    links = dom.get("links", [])
+    if links:
+        l_branch = tree.add(f"[blue]Links ({len(links)} found)[/blue]")
+        for link in links[:8]:
+            text = link.get("text", "")[:25] or "(no text)"
+            href = link.get("href", "")[:40]
+            l_branch.add(f"{text} → [dim]{href}[/dim]")
+
+    console.print(tree)
+    console.print()
+
+
 def requires_server(f: Callable) -> Callable:
     """Decorator that ensures server is running before command executes.
 
@@ -178,6 +230,17 @@ async def _navigate_command(url: str, wait: float, port: Optional[int]):
             )
             if wait > 0:
                 console.print(f"[dim]Waited {wait} seconds after navigation[/dim]")
+
+            # Fetch and display skeletal DOM
+            await asyncio.sleep(1.5)  # Give page time to load
+            console.print("[dim]Fetching page structure...[/dim]")
+            skeletal = await client.get_skeletal_dom()
+            # Unwrap nested response for success check
+            skeletal_inner = skeletal.get("response", skeletal) if "response" in skeletal else skeletal
+            if skeletal_inner.get("success"):
+                _display_skeletal_dom(skeletal)
+            else:
+                console.print(f"[yellow]⚠ Could not get page structure: {skeletal_inner.get('error', 'Unknown')}[/yellow]")
         else:
             console.print(
                 Panel(

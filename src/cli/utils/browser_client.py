@@ -394,6 +394,28 @@ class BrowserClient:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    async def get_skeletal_dom(self, timeout: float = 5.0) -> Dict[str, Any]:
+        """Get skeletal DOM showing key interactive elements.
+
+        Args:
+            timeout: Request timeout in seconds
+
+        Returns:
+            Response dictionary with skeletal DOM data
+        """
+        if not self._connected:
+            return {"success": False, "error": "Not connected to server"}
+
+        message = {
+            "type": "dom_command",
+            "requestId": str(uuid.uuid4()),
+            "command": {
+                "type": "get_skeletal_dom",
+                "params": {},
+            },
+        }
+        return await self._send_and_wait(message, timeout)
+
 
 async def find_active_port(
     start_port: int = PORT_RANGE_START, end_port: int = PORT_RANGE_END
