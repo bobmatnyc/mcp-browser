@@ -9,10 +9,13 @@ import click
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
-from rich.table import Table
 
 from ..utils.browser_client import BrowserClient, find_active_port
 from ..utils.daemon import ensure_server_running, get_server_status
+from .browser_refactored import (
+    create_command_handlers,
+    process_interactive_command,
+)
 
 console = Console()
 
@@ -698,13 +701,90 @@ async def _extract_semantic_command(
         await client.disconnect()
 
 
+def _format_heading_text(heading: Dict[str, Any]) -> str:
+    """Format a single heading with indentation."""
+    level = heading.get("level", 1)
+    text = heading.get("text", "")[:80]
+    indent = "  " * (level - 1)
+    return f"{indent}[yellow]H{level}[/yellow] {text}"
+
+
+def _format_landmark_text(landmark: Dict[str, Any]) -> str:
+    """Format a single landmark with role and label."""
+    label = landmark.get("label") or landmark.get("tag", "")
+    role = landmark.get("role", "unknown")
+    if label:
+        return f"  [{role}] {label}"
+    return f"  [{role}]"
+
+
+def _format_link_text(link: Dict[str, Any]) -> str:
+    """Format a single link with text or aria label."""
+    text = link.get("text", "")[:60] or link.get("ariaLabel", "") or "[no text]"
+    return f"  • {text}"
+
+
+def _format_form_field(field: Dict[str, Any]) -> str:
+    """Format a single form field with name, type, and label."""
+    field_name = field.get("name") or field.get("id") or "[unnamed]"
+    field_type = field.get("type", "text")
+    label = field.get("label") or field.get("placeholder") or ""
+    required = " *" if field.get("required") else ""
+    return f"    - {field_name} ({field_type}){required}: {label[:30]}"
+
+
+def _format_form_summary(form: Dict[str, Any]) -> str:
+    """Format form header with name, method, and field count."""
+    name = form.get("name") or form.get("id") or form.get("ariaLabel") or "[unnamed]"
+    method = (form.get("method") or "GET").upper()
+    fields = form.get("fields", [])
+    return f"  [bold]{name}[/bold] ({method}, {len(fields)} fields)"
+
+
+def _display_headings_section(headings: list[Dict[str, Any]]) -> None:
+    """Display document outline section."""
+    console.print("\n[bold cyan]📑 Document Outline[/bold cyan]")
+    for heading in headings:
+        console.print(_format_heading_text(heading))
+
+
+def _display_landmarks_section(landmarks: list[Dict[str, Any]]) -> None:
+    """Display page sections section."""
+    console.print("\n[bold cyan]🏛️ Page Sections[/bold cyan]")
+    for landmark in landmarks:
+        console.print(_format_landmark_text(landmark))
+
+
+def _display_links_section(links: list[Dict[str, Any]], max_display: int = 20) -> None:
+    """Display links section with truncation."""
+    console.print(f"\n[bold cyan]🔗 Links ({len(links)} total)[/bold cyan]")
+    for link in links[:max_display]:
+        console.print(_format_link_text(link))
+    if len(links) > max_display:
+        console.print(f"  [dim]... and {len(links) - max_display} more[/dim]")
+
+
+def _display_forms_section(forms: list[Dict[str, Any]], max_fields: int = 5) -> None:
+    """Display forms section with field details."""
+    console.print(f"\n[bold cyan]📝 Forms ({len(forms)} total)[/bold cyan]")
+    for form in forms:
+        console.print(_format_form_summary(form))
+        fields = form.get("fields", [])
+        for field in fields[:max_fields]:
+            console.print(_format_form_field(field))
+        if len(fields) > max_fields:
+            console.print(
+                f"    [dim]... and {len(fields) - max_fields} more fields[/dim]"
+            )
+
+
 def _display_semantic_dom(
     dom: Dict[str, Any],
     show_headings: bool,
     show_landmarks: bool,
     show_links: bool,
     show_forms: bool,
-):
+) -> None:
     """Display semantic DOM in rich format."""
     console.print(
         Panel(
@@ -715,57 +795,17 @@ def _display_semantic_dom(
         )
     )
 
-    # Headings
-    if show_headings and dom.get("headings"):
-        console.print("\n[bold cyan]📑 Document Outline[/bold cyan]")
-        for h in dom["headings"]:
-            indent = "  " * (h.get("level", 1) - 1)
-            console.print(
-                f"{indent}[yellow]H{h.get('level')}[/yellow] {h.get('text', '')[:80]}"
-            )
+    # Dispatch to section handlers
+    section_handlers = {
+        "headings": (show_headings, _display_headings_section),
+        "landmarks": (show_landmarks, _display_landmarks_section),
+        "links": (show_links, _display_links_section),
+        "forms": (show_forms, _display_forms_section),
+    }
 
-    # Landmarks
-    if show_landmarks and dom.get("landmarks"):
-        console.print("\n[bold cyan]🏛️ Page Sections[/bold cyan]")
-        for lm in dom["landmarks"]:
-            label = lm.get("label") or lm.get("tag", "")
-            role = lm.get("role", "unknown")
-            if label:
-                console.print(f"  [{role}] {label}")
-            else:
-                console.print(f"  [{role}]")
-
-    # Links
-    if show_links and dom.get("links"):
-        links_list = dom["links"]
-        console.print(f"\n[bold cyan]🔗 Links ({len(links_list)} total)[/bold cyan]")
-        for link in links_list[:20]:
-            text = link.get("text", "")[:60] or link.get("ariaLabel", "") or "[no text]"
-            console.print(f"  • {text}")
-        if len(links_list) > 20:
-            console.print(f"  [dim]... and {len(links_list) - 20} more[/dim]")
-
-    # Forms
-    if show_forms and dom.get("forms"):
-        console.print(f"\n[bold cyan]📝 Forms ({len(dom['forms'])} total)[/bold cyan]")
-        for form in dom["forms"]:
-            name = (
-                form.get("name")
-                or form.get("id")
-                or form.get("ariaLabel")
-                or "[unnamed]"
-            )
-            method = (form.get("method") or "GET").upper()
-            fields = form.get("fields", [])
-            console.print(f"  [bold]{name}[/bold] ({method}, {len(fields)} fields)")
-            for field in fields[:5]:
-                field_name = field.get("name") or field.get("id") or "[unnamed]"
-                field_type = field.get("type", "text")
-                label = field.get("label") or field.get("placeholder") or ""
-                req = " *" if field.get("required") else ""
-                console.print(f"    - {field_name} ({field_type}){req}: {label[:30]}")
-            if len(fields) > 5:
-                console.print(f"    [dim]... and {len(fields) - 5} more fields[/dim]")
+    for key, (should_show, handler) in section_handlers.items():
+        if should_show and dom.get(key):
+            handler(dom[key])
 
 
 @extract.command(name="selector")
@@ -1004,7 +1044,14 @@ async def _run_demo_scenario(port: int):
 
 
 async def _run_interactive_test(port: int):
-    """Run interactive test session."""
+    """Run interactive test session with command handler pattern.
+
+    This refactored version uses:
+    - Handler classes for each command (complexity reduction)
+    - Helper functions for common operations
+    - Dictionary-based command dispatch
+    """
+    # Display welcome message
     console.print(
         Panel(
             "[bold cyan]🧪 Interactive Browser Test Session[/bold cyan]\n\n"
@@ -1024,6 +1071,9 @@ async def _run_interactive_test(port: int):
         )
     )
 
+    # Initialize command handlers
+    handlers = create_command_handlers()
+
     client = BrowserClient(port=port)
     if not await client.connect():
         sys.exit(1)
@@ -1036,124 +1086,12 @@ async def _run_interactive_test(port: int):
                     "\n[bold cyan]browser>[/bold cyan]", default="help"
                 )
 
-                if not command or command.strip() == "":
-                    continue
-
-                parts = command.strip().split()
-                cmd = parts[0].lower()
-
-                if cmd == "exit" or cmd == "quit":
-                    console.print("[yellow]Exiting interactive session...[/yellow]")
+                # Process command and check if should continue
+                should_continue = await process_interactive_command(
+                    command, handlers, client, port
+                )
+                if not should_continue:
                     break
-
-                elif cmd == "help":
-                    console.print(
-                        "\n[bold]Available Commands:[/bold]\n"
-                        "  navigate <url>           Navigate to URL\n"
-                        "  click <selector>         Click element\n"
-                        "  fill <selector> <value>  Fill form field\n"
-                        "  scroll <up|down> [px]    Scroll page\n"
-                        "  submit <selector>        Submit form\n"
-                        "  extract <selector>       Extract content\n"
-                        "  status                   Check server status\n"
-                        "  help                     Show this help\n"
-                        "  exit                     Exit session\n"
-                    )
-
-                elif cmd == "status":
-                    status = await client.check_server_status()
-                    table = Table(title="Server Status")
-                    table.add_column("Property", style="cyan")
-                    table.add_column("Value", style="green")
-                    table.add_row("Status", status.get("status", "unknown"))
-                    table.add_row("Port", str(port))
-                    console.print(table)
-
-                elif cmd == "navigate":
-                    if len(parts) < 2:
-                        console.print("[red]Usage: navigate <url>[/red]")
-                        continue
-                    url = parts[1]
-                    result = await client.navigate(url, wait=0)
-                    if result["success"]:
-                        console.print(f"[green]✓ Navigated to {url}[/green]")
-                    else:
-                        console.print(f"[red]✗ Failed: {result.get('error')}[/red]")
-
-                elif cmd == "click":
-                    if len(parts) < 2:
-                        console.print("[red]Usage: click <selector>[/red]")
-                        continue
-                    selector = parts[1]
-                    result = await client.click_element(selector)
-                    if result["success"]:
-                        console.print(f"[green]✓ Clicked {selector}[/green]")
-                    else:
-                        console.print(f"[red]✗ Failed: {result.get('error')}[/red]")
-
-                elif cmd == "fill":
-                    if len(parts) < 3:
-                        console.print("[red]Usage: fill <selector> <value>[/red]")
-                        continue
-                    selector = parts[1]
-                    value = " ".join(parts[2:])
-                    result = await client.fill_field(selector, value)
-                    if result["success"]:
-                        console.print(
-                            f"[green]✓ Filled {selector} with '{value}'[/green]"
-                        )
-                    else:
-                        console.print(f"[red]✗ Failed: {result.get('error')}[/red]")
-
-                elif cmd == "scroll":
-                    direction = "down"
-                    amount = 500
-                    if len(parts) >= 2:
-                        direction = parts[1].lower()
-                        if direction not in ["up", "down"]:
-                            console.print("[red]Direction must be 'up' or 'down'[/red]")
-                            continue
-                    if len(parts) >= 3:
-                        try:
-                            amount = int(parts[2])
-                        except ValueError:
-                            console.print("[red]Amount must be a number[/red]")
-                            continue
-                    result = await client.scroll(direction, amount)
-                    if result["success"]:
-                        console.print(
-                            f"[green]✓ Scrolled {direction} by {amount}px[/green]"
-                        )
-                    else:
-                        console.print(f"[red]✗ Failed: {result.get('error')}[/red]")
-
-                elif cmd == "submit":
-                    if len(parts) < 2:
-                        console.print("[red]Usage: submit <selector>[/red]")
-                        continue
-                    selector = parts[1]
-                    result = await client.submit_form(selector)
-                    if result["success"]:
-                        console.print(f"[green]✓ Submitted form {selector}[/green]")
-                    else:
-                        console.print(f"[red]✗ Failed: {result.get('error')}[/red]")
-
-                elif cmd == "extract":
-                    if len(parts) < 2:
-                        console.print("[red]Usage: extract <selector>[/red]")
-                        continue
-                    selector = parts[1]
-                    result = await client.extract_content(selector)
-                    if result["success"]:
-                        console.print(
-                            f"[green]✓ Extracted content from {selector}[/green]"
-                        )
-                    else:
-                        console.print(f"[red]✗ Failed: {result.get('error')}[/red]")
-
-                else:
-                    console.print(f"[red]Unknown command: {cmd}[/red]")
-                    console.print("[dim]Type 'help' for available commands[/dim]")
 
             except KeyboardInterrupt:
                 console.print("\n[yellow]Use 'exit' to quit[/yellow]")

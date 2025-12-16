@@ -14,29 +14,9 @@ from typing import Any, Dict, List, Optional
 from mcp.server import Server
 from mcp.types import ImageContent, TextContent, Tool
 
+from .tools import PortResolver
+
 logger = logging.getLogger(__name__)
-
-# CDP port that should not be used with mcp-browser
-CDP_PORT = 9222
-
-
-def _get_daemon_port() -> Optional[int]:
-    """Get the port of the running mcp-browser daemon from registry.
-
-    Returns:
-        Port number if daemon is running, None otherwise
-    """
-    try:
-        from ..cli.utils.daemon import is_process_running, read_service_registry
-
-        registry = read_service_registry()
-        for server in registry.get("servers", []):
-            if is_process_running(server.get("pid")):
-                return server.get("port")
-        return None
-    except Exception as e:
-        logger.debug(f"Could not read daemon registry: {e}")
-        return None
 
 
 class MCPService:
@@ -69,7 +49,7 @@ class MCPService:
         self.dom_interaction_service = dom_interaction_service
         self.browser_controller = browser_controller
         self.capability_detector = capability_detector
-        self._cached_daemon_port: Optional[int] = None
+        self.port_resolver = PortResolver()
         # Initialize server with version info
         self.server = Server(
             name="mcp-browser",
@@ -326,53 +306,6 @@ class MCPService:
             else:
                 return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
-    def _resolve_port(self, port: Optional[int]) -> tuple[Optional[int], Optional[str]]:
-        """Resolve the port to use, with validation.
-
-        Args:
-            port: Port provided by the user (may be None)
-
-        Returns:
-            Tuple of (resolved_port, warning_message)
-            - resolved_port: The port to use (from argument or daemon registry)
-            - warning_message: Optional warning if CDP port was used
-        """
-        warning = None
-
-        # Warn if CDP port is used (common mistake)
-        if port == CDP_PORT:
-            warning = (
-                f"Warning: Port {CDP_PORT} is the Chrome DevTools Protocol port, "
-                f"not the mcp-browser daemon port. "
-            )
-            # Try to get the correct daemon port
-            daemon_port = self._cached_daemon_port or _get_daemon_port()
-            if daemon_port:
-                self._cached_daemon_port = daemon_port
-                warning += f"Using daemon port {daemon_port} instead."
-                return daemon_port, warning
-            else:
-                warning += "No running daemon found. Start with: mcp-browser start"
-                return None, warning
-
-        # If port provided, use it
-        if port is not None:
-            return port, None
-
-        # No port provided - get from daemon registry
-        if self._cached_daemon_port:
-            return self._cached_daemon_port, None
-
-        daemon_port = _get_daemon_port()
-        if daemon_port:
-            self._cached_daemon_port = daemon_port
-            return daemon_port, None
-
-        # No daemon running
-        return (
-            None,
-            "No port specified and no running daemon found. Start with: mcp-browser start",
-        )
 
     # ========================================================================
     # Consolidated Handler: browser_action (navigate, click, fill, select, wait)
@@ -411,7 +344,7 @@ class MCPService:
         if not url:
             return [TextContent(type="text", text="Error: 'url' is required for navigate action")]
 
-        port, port_warning = self._resolve_port(arguments.get("port"))
+        port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
 
@@ -460,7 +393,7 @@ class MCPService:
         if not self.dom_interaction_service:
             return [TextContent(type="text", text="DOM interaction service not available")]
 
-        port, port_warning = self._resolve_port(arguments.get("port"))
+        port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
 
@@ -498,7 +431,7 @@ class MCPService:
         if value is None:
             return [TextContent(type="text", text="Error: 'value' is required for fill action")]
 
-        port, port_warning = self._resolve_port(arguments.get("port"))
+        port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
 
@@ -529,7 +462,7 @@ class MCPService:
         if not selector:
             return [TextContent(type="text", text="Error: 'selector' is required for select action")]
 
-        port, port_warning = self._resolve_port(arguments.get("port"))
+        port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
 
@@ -566,7 +499,7 @@ class MCPService:
         if not selector:
             return [TextContent(type="text", text="Error: 'selector' is required for wait action")]
 
-        port, port_warning = self._resolve_port(arguments.get("port"))
+        port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
 
@@ -622,7 +555,7 @@ class MCPService:
 
     async def _query_logs(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle logs query."""
-        port, port_warning = self._resolve_port(arguments.get("port"))
+        port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
 
@@ -660,7 +593,7 @@ class MCPService:
         if not self.dom_interaction_service:
             return [TextContent(type="text", text="DOM interaction service not available")]
 
-        port, port_warning = self._resolve_port(arguments.get("port"))
+        port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
 
@@ -738,7 +671,7 @@ class MCPService:
         self, arguments: Dict[str, Any]
     ) -> List[ImageContent | TextContent]:
         """Handle screenshot capture via browser extension."""
-        port, port_warning = self._resolve_port(arguments.get("port"))
+        port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
 
@@ -794,7 +727,7 @@ class MCPService:
         if not form_data:
             return [TextContent(type="text", text="Error: 'form_data' is required for fill action")]
 
-        port, port_warning = self._resolve_port(arguments.get("port"))
+        port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
 
@@ -825,7 +758,7 @@ class MCPService:
         if not self.dom_interaction_service:
             return [TextContent(type="text", text="DOM interaction service not available")]
 
-        port, port_warning = self._resolve_port(arguments.get("port"))
+        port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
 
@@ -875,7 +808,7 @@ class MCPService:
         if not self.browser_service:
             return [TextContent(type="text", text="Browser service not available")]
 
-        port, port_warning = self._resolve_port(arguments.get("port"))
+        port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
 
@@ -928,7 +861,7 @@ class MCPService:
         if not self.browser_service:
             return [TextContent(type="text", text="Browser service not available")]
 
-        port, port_warning = self._resolve_port(arguments.get("port"))
+        port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
 
