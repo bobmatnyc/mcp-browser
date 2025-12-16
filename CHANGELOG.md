@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.37] - 2025-12-16
+
+### Fixed
+- Setup command now always syncs extension version even if extension already installed
+  - Previously, extension version would stay stale after package updates
+  - Extracted `sync_extension_version()` to dedicated extension utility module
+  - Added 6 unit tests for version sync functionality
+
 ## [2.2.36] - 2025-12-16
 
 
