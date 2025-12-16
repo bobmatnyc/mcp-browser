@@ -13,6 +13,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from ..utils import console
 from ..utils.daemon import get_config_dir
+from ..utils.extension import sync_extension_version
 
 
 @click.command()
@@ -227,38 +228,26 @@ def install_extension(force: bool = False) -> bool:
             # Skip browsers without source (not an error)
             continue
 
-        # Skip if already installed (unless force)
-        if target_dir.exists() and not force:
-            installed_count += 1
-            continue
+        # Copy extension if needed (new install or force)
+        if not target_dir.exists() or force:
+            try:
+                # Remove existing if force
+                if target_dir.exists():
+                    shutil.rmtree(target_dir)
 
-        try:
-            # Remove existing if force
-            if target_dir.exists():
-                shutil.rmtree(target_dir)
+                # Copy extension
+                shutil.copytree(source_dir, target_dir)
+                console.print(f"[dim]  Installed {browser} extension[/dim]")
+            except Exception:
+                console.print(
+                    f"[yellow]  Failed to install {browser} extension[/yellow]"
+                )
+                continue
 
-            # Copy extension
-            shutil.copytree(source_dir, target_dir)
+        # ALWAYS sync version (even if extension already existed)
+        sync_extension_version(target_dir)
 
-            # Sync extension version with package version
-            from ..._version import __version__
-
-            manifest_path = target_dir / "manifest.json"
-            if manifest_path.exists():
-                try:
-                    with open(manifest_path, "r") as f:
-                        manifest = json.load(f)
-                    manifest["version"] = __version__
-                    with open(manifest_path, "w") as f:
-                        json.dump(manifest, f, indent=2)
-                except Exception:
-                    # Non-fatal: version sync failed but extension still deployed
-                    pass
-
-            installed_count += 1
-            console.print(f"[dim]  Installed {browser} extension[/dim]")
-        except Exception:
-            console.print(f"[yellow]  Failed to install {browser} extension[/yellow]")
+        installed_count += 1
 
     if installed_count > 0:
         console.print("[dim]  Tip: Add 'mcp-browser-extensions/' to .gitignore[/dim]")
