@@ -16,6 +16,7 @@ from mcp.types import ImageContent, TextContent, Tool
 
 from .tools import (
     CapabilityToolService,
+    ContentExtractionToolService,
     DOMToolService,
     FormToolService,
     LogQueryToolService,
@@ -78,6 +79,9 @@ class MCPService:
         )
         self.capability_tool_service = CapabilityToolService(
             capability_detector=capability_detector
+        )
+        self.content_extraction_tool_service = ContentExtractionToolService(
+            browser_service=browser_service
         )
         # Initialize server with version info
         self.server = Server(
@@ -536,180 +540,41 @@ class MCPService:
 
     async def _extract_content(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle content extraction using Readability."""
-        if not self.browser_service:
-            return [TextContent(type="text", text="Browser service not available")]
-
         port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
 
         tab_id = arguments.get("tab_id")
 
-        result = await self.browser_service.extract_content(port=port, tab_id=tab_id)
+        # Delegate to content extraction tool service
+        result = await self.content_extraction_tool_service.handle_extract_content(
+            port=port, tab_id=tab_id
+        )
 
-        if result.get("success"):
-            content = result.get("content", {})
-            lines = [f"# {content.get('title', 'Untitled')}", ""]
-
-            # Metadata
-            if content.get("byline"):
-                lines.append(f"**Author:** {content['byline']}")
-            if content.get("siteName"):
-                lines.append(f"**Source:** {content['siteName']}")
-            if content.get("wordCount"):
-                lines.append(f"**Words:** {content['wordCount']:,}")
-
-            lines.extend(["", "---", ""])
-
-            # Excerpt
-            if content.get("excerpt"):
-                lines.extend([f"> {content['excerpt']}", ""])
-
-            # Main text
-            text = content.get("textContent", "")
-            if text:
-                max_chars = 50000
-                if len(text) > max_chars:
-                    text = (
-                        text[:max_chars]
-                        + f"\n\n[Truncated {len(text) - max_chars:,} chars]"
-                    )
-                lines.append(text)
-            else:
-                lines.append("[No readable content extracted]")
-
-            if content.get("fallback"):
-                lines.extend(
-                    [
-                        "",
-                        "---",
-                        "*Fallback extraction - page may not be optimized for reading*",
-                    ]
-                )
-
-            return [TextContent(type="text", text="\n".join(lines))]
-        else:
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Content extraction failed: {result.get('error', 'Unknown error')}",
-                )
-            ]
+        return [TextContent(type="text", text=result["formatted_text"])]
 
     async def _extract_semantic_dom(
         self, arguments: Dict[str, Any]
     ) -> List[TextContent]:
         """Handle semantic DOM extraction."""
-        if not self.browser_service:
-            return [TextContent(type="text", text="Browser service not available")]
-
         port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
 
         tab_id = arguments.get("tab_id")
-        options = {
-            "include_headings": arguments.get("include_headings", True),
-            "include_landmarks": arguments.get("include_landmarks", True),
-            "include_links": arguments.get("include_links", True),
-            "include_forms": arguments.get("include_forms", True),
-            "max_text_length": arguments.get("max_text_length", 100),
-        }
 
-        result = await self.browser_service.extract_semantic_dom(port, tab_id, options)
+        # Delegate to content extraction tool service
+        result = await self.content_extraction_tool_service.handle_extract_semantic_dom(
+            port=port,
+            tab_id=tab_id,
+            include_headings=arguments.get("include_headings", True),
+            include_landmarks=arguments.get("include_landmarks", True),
+            include_links=arguments.get("include_links", True),
+            include_forms=arguments.get("include_forms", True),
+            max_text_length=arguments.get("max_text_length", 100),
+        )
 
-        if result.get("success"):
-            dom = result.get("dom", {})
-            output = self._format_semantic_dom(dom, options)
-            return [TextContent(type="text", text=output)]
-        else:
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Semantic DOM extraction failed: {result.get('error', 'Unknown error')}",
-                )
-            ]
-
-    def _format_semantic_dom(self, dom: Dict[str, Any], options: Dict[str, Any]) -> str:
-        """Format semantic DOM as readable text output."""
-        lines = []
-        lines.append(f"# {dom.get('title', 'Untitled')}")
-        lines.append(f"URL: {dom.get('url', 'unknown')}")
-        lines.append("")
-
-        # Headings
-        headings = dom.get("headings", [])
-        if headings and options.get("include_headings", True):
-            lines.append("## Outline")
-            for h in headings:
-                indent = "  " * (h.get("level", 1) - 1)
-                text = h.get("text", "")[:100]
-                lines.append(f"{indent}- H{h.get('level')}: {text}")
-            lines.append("")
-
-        # Landmarks
-        landmarks = dom.get("landmarks", [])
-        if landmarks and options.get("include_landmarks", True):
-            lines.append("## Sections")
-            for lm in landmarks:
-                role = lm.get("role", "unknown")
-                label = lm.get("label") or lm.get("tag", "")
-                lines.append(f"- [{role}] {label}" if label else f"- [{role}]")
-            lines.append("")
-
-        # Links
-        links = dom.get("links", [])
-        if links and options.get("include_links", True):
-            lines.append(f"## Links ({len(links)})")
-            for link in links[:50]:
-                text = (
-                    link.get("text", "").strip()[:80]
-                    or link.get("ariaLabel", "")
-                    or "[no text]"
-                )
-                href = link.get("href", "")
-                lines.append(f"- {text}")
-                if href and not href.startswith("javascript:"):
-                    lines.append(f"  → {href[:100]}")
-            if len(links) > 50:
-                lines.append(f"  ... +{len(links) - 50} more")
-            lines.append("")
-
-        # Forms
-        forms = dom.get("forms", [])
-        if forms and options.get("include_forms", True):
-            lines.append(f"## Forms ({len(forms)})")
-            for form in forms:
-                name = (
-                    form.get("name")
-                    or form.get("id")
-                    or form.get("ariaLabel")
-                    or "[unnamed]"
-                )
-                lines.append(f"### {name}")
-                if form.get("action"):
-                    lines.append(f"  Action: {form.get('action')}")
-                lines.append(f"  Method: {form.get('method', 'GET').upper()}")
-                fields = form.get("fields", [])
-                if fields:
-                    lines.append("  Fields:")
-                    for field in fields:
-                        ftype = field.get("type", "text")
-                        fname = field.get("name") or field.get("id") or "[unnamed]"
-                        label = (
-                            field.get("label")
-                            or field.get("ariaLabel")
-                            or field.get("placeholder")
-                            or ""
-                        )
-                        req = " (required)" if field.get("required") else ""
-                        if label:
-                            lines.append(f"    - {fname} ({ftype}): {label}{req}")
-                        else:
-                            lines.append(f"    - {fname} ({ftype}){req}")
-            lines.append("")
-
-        return "\n".join(lines)
+        return [TextContent(type="text", text=result["formatted_text"])]
 
     # ========================================================================
     # Server lifecycle methods

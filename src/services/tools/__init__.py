@@ -1,6 +1,7 @@
 """Utility classes for MCP tools."""
 
 from .capability_tool_service import CapabilityToolService
+from .content_extraction_tool_service import ContentExtractionToolService
 from .dom_tool_service import DOMToolService
 from .form_tool_service import FormToolService
 from .log_query_tool_service import LogQueryToolService
@@ -10,6 +11,7 @@ from .screenshot_tool_service import ScreenshotToolService
 
 __all__ = [
     "CapabilityToolService",
+    "ContentExtractionToolService",
     "DOMToolService",
     "FormToolService",
     "LogQueryToolService",
