@@ -13,7 +13,8 @@ logger = logging.getLogger(__name__)
 class BrowserConnection:
     """Represents a browser connection."""
 
-    port: int
+    port: int  # client ephemeral port (internal tracking)
+    server_port: int  # server listening port (user-facing, for MCP tools)
     connected_at: datetime
     last_message_at: Optional[datetime] = None
     message_count: int = 0
@@ -49,15 +50,23 @@ class BrowserState:
     """Manages state for all browser connections."""
 
     connections: Dict[int, BrowserConnection] = field(default_factory=dict)
+    server_port_map: Dict[int, int] = field(
+        default_factory=dict
+    )  # server_port → client_port mapping
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
     async def add_connection(
-        self, port: int, websocket: Any, user_agent: Optional[str] = None
+        self,
+        port: int,
+        server_port: int,
+        websocket: Any,
+        user_agent: Optional[str] = None,
     ) -> BrowserConnection:
         """Add a new browser connection.
 
         Args:
-            port: Port number
+            port: Client ephemeral port number (internal tracking)
+            server_port: Server listening port number (user-facing, for MCP tools)
             websocket: WebSocket connection object
             user_agent: Optional user agent string
 
@@ -67,35 +76,49 @@ class BrowserState:
         async with self._lock:
             connection = BrowserConnection(
                 port=port,
+                server_port=server_port,
                 connected_at=datetime.now(),
                 websocket=websocket,
                 user_agent=user_agent,
             )
             self.connections[port] = connection
+            # Map server port to client port for user-facing API
+            self.server_port_map[server_port] = port
             return connection
 
     async def remove_connection(self, port: int) -> None:
         """Remove a browser connection.
 
         Args:
-            port: Port number to remove
+            port: Port number to remove (client port)
         """
         async with self._lock:
             if port in self.connections:
+                # Clean up server_port_map first
+                conn = self.connections[port]
+                if conn.server_port in self.server_port_map:
+                    del self.server_port_map[conn.server_port]
+
+                # Then remove connection
                 self.connections[port].disconnect()
                 del self.connections[port]
 
     async def get_connection(self, port: int) -> Optional[BrowserConnection]:
         """Get a browser connection by port.
 
+        Supports both server port (8851-8899) and client ephemeral port lookups.
+        When a server port is provided, it's automatically mapped to the client port.
+
         Args:
-            port: Port number
+            port: Port number (can be server port or client port)
 
         Returns:
             BrowserConnection if exists, None otherwise
         """
         async with self._lock:
-            return self.connections.get(port)
+            # Try server port mapping first (if it's a server port like 8852)
+            lookup_port = self.server_port_map.get(port, port)
+            return self.connections.get(lookup_port)
 
     async def update_connection_activity(self, port: int) -> None:
         """Update connection activity timestamp.

@@ -16,13 +16,14 @@ async def test_get_connection_exact_match():
     # Add a connection with client port
     mock_ws = MagicMock()
     await browser_state.add_connection(
-        port=57803, websocket=mock_ws, user_agent="Test Browser"
+        port=57803, server_port=8851, websocket=mock_ws, user_agent="Test Browser"
     )
 
-    # Should find exact match
+    # Should find exact match with client port
     result = await browser_state.get_connection(57803)
     assert result is not None
     assert result.port == 57803
+    assert result.server_port == 8851
     assert result.is_active
 
 
@@ -35,9 +36,9 @@ async def test_get_any_active_connection():
     mock_ws1 = MagicMock()
     mock_ws2 = MagicMock()
 
-    await browser_state.add_connection(port=57803, websocket=mock_ws1)
+    await browser_state.add_connection(port=57803, server_port=8851, websocket=mock_ws1)
 
-    await browser_state.add_connection(port=57804, websocket=mock_ws2)
+    await browser_state.add_connection(port=57804, server_port=8852, websocket=mock_ws2)
 
     # Should get first active connection
     result = await browser_state.get_any_active_connection()
@@ -53,7 +54,9 @@ async def test_get_any_active_connection_no_active():
 
     # Add an inactive connection
     mock_ws = MagicMock()
-    conn = await browser_state.add_connection(port=57803, websocket=mock_ws)
+    conn = await browser_state.add_connection(
+        port=57803, server_port=8851, websocket=mock_ws
+    )
     conn.disconnect()
 
     # Should return None
@@ -68,7 +71,9 @@ async def test_browser_service_connection_fallback_exact_match():
 
     # Add connection with client port
     mock_ws = MagicMock()
-    await browser_service.browser_state.add_connection(port=57803, websocket=mock_ws)
+    await browser_service.browser_state.add_connection(
+        port=57803, server_port=8851, websocket=mock_ws
+    )
 
     # Exact match should work
     connection = await browser_service._get_connection_with_fallback(57803)
@@ -81,14 +86,17 @@ async def test_browser_service_connection_fallback_server_port():
     """Test BrowserService._get_connection_with_fallback with server port."""
     browser_service = BrowserService()
 
-    # Add connection with client port (ephemeral)
+    # Add connection with client port (ephemeral) and server port 8851
     mock_ws = MagicMock()
-    await browser_service.browser_state.add_connection(port=57803, websocket=mock_ws)
+    await browser_service.browser_state.add_connection(
+        port=57803, server_port=8851, websocket=mock_ws
+    )
 
-    # Server port lookup (8851-8895 range) should fall back
+    # Server port lookup should use server_port_map to find connection
     connection = await browser_service._get_connection_with_fallback(8851)
     assert connection is not None
     assert connection.port == 57803  # Returns client port connection
+    assert connection.server_port == 8851  # But has server_port tracked
 
 
 @pytest.mark.asyncio
@@ -110,10 +118,12 @@ async def test_browser_service_navigate_with_fallback():
     mock_ws = AsyncMock()
     mock_ws.send = AsyncMock()
 
-    # Add connection with client port
-    await browser_service.browser_state.add_connection(port=57803, websocket=mock_ws)
+    # Add connection with client port and server port
+    await browser_service.browser_state.add_connection(
+        port=57803, server_port=8851, websocket=mock_ws
+    )
 
-    # Navigate using server port (should fall back to client port)
+    # Navigate using server port (should find connection via server_port_map)
     result = await browser_service.navigate_browser(8851, "https://example.com")
 
     assert result is True
@@ -138,7 +148,9 @@ async def test_browser_service_navigate_exact_port():
     mock_ws.send = AsyncMock()
 
     # Add connection with client port
-    await browser_service.browser_state.add_connection(port=57803, websocket=mock_ws)
+    await browser_service.browser_state.add_connection(
+        port=57803, server_port=8851, websocket=mock_ws
+    )
 
     # Navigate using exact client port
     result = await browser_service.navigate_browser(57803, "https://example.com")

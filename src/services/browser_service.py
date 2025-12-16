@@ -50,36 +50,47 @@ class BrowserService:
         websocket = connection_info["websocket"]
         remote_address = connection_info["remote_address"]
 
-        # Extract port from remote address
-        port = (
+        # Extract client port from remote address (ephemeral port for internal tracking)
+        client_port = (
             remote_address[1]
             if isinstance(remote_address, tuple)
             else self._get_next_port()
         )
 
-        # Add connection to state
+        # Extract server port from connection_info (listening port for user-facing API)
+        server_port = connection_info.get("server_port", client_port)
+
+        # Add connection to state with both ports
         await self.browser_state.add_connection(
-            port=port, websocket=websocket, user_agent=connection_info.get("user_agent")
+            port=client_port,
+            server_port=server_port,
+            websocket=websocket,
+            user_agent=connection_info.get("user_agent"),
         )
 
         # Initialize message buffer for this port
-        if port not in self._message_buffer:
-            self._message_buffer[port] = deque(maxlen=1000)
+        if client_port not in self._message_buffer:
+            self._message_buffer[client_port] = deque(maxlen=1000)
 
         # Start buffer flush task
-        if port not in self._buffer_tasks or self._buffer_tasks[port].done():
-            self._buffer_tasks[port] = asyncio.create_task(
-                self._flush_buffer_periodically(port)
+        if (
+            client_port not in self._buffer_tasks
+            or self._buffer_tasks[client_port].done()
+        ):
+            self._buffer_tasks[client_port] = asyncio.create_task(
+                self._flush_buffer_periodically(client_port)
             )
 
-        logger.info(f"Browser connected on port {port} from {remote_address}")
+        logger.info(
+            f"Browser connected: client_port={client_port}, server_port={server_port}, remote={remote_address}"
+        )
 
-        # Send acknowledgment
+        # Send acknowledgment with server_port (user-facing port)
         await websocket.send(
             json.dumps(
                 {
                     "type": "connection_ack",
-                    "port": port,
+                    "port": server_port,  # Return server port to client
                     "timestamp": datetime.now().isoformat(),
                 }
             )
@@ -184,29 +195,31 @@ class BrowserService:
             )
 
     async def _get_connection_with_fallback(
-        self, port: int
+        self, port: Optional[int]
     ) -> Optional[Any]:  # Returns BrowserConnection
         """Get connection by port, with fallback to any active connection.
 
+        BrowserState.get_connection now handles both server and client port lookups
+        via the server_port_map.
+
         Args:
-            port: Port number (may be server port or client port)
+            port: Port number (supports both server port and client port, or None)
 
         Returns:
             BrowserConnection if found, None otherwise
         """
-        # Try exact port match first
+        if port is None:
+            # No port specified, return any active connection
+            return await self.browser_state.get_any_active_connection()
+
+        # BrowserState.get_connection now automatically handles server→client port mapping
         connection = await self.browser_state.get_connection(port)
 
-        # If no exact match and port looks like a server port (8851-8895),
-        # fall back to any active connection
-        if not connection and 8851 <= port <= 8895:
-            connection = await self.browser_state.get_any_active_connection()
-            if connection:
-                logger.debug(
-                    f"Port {port} is server port, using client port {connection.port}"
-                )
+        if connection and connection.is_active:
+            return connection
 
-        return connection
+        # Fallback to any active connection if specific port not found
+        return await self.browser_state.get_any_active_connection()
 
     async def send_dom_command(
         self, port: int, command: Dict[str, Any], tab_id: Optional[int] = None

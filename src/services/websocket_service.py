@@ -287,6 +287,7 @@ class WebSocketService:
             "remote_address": websocket.remote_address,
             "path": path,
             "websocket": websocket,
+            "server_port": self.port,  # Pass server listening port for mapping
         }
 
         # Notify connection handler

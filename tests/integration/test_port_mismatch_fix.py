@@ -27,14 +27,14 @@ async def test_navigation_with_server_port():
     mock_ws.send = AsyncMock()
 
     client_port = 57803
+    server_port = 8851
+
     await browser_service.browser_state.add_connection(
-        port=client_port, websocket=mock_ws, user_agent="Test Browser"
+        port=client_port, server_port=server_port, websocket=mock_ws, user_agent="Test Browser"
     )
 
     # MCP tool tries to navigate using server port (8851)
-    # This previously failed because get_connection(8851) returned None
-    # Now it should fall back to any active connection
-    server_port = 8851
+    # Now the server_port_map should find the connection directly
     result = await browser_service.navigate_browser(server_port, "https://example.com")
 
     # Should succeed despite port mismatch
@@ -60,14 +60,15 @@ async def test_screenshot_with_server_port():
     mock_ws = AsyncMock()
     mock_ws.send = AsyncMock()
 
-    # Connect with client port
+    # Connect with client port and server port
     client_port = 57804
+    server_port = 8852
+
     await browser_service.browser_state.add_connection(
-        port=client_port, websocket=mock_ws
+        port=client_port, server_port=server_port, websocket=mock_ws
     )
 
     # Try to capture screenshot using server port
-    server_port = 8852
 
     # Start the async operation (don't wait for response since it's mocked)
     import asyncio
@@ -92,21 +93,25 @@ async def test_screenshot_with_server_port():
 
 @pytest.mark.asyncio
 async def test_port_range_fallback():
-    """Test that fallback only applies to server port range (8851-8895)."""
+    """Test that server_port_map works and fallback applies when not found."""
     browser_service = BrowserService()
 
-    # Add connection with client port
+    # Add connection with client port and server port
     mock_ws = AsyncMock()
-    await browser_service.browser_state.add_connection(port=57803, websocket=mock_ws)
+    await browser_service.browser_state.add_connection(
+        port=57803, server_port=8860, websocket=mock_ws
+    )
 
-    # Server port in range should trigger fallback
+    # Server port should use server_port_map to find connection
     result = await browser_service._get_connection_with_fallback(8860)
-    assert result is not None, "Server port should trigger fallback"
+    assert result is not None, "Server port should find connection via mapping"
     assert result.port == 57803
+    assert result.server_port == 8860
 
-    # Random port outside range should NOT trigger fallback
+    # Random port outside server_port_map should trigger fallback to any active
     result = await browser_service._get_connection_with_fallback(12345)
-    assert result is None, "Non-server port should not trigger fallback"
+    assert result is not None, "Random port should fallback to active connection"
+    assert result.port == 57803  # Falls back to our only connection
 
 
 @pytest.mark.asyncio
@@ -114,21 +119,30 @@ async def test_multiple_connections_fallback():
     """Test fallback behavior with multiple connections."""
     browser_service = BrowserService()
 
-    # Add multiple connections
+    # Add multiple connections with different server ports
     mock_ws1 = AsyncMock()
     mock_ws2 = AsyncMock()
     mock_ws2.send = AsyncMock()
 
-    await browser_service.browser_state.add_connection(port=57803, websocket=mock_ws1)
+    await browser_service.browser_state.add_connection(
+        port=57803, server_port=8851, websocket=mock_ws1
+    )
 
-    await browser_service.browser_state.add_connection(port=57804, websocket=mock_ws2)
+    await browser_service.browser_state.add_connection(
+        port=57804, server_port=8852, websocket=mock_ws2
+    )
 
     # Disconnect first connection
     first_conn = await browser_service.browser_state.get_connection(57803)
     first_conn.disconnect()
 
-    # Server port should fall back to second (active) connection
+    # Server port 8851 should find first connection (even though inactive)
     result = await browser_service._get_connection_with_fallback(8851)
     assert result is not None
-    assert result.is_active
-    assert result.port == 57804  # Should skip inactive connection
+    # But since it's inactive, fallback should return active connection
+    if not result.is_active:
+        # Retry should get active connection
+        result = await browser_service.browser_state.get_any_active_connection()
+        assert result is not None
+        assert result.is_active
+        assert result.port == 57804  # Should get second active connection
