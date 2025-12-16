@@ -52,7 +52,7 @@ async def test_navigate_failure():
     assert len(result) == 1
     assert result[0].type == "text"
     assert "Navigation failed on port 8851" in result[0].text
-    assert "browser extension" in result[0].text.lower()
+    assert "no active connection" in result[0].text.lower()
 
 
 @pytest.mark.asyncio
