@@ -2,8 +2,10 @@
 
 import asyncio
 import json
+import os
 import time
 from pathlib import Path
+from typing import Optional
 
 import click
 from rich.panel import Panel
@@ -21,6 +23,7 @@ from ..utils.daemon import (
     get_config_dir,
     get_server_status,
     is_port_available,
+    read_service_registry,
 )
 
 
@@ -52,8 +55,14 @@ def create_default_config():
 @click.option(
     "--no-start", is_flag=True, help="Don't auto-start server (default: auto-start)"
 )
+@click.option(
+    "--project",
+    "-p",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, resolve_path=True),
+    help="Project directory to check (default: current directory)",
+)
 @click.pass_context
-def doctor(ctx, fix, verbose, no_start):
+def doctor(ctx, fix, verbose, no_start, project):
     """🩺 Diagnose and fix common MCP Browser issues.
 
     \b
@@ -73,6 +82,7 @@ def doctor(ctx, fix, verbose, no_start):
       mcp-browser doctor --no-start # Skip auto-start
       mcp-browser doctor --fix     # Auto-fix issues
       mcp-browser doctor -v        # Verbose output
+      mcp-browser doctor --project /path/to/project  # Check specific project
 
     \b
     Common issues and solutions:
@@ -83,14 +93,32 @@ def doctor(ctx, fix, verbose, no_start):
     """
     # Auto-start is default (unless --no-start is passed)
     start = not no_start
-    asyncio.run(_doctor_command(fix, verbose, start))
+    # Use provided project path or current directory
+    project_path = project if project else os.getcwd()
+    asyncio.run(_doctor_command(fix, verbose, start, project_path))
 
 
-async def _doctor_command(fix: bool, verbose: bool, start: bool = True):
-    """Execute doctor diagnostic checks."""
+async def _doctor_command(
+    fix: bool, verbose: bool, start: bool = True, project_path: Optional[str] = None
+):
+    """Execute doctor diagnostic checks.
+
+    Args:
+        fix: Attempt to fix issues automatically
+        verbose: Show detailed diagnostic information
+        start: Auto-start server if not running
+        project_path: Project directory to check (default: current directory)
+    """
+    if project_path is None:
+        project_path = os.getcwd()
+
+    # Normalize project path
+    project_path = os.path.normpath(os.path.abspath(project_path))
+
     console.print(
         Panel.fit(
-            "[bold blue]🩺 MCP Browser Doctor[/bold blue]\n"
+            f"[bold blue]🩺 MCP Browser Doctor[/bold blue]\n"
+            f"Checking project: [cyan]{project_path}[/cyan]\n"
             "Running comprehensive diagnostic checks...",
             border_style="blue",
         )
@@ -112,12 +140,12 @@ async def _doctor_command(fix: bool, verbose: bool, start: bool = True):
 
     # Test 4: Server Status (with optional auto-start)
     console.print("[cyan]→ Checking server status...[/cyan]")
-    server_result = _check_server_status()
+    server_result = _check_server_status(project_path)
 
     # Auto-start server if requested and not running
     if start and server_result["status"] != "pass":
         console.print("[cyan]→ Starting server...[/cyan]")
-        server_result = await _start_server_for_doctor()
+        server_result = await _start_server_for_doctor(project_path)
 
     results.append(server_result)
 
@@ -135,12 +163,12 @@ async def _doctor_command(fix: bool, verbose: bool, start: bool = True):
 
     # Test 8: WebSocket Connectivity (if server running)
     console.print("[cyan]→ Checking WebSocket connectivity...[/cyan]")
-    ws_result = await _check_websocket_connectivity()
+    ws_result = await _check_websocket_connectivity(project_path)
     results.append(ws_result)
 
     # Test 9: Browser Extension Connection (if server running)
     console.print("[cyan]→ Checking browser extension connection...[/cyan]")
-    ext_result = await _check_browser_extension_connection()
+    ext_result = await _check_browser_extension_connection(project_path)
     results.append(ext_result)
 
     # Test 10: Console Log Capture (if extension connected)
@@ -150,7 +178,7 @@ async def _doctor_command(fix: bool, verbose: bool, start: bool = True):
 
         # Test 11: Browser Control (if extension connected)
         console.print("[cyan]→ Testing browser control...[/cyan]")
-        results.append(await _check_browser_control())
+        results.append(await _check_browser_control(project_path))
 
     # Test 12: System Requirements (if verbose)
     if verbose:
@@ -273,9 +301,16 @@ def _check_mcp_installer() -> dict:
         }
 
 
-def _check_server_status() -> dict:
-    """Check if server is running."""
-    is_running, pid, port = get_server_status()
+def _check_server_status(project_path: str) -> dict:
+    """Check if server is running for the specified project.
+
+    Args:
+        project_path: Absolute path to the project directory
+
+    Returns:
+        Check result dict with status and message
+    """
+    is_running, pid, port = get_server_status(project_path)
 
     if is_running:
         return {
@@ -284,10 +319,24 @@ def _check_server_status() -> dict:
             "message": f"Running on port {port} (PID: {pid})",
         }
 
+    # Check if there are other servers running for different projects
+    registry = read_service_registry()
+    other_servers = []
+    for server in registry.get("servers", []):
+        server_project = server.get("project_path", "")
+        # Normalize for comparison
+        server_project = os.path.normpath(os.path.abspath(server_project))
+        if server_project != os.path.normpath(os.path.abspath(project_path)):
+            other_servers.append(f"{server_project} (port {server.get('port')})")
+
+    message = f"Not running for this project"
+    if other_servers:
+        message += f"\n    → Found servers for: {', '.join(other_servers)}"
+
     return {
         "name": "Server Status",
         "status": "warning",
-        "message": "Not running (will auto-start on first command)",
+        "message": message,
         "fix": "Run: mcp-browser start",
     }
 
@@ -381,9 +430,16 @@ def _check_mcp_config() -> dict:
     }
 
 
-async def _check_websocket_connectivity() -> dict:
-    """Check WebSocket connectivity if server running."""
-    is_running, _, port = get_server_status()
+async def _check_websocket_connectivity(project_path: str) -> dict:
+    """Check WebSocket connectivity if server running.
+
+    Args:
+        project_path: Absolute path to the project directory
+
+    Returns:
+        Check result dict with status and message
+    """
+    is_running, _, port = get_server_status(project_path)
 
     if not is_running:
         return {
@@ -440,24 +496,37 @@ async def _check_system_requirements() -> dict:
     }
 
 
-async def _start_server_for_doctor() -> dict:
-    """Start the server for doctor testing."""
+async def _start_server_for_doctor(project_path: str) -> dict:
+    """Start the server for doctor testing.
+
+    Args:
+        project_path: Absolute path to the project directory
+
+    Returns:
+        Check result dict with status and message
+    """
     import subprocess
     import sys
 
     try:
-        # Start server in background
-        subprocess.Popen(
-            [sys.executable, "-m", "mcp_browser.cli.main", "start"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        # Start server in background (it will use the current directory)
+        # First, cd to the project directory
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(project_path)
+            subprocess.Popen(
+                [sys.executable, "-m", "mcp_browser.cli.main", "start"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        finally:
+            os.chdir(original_cwd)
 
         # Wait a moment for server to start
         await asyncio.sleep(2)
 
         # Check if it started
-        is_running, pid, port = get_server_status()
+        is_running, pid, port = get_server_status(project_path)
 
         if is_running:
             return {
@@ -481,9 +550,16 @@ async def _start_server_for_doctor() -> dict:
         }
 
 
-async def _check_browser_extension_connection() -> dict:
-    """Check if browser extension is connected to the server."""
-    is_running, pid, port = get_server_status()
+async def _check_browser_extension_connection(project_path: str) -> dict:
+    """Check if browser extension is connected to the server.
+
+    Args:
+        project_path: Absolute path to the project directory
+
+    Returns:
+        Check result dict with status and message
+    """
+    is_running, pid, port = get_server_status(project_path)
 
     if not is_running or port is None:
         return {
@@ -638,9 +714,16 @@ async def _check_console_log_capture() -> dict:
         }
 
 
-async def _check_browser_control() -> dict:
-    """Test browser control capabilities."""
-    is_running, _, port = get_server_status()
+async def _check_browser_control(project_path: str) -> dict:
+    """Test browser control capabilities.
+
+    Args:
+        project_path: Absolute path to the project directory
+
+    Returns:
+        Check result dict with status and message
+    """
+    is_running, _, port = get_server_status(project_path)
 
     if not is_running:
         return {

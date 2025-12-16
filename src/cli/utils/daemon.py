@@ -76,14 +76,19 @@ def get_project_server(project_path: str) -> Optional[dict]:
     Returns:
         Server entry dict or None if not found
     """
+    # Normalize the project path for consistent comparison
+    normalized_path = os.path.normpath(os.path.abspath(project_path))
+
     registry = read_service_registry()
     for server in registry.get("servers", []):
-        if server.get("project_path") == project_path:
+        # Normalize the stored path as well
+        server_path = os.path.normpath(os.path.abspath(server.get("project_path", "")))
+        if server_path == normalized_path:
             # Verify process is still running
             if is_process_running(server.get("pid")):
                 return server
             # Process died, remove stale entry
-            remove_project_server(project_path)
+            remove_project_server(normalized_path)
     return None
 
 
@@ -287,14 +292,24 @@ def cleanup_unregistered_servers() -> int:
     return killed
 
 
-def get_server_status() -> Tuple[bool, Optional[int], Optional[int]]:
+def get_server_status(
+    project_path: Optional[str] = None,
+) -> Tuple[bool, Optional[int], Optional[int]]:
     """
-    Check if server is running for the current project.
+    Check if server is running for the specified or current project.
+
+    Args:
+        project_path: Project directory to check (default: current directory)
 
     Returns:
         (is_running, pid, port) tuple
     """
-    project_path = os.getcwd()
+    if project_path is None:
+        project_path = os.getcwd()
+
+    # Normalize path for consistent comparison
+    project_path = os.path.normpath(os.path.abspath(project_path))
+
     server = get_project_server(project_path)
     if server:
         return True, server.get("pid"), server.get("port")
