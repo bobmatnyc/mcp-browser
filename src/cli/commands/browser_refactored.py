@@ -53,7 +53,12 @@ def display_skeletal_dom(skeletal_data: Dict[str, Any]) -> None:
     if inputs:
         input_node = tree.add("[bold green]Input Fields[/bold green]")
         for inp in inputs:
-            input_label = inp.get("placeholder") or inp.get("name") or inp.get("id") or "(unnamed)"
+            input_label = (
+                inp.get("placeholder")
+                or inp.get("name")
+                or inp.get("id")
+                or "(unnamed)"
+            )
             input_node.add(f"[{inp['type']}] {input_label}")
 
     # Add buttons
@@ -66,7 +71,9 @@ def display_skeletal_dom(skeletal_data: Dict[str, Any]) -> None:
     # Add links
     links = dom.get("links", [])
     if links:
-        link_node = tree.add(f"[bold magenta]Links (showing {len(links)})[/bold magenta]")
+        link_node = tree.add(
+            f"[bold magenta]Links (showing {len(links)})[/bold magenta]"
+        )
         for link in links[:5]:  # Show first 5
             link_node.add(f"{link['text']} → [dim]{link['href']}[/dim]")
         if len(links) > 5:
@@ -130,6 +137,7 @@ class NavigateHandler(InteractiveCommandHandler):
         # Wait briefly for page to load, then fetch skeletal DOM
         if result.get("success"):
             import asyncio
+
             await asyncio.sleep(1.5)  # Give page time to load
             result["skeletal_dom"] = await client.get_skeletal_dom()
 
@@ -164,6 +172,7 @@ class ClickHandler(InteractiveCommandHandler):
         # Wait briefly for any page changes, then fetch skeletal DOM
         if result.get("success"):
             import asyncio
+
             await asyncio.sleep(0.8)  # Give time for page updates
             result["skeletal_dom"] = await client.get_skeletal_dom()
 
@@ -199,6 +208,7 @@ class FillHandler(InteractiveCommandHandler):
         # Wait briefly, then fetch skeletal DOM to show current state
         if result.get("success"):
             import asyncio
+
             await asyncio.sleep(0.5)
             result["skeletal_dom"] = await client.get_skeletal_dom()
 

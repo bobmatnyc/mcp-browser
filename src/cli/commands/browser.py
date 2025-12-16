@@ -236,11 +236,17 @@ async def _navigate_command(url: str, wait: float, port: Optional[int]):
             console.print("[dim]Fetching page structure...[/dim]")
             skeletal = await client.get_skeletal_dom()
             # Unwrap nested response for success check
-            skeletal_inner = skeletal.get("response", skeletal) if "response" in skeletal else skeletal
+            skeletal_inner = (
+                skeletal.get("response", skeletal)
+                if "response" in skeletal
+                else skeletal
+            )
             if skeletal_inner.get("success"):
                 _display_skeletal_dom(skeletal)
             else:
-                console.print(f"[yellow]⚠ Could not get page structure: {skeletal_inner.get('error', 'Unknown')}[/yellow]")
+                console.print(
+                    f"[yellow]⚠ Could not get page structure: {skeletal_inner.get('error', 'Unknown')}[/yellow]"
+                )
         else:
             console.print(
                 Panel(
