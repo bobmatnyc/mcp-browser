@@ -94,9 +94,15 @@ class BrowserState:
         """
         async with self._lock:
             if port in self.connections:
-                # Clean up server_port_map first
+                # Clean up server_port_map ONLY if it still points to this connection
+                # This prevents a race condition where:
+                # 1. New connection A opens, server_port_map[8851] = A
+                # 2. Old connection B disconnects, would wrongly delete server_port_map[8851]
                 conn = self.connections[port]
-                if conn.server_port in self.server_port_map:
+                if (
+                    conn.server_port in self.server_port_map
+                    and self.server_port_map[conn.server_port] == port
+                ):
                     del self.server_port_map[conn.server_port]
 
                 # Then remove connection

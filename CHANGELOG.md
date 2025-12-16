@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.45] - 2025-12-16
+
+### Fixed
+- **CRITICAL**: Fixed race condition causing "No active browser connection" errors
+  - When extension reconnects rapidly, old disconnection would delete NEW connection's mapping
+  - `BrowserState.remove_connection()` now checks if mapping still points to itself before deleting
+  - This was root cause of unstable screenshot/DOM extraction despite extension being connected
+
 ## [2.2.44] - 2025-12-16
 
 ### Added
