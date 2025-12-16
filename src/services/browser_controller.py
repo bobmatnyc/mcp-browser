@@ -26,10 +26,11 @@ methods by implementing same interface pattern.
 NOTE: Playwright/CDP support has been removed to prevent memory leaks.
 """
 
-import asyncio
 import logging
 from enum import Flag, auto
 from typing import Any, Dict, Optional
+
+from .fallback_executor import FallbackExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -281,6 +282,16 @@ class BrowserController:
             logger.warning(f"Invalid mode '{self.mode}', using 'auto'")
             self.mode = "auto"
 
+        # Initialize fallback executor
+        self.fallback_executor = FallbackExecutor(
+            extension_timeout=self.EXTENSION_TIMEOUT,
+            applescript_enabled=(
+                self.fallback_enabled
+                and self.applescript is not None
+                and self.applescript.is_macos
+            ),
+        )
+
         logger.info(
             f"BrowserController initialized: mode={self.mode}, "
             f"browser={self.preferred_browser}, fallback={self.fallback_enabled}"
@@ -313,41 +324,35 @@ class BrowserController:
         if action in self.EXTENSION_ONLY_ACTIONS:
             return await self._extension_only(action, port, **kwargs)
 
-        # Try extension first with timeout (if port provided)
         logger.info(f"execute_action: action={action}, port={port}")
-        if port and await self._has_extension_connection(port):
-            try:
-                result = await asyncio.wait_for(
-                    self._try_extension(action, port, **kwargs),
-                    timeout=self.EXTENSION_TIMEOUT,
-                )
-                if result.get("success"):
-                    logger.info(f"Action '{action}' completed via extension")
-                    return result
-            except asyncio.TimeoutError:
-                logger.warning(
-                    f"Extension timeout ({self.EXTENSION_TIMEOUT}s) for '{action}', falling back to AppleScript"
-                )
-            except ExtensionNotConnectedError:
-                logger.info(f"Extension disconnected, using AppleScript for '{action}'")
-            except Exception as e:
-                logger.warning(
-                    f"Extension error for '{action}': {e}, falling back to AppleScript"
-                )
 
-        # Fallback to AppleScript
-        if self.fallback_enabled and self.applescript and self.applescript.is_macos:
-            try:
-                result = await self._try_applescript(action, **kwargs)
-                if result.get("success"):
-                    logger.info(f"Action '{action}' completed via AppleScript")
-                    return result
-            except Exception as e:
-                logger.warning(f"AppleScript error for '{action}': {e}")
+        # Create extension handler if port provided and connection exists
+        async def extension_handler() -> Dict[str, Any]:
+            return await self._try_extension(action, port, **kwargs)
 
+        # Create AppleScript handler if available
+        async def applescript_handler() -> Dict[str, Any]:
+            return await self._try_applescript(action, **kwargs)
+
+        # Check if extension is available
+        has_extension = port and await self._has_extension_connection(port)
+        has_applescript = (
+            self.fallback_enabled and self.applescript and self.applescript.is_macos
+        )
+
+        # Execute with fallback using FallbackExecutor
+        if has_extension or has_applescript:
+            return await self.fallback_executor.execute_with_fallback(
+                action_name=action,
+                extension_handler=extension_handler if has_extension else None,
+                applescript_handler=applescript_handler if has_applescript else None,
+                extension_only=False,
+            )
+
+        # No methods available
         return {
             "success": False,
-            "error": f"All methods failed for action '{action}'",
+            "error": f"No available method for action '{action}'",
             "method": "none",
             "data": None,
         }
@@ -381,27 +386,15 @@ class BrowserController:
                 "data": None,
             }
 
-        try:
-            result = await asyncio.wait_for(
-                self._try_extension(action, port, **kwargs),
-                timeout=self.EXTENSION_TIMEOUT,
-            )
-            logger.info(f"Extension-only action '{action}' completed")
-            return result
-        except asyncio.TimeoutError:
-            return {
-                "success": False,
-                "error": f"Extension timeout ({self.EXTENSION_TIMEOUT}s) for '{action}'",
-                "method": "extension",
-                "data": None,
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Extension error for '{action}': {str(e)}",
-                "method": "extension",
-                "data": None,
-            }
+        # Create extension handler
+        async def extension_handler() -> Dict[str, Any]:
+            return await self._try_extension(action, port, **kwargs)
+
+        # Use FallbackExecutor for extension-only actions
+        return await self.fallback_executor.execute_extension_only(
+            action_name=action,
+            extension_handler=extension_handler,
+        )
 
     async def _try_extension(self, action: str, port: int, **kwargs) -> Dict[str, Any]:
         """Execute action via extension.

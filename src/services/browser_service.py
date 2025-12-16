@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from ..models import BrowserState, ConsoleMessage
+from .async_request_response_service import AsyncRequestResponseService
 
 logger = logging.getLogger(__name__)
 
@@ -15,12 +16,18 @@ logger = logging.getLogger(__name__)
 class BrowserService:
     """Service for handling browser connections and messages."""
 
-    def __init__(self, storage_service=None, dom_interaction_service=None):
+    def __init__(
+        self,
+        storage_service=None,
+        dom_interaction_service=None,
+        async_request_response_service=None,
+    ):
         """Initialize browser service.
 
         Args:
             storage_service: Optional storage service for persistence
             dom_interaction_service: Optional DOM interaction service for element manipulation
+            async_request_response_service: Optional async request/response service (auto-created if None)
         """
         self.storage_service = storage_service
         self.dom_interaction_service = dom_interaction_service
@@ -28,11 +35,11 @@ class BrowserService:
         self._message_buffer: Dict[int, deque] = {}
         self._buffer_tasks: Dict[int, asyncio.Task] = {}
         self._buffer_interval = 2.5  # seconds
-        # For async request/response with creation time tracking
-        self._pending_requests: Dict[str, Dict[str, Any]] = {}
-        self._cleanup_task: Optional[asyncio.Task] = None
-        self._cleanup_interval = 30.0  # seconds - cleanup check interval
-        self._request_timeout = 120.0  # seconds - max age for pending requests
+
+        # Async request/response service for WebSocket communication
+        self._async_rr_service = (
+            async_request_response_service or AsyncRequestResponseService()
+        )
 
     async def handle_browser_connect(self, connection_info: Dict[str, Any]) -> None:
         """Handle browser connection event.
@@ -333,45 +340,25 @@ class BrowserService:
             return {"success": False, "error": "No active browser connection"}
 
         try:
-            import uuid
-
-            request_id = str(uuid.uuid4())
-
-            # Create a future to wait for response with creation time tracking
-            response_future = asyncio.Future()
-            self._pending_requests[request_id] = {
-                "future": response_future,
-                "created_at": datetime.now(),
-            }
-
-            await connection.websocket.send(
-                json.dumps(
-                    {
-                        "type": "extract_content",
-                        "requestId": request_id,
-                        "tabId": tab_id,
-                        "timestamp": datetime.now().isoformat(),
-                    }
-                )
-            )
-
             logger.info(
-                f"Sent content extraction request to port {port}, tab {tab_id or 'active'}"
+                f"Sending content extraction request to port {port}, tab {tab_id or 'active'}"
             )
 
-            try:
-                # Wait for response with timeout
-                result = await asyncio.wait_for(response_future, timeout=timeout)
-                return result
-            except asyncio.TimeoutError:
-                logger.warning(f"Content extraction timed out after {timeout}s")
+            result = await self._async_rr_service.send_request(
+                websocket=connection.websocket,
+                message_type="extract_content",
+                timeout=timeout,
+                tab_id=tab_id,
+            )
+
+            if result is None:
+                # Timeout occurred
                 return {
                     "success": False,
                     "error": f"Content extraction timed out after {timeout} seconds",
                 }
-            finally:
-                # Clean up pending request
-                self._pending_requests.pop(request_id, None)
+
+            return result
 
         except Exception as e:
             logger.error(f"Failed to send content extraction command: {e}")
@@ -384,42 +371,38 @@ class BrowserService:
         options: Optional[Dict[str, Any]] = None,
         timeout: float = 10.0,
     ) -> Dict[str, Any]:
-        """Extract semantic DOM structure from browser tab."""
+        """Extract semantic DOM structure from browser tab.
+
+        Args:
+            port: Port number
+            tab_id: Optional specific tab ID
+            options: Optional extraction options (include_headings, include_links, etc.)
+            timeout: Timeout for extraction operation
+
+        Returns:
+            Dict containing semantic DOM structure or error information
+        """
         connection = await self._get_connection_with_fallback(port)
 
         if not connection or not connection.websocket:
             return {"success": False, "error": "No active browser connection"}
 
         try:
-            import uuid
+            logger.info(f"Sending semantic DOM extraction request to port {port}")
 
-            request_id = str(uuid.uuid4())
+            result = await self._async_rr_service.send_request(
+                websocket=connection.websocket,
+                message_type="extract_semantic_dom",
+                payload={"options": options or {}},
+                timeout=timeout,
+                tab_id=tab_id,
+            )
 
-            response_future: asyncio.Future[Dict[str, Any]] = asyncio.Future()
-            self._pending_requests[request_id] = {
-                "future": response_future,
-                "created_at": datetime.now(),
-            }
-
-            message = {
-                "type": "extract_semantic_dom",
-                "requestId": request_id,
-                "tabId": tab_id,
-                "options": options or {},
-                "timestamp": datetime.now().isoformat(),
-            }
-
-            await connection.websocket.send(json.dumps(message))
-            logger.info(f"Sent semantic DOM extraction request to port {port}")
-
-            try:
-                result = await asyncio.wait_for(response_future, timeout=timeout)
-                return result
-            except asyncio.TimeoutError:
-                logger.warning(f"Semantic DOM extraction timed out after {timeout}s")
+            if result is None:
+                # Timeout occurred
                 return {"success": False, "error": f"Timeout after {timeout}s"}
-            finally:
-                self._pending_requests.pop(request_id, None)
+
+            return result
 
         except Exception as e:
             logger.error(f"Failed to extract semantic DOM: {e}")
@@ -432,29 +415,33 @@ class BrowserService:
             data: Response data including extracted content
         """
         request_id = data.get("requestId")
-        if request_id and request_id in self._pending_requests:
-            request_data = self._pending_requests[request_id]
-            future = request_data["future"]
-            if not future.done():
-                response = data.get("response", {})
-                future.set_result(response)
+        response = data.get("response", {})
+
+        if request_id:
+            success = await self._async_rr_service.handle_response(
+                request_id, response
+            )
+            if success:
                 logger.info(
                     f"Received content extraction response for request {request_id}"
                 )
         else:
-            logger.warning(
-                f"Received content extraction response for unknown request: {request_id}"
-            )
+            logger.warning("Received content extraction response without requestId")
 
     async def handle_semantic_dom_extracted(self, data: Dict[str, Any]) -> None:
-        """Handle semantic DOM extraction response from browser."""
+        """Handle semantic DOM extraction response from browser.
+
+        Args:
+            data: Response data including semantic DOM structure
+        """
         request_id = data.get("requestId")
-        if request_id and request_id in self._pending_requests:
-            request_data = self._pending_requests[request_id]
-            future = request_data["future"]
-            if not future.done():
-                response = data.get("response", {})
-                future.set_result(response)
+        response = data.get("response", {})
+
+        if request_id:
+            success = await self._async_rr_service.handle_response(
+                request_id, response
+            )
+            if success:
                 logger.info(f"Received semantic DOM for request {request_id}")
 
     async def capture_screenshot_via_extension(
@@ -475,38 +462,25 @@ class BrowserService:
             return {"success": False, "error": "No active browser connection"}
 
         try:
-            import uuid
+            logger.info(f"Sending screenshot capture request to port {port}")
 
-            request_id = str(uuid.uuid4())
-
-            response_future = asyncio.Future()
-            self._pending_requests[request_id] = {
-                "future": response_future,
-                "created_at": datetime.now(),
-            }
-
-            await connection.websocket.send(
-                json.dumps(
-                    {
-                        "type": "capture_screenshot",
-                        "requestId": request_id,
-                        "timestamp": datetime.now().isoformat(),
-                    }
-                )
+            result = await self._async_rr_service.send_request(
+                websocket=connection.websocket,
+                message_type="capture_screenshot",
+                timeout=timeout,
             )
 
-            try:
-                result = await asyncio.wait_for(response_future, timeout=timeout)
-                return result
-            except asyncio.TimeoutError:
+            if result is None:
+                # Timeout occurred
                 return {
                     "success": False,
                     "error": f"Screenshot timed out after {timeout}s",
                 }
-            finally:
-                self._pending_requests.pop(request_id, None)
+
+            return result
 
         except Exception as e:
+            logger.error(f"Failed to capture screenshot: {e}")
             return {"success": False, "error": str(e)}
 
     async def handle_screenshot_captured(self, data: Dict[str, Any]) -> None:
@@ -516,84 +490,23 @@ class BrowserService:
             data: Response data including screenshot base64 data
         """
         request_id = data.get("requestId")
-        if request_id and request_id in self._pending_requests:
-            request_data = self._pending_requests[request_id]
-            future = request_data["future"]
-            if not future.done():
-                future.set_result(data)
+
+        if request_id:
+            success = await self._async_rr_service.handle_response(request_id, data)
+            if success:
                 logger.info(
                     f"Received screenshot_captured response for request {request_id}"
                 )
-        else:
-            logger.warning(
-                f"Received screenshot_captured response for unknown request: {request_id}"
-            )
-
-    async def _cleanup_pending_requests(self) -> None:
-        """Clean up orphaned or expired pending requests.
-
-        Removes:
-        - Requests older than _request_timeout (2 minutes)
-        - Completed futures that weren't cleaned up
-        """
-        now = datetime.now()
-        to_remove = []
-
-        for request_id, request_data in self._pending_requests.items():
-            future = request_data["future"]
-            created_at = request_data["created_at"]
-            age = (now - created_at).total_seconds()
-
-            # Remove if completed or expired
-            if future.done():
-                to_remove.append(request_id)
-                logger.debug(f"Cleaning up completed request {request_id}")
-            elif age > self._request_timeout:
-                to_remove.append(request_id)
-                # Cancel the future if it's still pending
-                if not future.done():
-                    future.cancel()
-                logger.warning(
-                    f"Cleaning up expired request {request_id} (age: {age:.1f}s)"
-                )
-
-        # Remove stale requests
-        for request_id in to_remove:
-            self._pending_requests.pop(request_id, None)
-
-        if to_remove:
-            logger.info(f"Cleaned up {len(to_remove)} stale pending requests")
-
-    async def _cleanup_pending_requests_loop(self) -> None:
-        """Periodically clean up orphaned pending requests."""
-        while True:
-            try:
-                await asyncio.sleep(self._cleanup_interval)
-                await self._cleanup_pending_requests()
-            except asyncio.CancelledError:
-                # Final cleanup before cancellation
-                await self._cleanup_pending_requests()
-                break
-            except Exception as e:
-                logger.error(f"Error in pending requests cleanup task: {e}")
 
     async def start_cleanup_task(self) -> None:
         """Start the background cleanup task for pending requests."""
-        if self._cleanup_task and not self._cleanup_task.done():
-            return
-
-        self._cleanup_task = asyncio.create_task(self._cleanup_pending_requests_loop())
-        logger.info("Started pending requests cleanup task")
+        await self._async_rr_service.start_cleanup_task()
+        logger.info("Started async request/response cleanup task")
 
     async def cleanup(self) -> None:
         """Clean up all resources and background tasks."""
-        # Cancel cleanup task
-        if self._cleanup_task and not self._cleanup_task.done():
-            self._cleanup_task.cancel()
-            try:
-                await self._cleanup_task
-            except asyncio.CancelledError:
-                pass
+        # Shutdown async request/response service
+        await self._async_rr_service.shutdown()
 
         # Cancel all buffer tasks
         for port, task in list(self._buffer_tasks.items()):
@@ -603,9 +516,6 @@ class BrowserService:
                     await task
                 except asyncio.CancelledError:
                     pass
-
-        # Final cleanup of pending requests
-        await self._cleanup_pending_requests()
 
         logger.info("BrowserService cleanup completed")
 

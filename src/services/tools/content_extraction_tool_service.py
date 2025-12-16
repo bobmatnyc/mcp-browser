@@ -184,9 +184,7 @@ class ContentExtractionToolService:
             return text[:max_chars] + f"\n\n[Truncated {len(text) - max_chars:,} chars]"
         return text
 
-    def _format_semantic_dom(
-        self, dom: Dict[str, Any], options: Dict[str, Any]
-    ) -> str:
+    def _format_semantic_dom(self, dom: Dict[str, Any], options: Dict[str, Any]) -> str:
         """Format semantic DOM structure.
 
         Args:
