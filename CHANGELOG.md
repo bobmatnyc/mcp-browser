@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.41] - 2025-12-16
+
+### Fixed
+- MCP tools now use the correct server port for the current project
+  - Previously, `PortResolver._get_daemon_port()` returned the first running server found
+  - Now it matches server's `project_path` to current working directory
+  - Fixes issue where MCP tools from project A would control browser in project B
+
 ## [2.2.40] - 2025-12-16
 
 ### Fixed

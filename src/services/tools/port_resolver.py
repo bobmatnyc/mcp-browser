@@ -5,6 +5,7 @@ It handles auto-detection from daemon registry and warns about common mistakes.
 """
 
 import logging
+import os
 from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -97,16 +98,40 @@ class PortResolver:
         """Get the port of the running mcp-browser daemon from registry.
 
         Returns:
-            Port number if daemon is running, None otherwise
+            Port number if daemon is running FOR THE CURRENT PROJECT, None otherwise
 
         Note:
             This method imports CLI utilities lazily to avoid circular dependencies
             and unnecessary imports when running in MCP stdio mode.
+
+            IMPORTANT: Returns the server matching the current working directory,
+            not just the first running server found.
         """
         try:
             from ...cli.utils.daemon import is_process_running, read_service_registry
 
             registry = read_service_registry()
+            current_cwd = os.path.normpath(os.path.abspath(os.getcwd()))
+
+            # First, look for server matching current project
+            for server in registry.get("servers", []):
+                pid = server.get("pid")
+                port = server.get("port")
+                project_path = server.get("project_path", "")
+
+                if (
+                    pid is not None
+                    and is_process_running(pid)
+                    and isinstance(port, int)
+                ):
+                    # Check if this server belongs to the current project
+                    normalized_project = os.path.normpath(os.path.abspath(project_path))
+                    if normalized_project == current_cwd:
+                        logger.debug(f"Found daemon for current project: port {port}")
+                        return port
+
+            # Fallback: if no matching project, return first running server
+            # (backwards compatibility, but log a warning)
             for server in registry.get("servers", []):
                 pid = server.get("pid")
                 port = server.get("port")
@@ -115,7 +140,12 @@ class PortResolver:
                     and is_process_running(pid)
                     and isinstance(port, int)
                 ):
+                    logger.warning(
+                        f"No daemon for current project ({current_cwd}), "
+                        f"using fallback port {port} from {server.get('project_path', 'unknown')}"
+                    )
                     return port
+
             return None
         except Exception as e:
             logger.debug(f"Could not read daemon registry: {e}")
