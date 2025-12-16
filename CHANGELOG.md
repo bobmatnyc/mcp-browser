@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.31] - 2025-12-16
+
+### Fixed
+- Resolved RuntimeWarning for module import order in CLI
+  - Changed from eager import to lazy import pattern using `__getattr__`
+  - Eliminates warning when running `python -m src.cli.main`
+
+### Changed
+- Improved project organization per standards
+  - Moved `test_applescript_integration.py` to `tests/integration/`
+  - Removed outdated `docs/CHANGELOG.md` duplicate
+  - Moved `BUILD_TRACKING.md` to `docs/developer/`
+  - Removed legacy `Makefile.legacy`
+  - Added `chunk-graph.json` to `.gitignore`
+
 ## [2.2.30] - 2025-12-15
 
 ### Added
