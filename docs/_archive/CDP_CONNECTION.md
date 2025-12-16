@@ -1,4 +1,6 @@
-# CDP Connection Guide
+# CDP Connection Guide (Archived)
+
+This document is retained for historical context. CDP support is not available in current `mcp-browser` releases; use the extension-backed daemon flow instead.
 
 Connect to your existing Chrome browser via Chrome DevTools Protocol (CDP) to use MCP Browser while preserving your browser session, cookies, and extensions.
 
@@ -14,7 +16,7 @@ The CDP connection feature allows you to:
 ## Prerequisites
 
 1. **Google Chrome** (or Chromium-based browser)
-2. **Playwright** installed:
+2. **Playwright** installed (required for CDP mode):
    ```bash
    pip install playwright
    playwright install
@@ -82,7 +84,7 @@ Active Pages        3
 
 ### 3. Configure MCP Browser to Use CDP
 
-Create or update your configuration file (`~/.mcp-browser/config.json`):
+Create or update your configuration file (`~/.mcp-browser/config/settings.json`):
 
 ```json
 {
@@ -106,18 +108,18 @@ Create or update your configuration file (`~/.mcp-browser/config.json`):
 Once configured, all MCP Browser tools will use your existing browser:
 
 ```python
-# In Claude Code, MCP tools automatically use CDP connection
+# MCP Browser exposes a consolidated tool surface (see docs/reference/MCP_TOOLS.md).
 # Example: Navigate to a URL (preserves cookies/session)
-await mcp.call_tool("browser_navigate", {"url": "https://example.com"})
+await mcp.call_tool("browser_action", {"action": "navigate", "url": "https://example.com"})
 
 # Click elements (works with logged-in state)
-await mcp.call_tool("browser_click", {"selector": "#dashboard-link"})
+await mcp.call_tool("browser_action", {"action": "click", "selector": "#dashboard-link"})
 
-# Fill forms (auto-fill from saved passwords works!)
-await mcp.call_tool("browser_fill", {
-    "selector": "#search-input",
-    "value": "query"
-})
+# Fill a field
+await mcp.call_tool(
+    "browser_action",
+    {"action": "fill", "selector": "#search-input", "value": "query"},
+)
 ```
 
 ## Advanced Usage
@@ -183,7 +185,7 @@ from mcp_browser.services.applescript_service import AppleScriptService
 
 async def connect_to_browser():
     # Create service instances
-    websocket_service = WebSocketService(host="localhost", port_range=[8875, 8895])
+    websocket_service = WebSocketService(host="localhost", start_port=8851, end_port=8899)
     browser_service = BrowserService()
     applescript_service = AppleScriptService()
 
@@ -457,19 +459,9 @@ Yes! Any Chromium-based browser supports CDP:
 /Applications/Microsoft\ Edge.app/Contents/MacOS/Microsoft\ Edge --remote-debugging-port=9222
 ```
 
-### Can I connect to remote Chrome instances?
+### Remote Chrome instances
 
-Yes, but **not recommended** for security reasons. If needed:
-
-```bash
-# Remote Chrome (insecure!)
-chrome --remote-debugging-address=0.0.0.0 --remote-debugging-port=9222
-
-# Connect from different machine
-mcp-browser connect --cdp-url http://remote-ip:9222
-```
-
-**Warning**: This exposes full browser control to anyone with network access!
+CDP mode is intended for **local** use (`localhost`) only. Exposing Chrome’s remote debugging port over the network is unsafe and is not supported by the `mcp-browser connect` CLI.
 
 ### Will CDP interfere with manual browsing?
 
@@ -491,9 +483,9 @@ Yes, in `"auto"` mode, MCP Browser will try the extension first and fall back to
 
 ## Related Documentation
 
-- [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - MCP Browser command reference
-- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - General troubleshooting guide
-- [DEVELOPER.md](DEVELOPER.md) - Developer documentation
+- `docs/guides/QUICK_REFERENCE.md` - MCP Browser command reference
+- `docs/guides/TROUBLESHOOTING.md` - General troubleshooting guide
+- `docs/developer/DEVELOPER.md` - Maintainer documentation
 - [Chrome DevTools Protocol](https://chromedevtools.github.io/devtools-protocol/) - Official CDP documentation
 
 ## Support
@@ -508,5 +500,5 @@ For issues or questions:
 **Next Steps:**
 1. Start Chrome with CDP: `chrome --remote-debugging-port=9222`
 2. Test connection: `mcp-browser connect`
-3. Configure mode: Update `~/.mcp-browser/config.json`
+3. Configure mode: Update `~/.mcp-browser/config/settings.json`
 4. Start using MCP Browser with your existing browser session!

@@ -182,7 +182,10 @@ class TestServiceIntegration:
 
         # Add mock connection to browser state with both client and server port
         await browser_service.browser_state.add_connection(
-            port=8875, server_port=8875, websocket=mock_websocket, user_agent="Test Agent"
+            port=8875,
+            server_port=8875,
+            websocket=mock_websocket,
+            user_agent="Test Agent",
         )
 
         # Test navigation

@@ -71,7 +71,7 @@ Added browser control configuration in `src/cli/utils/server.py`:
    - Mode-driven selection
    - Complete MCP tool integration
 
-3. **`docs/APPLESCRIPT_FALLBACK.md`** (Comprehensive documentation)
+3. **`docs/guides/APPLESCRIPT_FALLBACK.md`** (Comprehensive documentation)
    - Architecture overview
    - Configuration guide
    - macOS permission setup instructions
@@ -461,7 +461,7 @@ The AppleScript fallback implementation is **production-ready** and provides:
 ```
 
 **Documentation:**
-- New: `docs/APPLESCRIPT_FALLBACK.md` - Complete fallback guide
+- New: `docs/guides/APPLESCRIPT_FALLBACK.md` - Complete fallback guide
 - Updated: Permission setup instructions for macOS
 - Updated: Feature comparison table
 

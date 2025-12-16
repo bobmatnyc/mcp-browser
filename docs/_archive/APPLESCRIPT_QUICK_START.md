@@ -1,4 +1,6 @@
-# AppleScript Fallback Quick Start
+# AppleScript Fallback Quick Start (Archived)
+
+This guide is retained for historical context and may be stale. For current AppleScript fallback behavior and configuration, see `docs/guides/APPLESCRIPT_FALLBACK.md`.
 
 ## 🚀 30-Second Setup (macOS Users)
 

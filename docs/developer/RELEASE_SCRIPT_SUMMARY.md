@@ -52,8 +52,8 @@ release-script-skip-push   # Local-only release
 
 ### 3. Documentation
 **Created**:
-- `docs/RELEASE_SCRIPT.md` - Comprehensive documentation (450+ lines)
-- `docs/RELEASE_QUICKSTART.md` - Quick reference guide (100+ lines)
+- `docs/guides/releases/RELEASE_SCRIPT.md` - Comprehensive documentation (450+ lines)
+- `docs/guides/releases/RELEASE_QUICKSTART.md` - Quick reference guide (100+ lines)
 
 ## Workflow Automation
 
@@ -308,7 +308,7 @@ The script is fully functional and ready for production use. It has been tested 
 
 ## Support
 
-- **Documentation**: See `docs/RELEASE_SCRIPT.md`
-- **Quick Start**: See `docs/RELEASE_QUICKSTART.md`
+- **Documentation**: See `docs/guides/releases/RELEASE_SCRIPT.md`
+- **Quick Start**: See `docs/guides/releases/RELEASE_QUICKSTART.md`
 - **Help**: Run `python scripts/release.py --help`
 - **Issues**: Open GitHub issue with error logs

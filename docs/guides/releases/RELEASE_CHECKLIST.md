@@ -252,4 +252,4 @@ python scripts/release.py --help  # Full options
 ## Documentation
 - Full docs: [RELEASE_SCRIPT.md](RELEASE_SCRIPT.md)
 - Quick start: [RELEASE_QUICKSTART.md](RELEASE_QUICKSTART.md)
-- Summary: [RELEASE_SCRIPT_SUMMARY.md](../RELEASE_SCRIPT_SUMMARY.md)
+- Summary: `docs/developer/RELEASE_SCRIPT_SUMMARY.md`

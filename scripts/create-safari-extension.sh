@@ -305,7 +305,7 @@ For public distribution, you need:
 2. Developer ID certificate
 3. App notarization
 
-See [docs/SAFARI_EXTENSION.md](../docs/SAFARI_EXTENSION.md) for full details.
+See [docs/guides/SAFARI_EXTENSION.md](../docs/guides/SAFARI_EXTENSION.md) for full details.
 
 ## Common Issues
 
@@ -319,7 +319,7 @@ See [docs/SAFARI_EXTENSION.md](../docs/SAFARI_EXTENSION.md) for full details.
 ### WebSocket connection fails
 
 1. Check that MCP server is running
-2. Verify port range (8875-8895)
+2. Verify port range (8851-8899)
 3. Check Console.app for sandbox errors
 4. Ensure capabilities are enabled in Xcode
 
@@ -333,7 +333,7 @@ See [docs/SAFARI_EXTENSION.md](../docs/SAFARI_EXTENSION.md) for full details.
 ## Documentation
 
 Full Safari extension documentation:
-- [Safari Extension Guide](../docs/SAFARI_EXTENSION.md)
+- [Safari Extension Guide](../docs/guides/SAFARI_EXTENSION.md)
 - [Apple's Safari Extensions](https://developer.apple.com/documentation/safariservices/safari_web_extensions)
 
 ## Support
@@ -381,7 +381,7 @@ echo "   • Open any website in Safari"
 echo "   • Check console messages are captured"
 echo ""
 echo -e "${BLUE}Documentation:${NC}"
-echo "  • Safari setup: docs/SAFARI_EXTENSION.md"
+echo "  • Safari setup: docs/guides/SAFARI_EXTENSION.md"
 echo "  • Extension README: mcp-browser-extension-safari/README.md"
 echo ""
 echo -e "${GREEN}Happy developing! 🎉${NC}"

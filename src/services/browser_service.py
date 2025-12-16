@@ -431,9 +431,7 @@ class BrowserService:
         response = data.get("response", {})
 
         if request_id:
-            success = await self._async_rr_service.handle_response(
-                request_id, response
-            )
+            success = await self._async_rr_service.handle_response(request_id, response)
             if success:
                 logger.info(
                     f"Received content extraction response for request {request_id}"
@@ -451,9 +449,7 @@ class BrowserService:
         response = data.get("response", {})
 
         if request_id:
-            success = await self._async_rr_service.handle_response(
-                request_id, response
-            )
+            success = await self._async_rr_service.handle_response(request_id, response)
             if success:
                 logger.info(f"Received semantic DOM for request {request_id}")
 

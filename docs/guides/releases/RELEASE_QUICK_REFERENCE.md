@@ -82,8 +82,8 @@ git push origin :refs/tags/vX.Y.Z
 
 ```bash
 make help                # Show all targets
-cat RELEASE.md           # Read full guide
-cat docs/RELEASE_CHEATSHEET.md  # Read cheatsheet
+cat docs/guides/releases/RELEASE.md           # Read full guide
+cat docs/guides/releases/RELEASE_CHEATSHEET.md  # Read cheatsheet
 ```
 
 ---

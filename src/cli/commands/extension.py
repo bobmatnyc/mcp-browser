@@ -10,6 +10,7 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from ..utils import console
+from ..utils.extension import sync_extension_version
 
 
 def find_extension_source() -> Optional[Path]:
@@ -129,6 +130,9 @@ def copy_extension(source: Path, destination: Path, force: bool = False) -> bool
         ) as progress:
             progress.add_task(description="Copying extension files...", total=None)
             shutil.copytree(source, destination)
+
+        # Sync version with package version
+        sync_extension_version(destination)
 
         # Count files
         file_count = sum(1 for _ in destination.rglob("*") if _.is_file())

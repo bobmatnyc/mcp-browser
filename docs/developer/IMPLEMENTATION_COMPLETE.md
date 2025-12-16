@@ -94,7 +94,7 @@ The comprehensive AppleScript-based browser control fallback for mcp-browser on 
 
 ### ✅ Documentation
 
-- [x] **Comprehensive Fallback Guide** (`docs/APPLESCRIPT_FALLBACK.md`)
+- [x] **Comprehensive Fallback Guide** (`docs/guides/APPLESCRIPT_FALLBACK.md`)
   - [x] Architecture overview with diagrams
   - [x] Configuration guide with examples
   - [x] macOS permission setup instructions (step-by-step)
@@ -113,7 +113,7 @@ The comprehensive AppleScript-based browser control fallback for mcp-browser on 
   - [x] Memory impact analysis
   - [x] Release notes draft
 
-- [x] **Quick Start Guide** (`APPLESCRIPT_QUICK_START.md`)
+- [x] **Quick Start Guide** (`docs/_archive/APPLESCRIPT_QUICK_START.md`) (archived)
   - [x] 30-second setup instructions
   - [x] Common scenarios
   - [x] Troubleshooting (30 seconds)
@@ -404,9 +404,9 @@ mcp-browser start  # Set mode="applescript" in config
 
 1. ✅ `src/services/applescript_service.py` (636 lines)
 2. ✅ `src/services/browser_controller.py` (514 lines)
-3. ✅ `docs/APPLESCRIPT_FALLBACK.md` (~1,200 lines)
+3. ✅ `docs/guides/APPLESCRIPT_FALLBACK.md` (~1,200 lines)
 4. ✅ `APPLESCRIPT_IMPLEMENTATION_SUMMARY.md` (~900 lines)
-5. ✅ `APPLESCRIPT_QUICK_START.md` (~200 lines)
+5. ✅ `docs/_archive/APPLESCRIPT_QUICK_START.md` (~200 lines; archived)
 6. ✅ `IMPLEMENTATION_COMPLETE.md` (this file, ~500 lines)
 7. ✅ `tests/test_applescript_integration.py` (315 lines)
 
@@ -438,8 +438,8 @@ Architecture:
 - Service container integration with dependency injection
 
 Documentation:
-- Complete fallback guide (docs/APPLESCRIPT_FALLBACK.md)
-- Quick start guide (APPLESCRIPT_QUICK_START.md)
+- Complete fallback guide (`docs/guides/APPLESCRIPT_FALLBACK.md`)
+- Quick start guide (`docs/_archive/APPLESCRIPT_QUICK_START.md`) (archived)
 - Implementation summary with design decisions
 - Integration tests and manual testing guide
 
@@ -454,7 +454,7 @@ Backward Compatibility: FULL
 Files:
 - New: src/services/applescript_service.py (636 lines)
 - New: src/services/browser_controller.py (514 lines)
-- New: docs/APPLESCRIPT_FALLBACK.md
+- New: docs/guides/APPLESCRIPT_FALLBACK.md
 - New: tests/test_applescript_integration.py
 - Modified: src/services/mcp_service.py (+32)
 - Modified: src/cli/utils/server.py (+61)

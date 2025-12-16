@@ -4,7 +4,7 @@ This document summarizes the Safari extension port implementation for MCP Browse
 
 ## What Was Implemented
 
-### 1. Comprehensive Documentation (docs/SAFARI_EXTENSION.md)
+### 1. Comprehensive Documentation (`docs/guides/SAFARI_EXTENSION.md`)
 
 A complete 600+ line guide covering:
 
@@ -175,7 +175,7 @@ Added Safari Extension section with:
 Updated file structure to include:
 - `mcp-browser-extension-safari-resources/` directory
 - `scripts/create-safari-extension.sh` script
-- `docs/SAFARI_EXTENSION.md` documentation
+- `docs/guides/SAFARI_EXTENSION.md` documentation
 
 ### 5. Content Script Compatibility
 
@@ -344,7 +344,7 @@ mcp-browser-extension-safari/            # After running script
 ## Success Criteria
 
 ### ✅ Documentation
-- [x] Comprehensive setup guide (docs/SAFARI_EXTENSION.md)
+- [x] Comprehensive setup guide (`docs/guides/SAFARI_EXTENSION.md`)
 - [x] Automated conversion script with help text
 - [x] Safari resources README
 - [x] Updated main README

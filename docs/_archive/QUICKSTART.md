@@ -1,4 +1,8 @@
-# MCP Browser Quick Start Guide
+# (Archived) MCP Browser Quick Start Guide
+
+This document is retained for historical context and may not match the current CLI and tool surface.
+
+Use `README.md` and `docs/guides/INSTALLATION.md` for current setup instructions.
 
 ## Installation in 3 Steps (5 Minutes Total)
 

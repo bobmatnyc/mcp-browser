@@ -1,4 +1,6 @@
-# MCP Browser - Comprehensive Test Results Report
+# (Archived) MCP Browser - Comprehensive Test Results Report
+
+This document is retained for historical context and may not match the current CLI and tool surface.
 
 **Test Date**: September 23, 2025
 **Test Environment**: macOS Darwin 24.5.0

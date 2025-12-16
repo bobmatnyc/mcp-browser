@@ -2,6 +2,8 @@
 
 Complete automation for mcp-browser release workflow.
 
+Quick entry points: `docs/guides/releases/RELEASE.md` and `docs/guides/releases/RELEASE_QUICK_REFERENCE.md`.
+
 ## Overview
 
 The `scripts/release.py` script automates the entire release process from version bumping to publishing. It handles all quality checks, builds, and deployment steps in a single command.

@@ -1,4 +1,6 @@
-# MCP Browser - Claude Code CLI Setup Complete ✅
+# (Archived) MCP Browser - Claude Code CLI Setup Complete ✅
+
+This document is retained for historical context and may not match the current CLI and tool surface.
 
 ## Configuration Status
 

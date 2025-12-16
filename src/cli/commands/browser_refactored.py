@@ -229,7 +229,10 @@ def create_command_handlers() -> Dict[str, InteractiveCommandHandler]:
 
 
 async def process_interactive_command(
-    command: str, handlers: Dict[str, InteractiveCommandHandler], client: BrowserClient, port: int
+    command: str,
+    handlers: Dict[str, InteractiveCommandHandler],
+    client: BrowserClient,
+    port: int,
 ) -> bool:
     """Process a single interactive command.
 

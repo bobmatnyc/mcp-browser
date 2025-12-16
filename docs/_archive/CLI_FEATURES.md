@@ -1,4 +1,6 @@
-# MCP Browser CLI - Comprehensive Help System
+# (Archived) MCP Browser CLI - Comprehensive Help System
+
+This document is retained for historical context and may not match the current CLI.
 
 ## Overview
 

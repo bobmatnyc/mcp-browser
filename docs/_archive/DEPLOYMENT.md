@@ -1,4 +1,6 @@
-# MCP Browser - Dual Deployment Guide
+# (Archived) MCP Browser - Dual Deployment Guide
+
+This document is retained for historical context and may not match the current dev tooling.
 
 This guide explains the two deployment methods for mcp-browser: **local development** and **system-wide installation**.
 

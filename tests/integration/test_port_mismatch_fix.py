@@ -30,7 +30,10 @@ async def test_navigation_with_server_port():
     server_port = 8851
 
     await browser_service.browser_state.add_connection(
-        port=client_port, server_port=server_port, websocket=mock_ws, user_agent="Test Browser"
+        port=client_port,
+        server_port=server_port,
+        websocket=mock_ws,
+        user_agent="Test Browser",
     )
 
     # MCP tool tries to navigate using server port (8851)

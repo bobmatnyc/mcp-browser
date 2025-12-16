@@ -45,7 +45,7 @@ User Request → BrowserController
 
 ### Browser Control Modes
 
-Configure fallback behavior in `~/.config/mcp-browser/config.json`:
+Configure fallback behavior in `~/.mcp-browser/config/settings.json`:
 
 ```json
 {
@@ -132,7 +132,7 @@ Note: Console log capture requires the browser extension.
 | **Extract Content** | ✅ | ❌ | Extension only (Readability) |
 | **JavaScript Execution** | ❌ | ✅ | AppleScript only |
 | **Multi-tab Management** | ✅ | ❌ | Extension only |
-| **Screenshot** | ✅ | ✅ | Playwright (independent) |
+| **Screenshot** | ✅ | ❌ | Screenshot capture is extension-backed |
 | **Performance** | ~10-50ms | ~100-500ms | Extension is 5-10x faster |
 
 ## Usage Examples
@@ -140,15 +140,11 @@ Note: Console log capture requires the browser extension.
 ### Automatic Fallback (Default)
 
 ```python
-# In Claude Code or MCP client
-# Extension connected → uses extension
-browser_navigate(port=8875, url="https://example.com")
+# In an MCP client (Claude Code / Claude Desktop), use the consolidated tool surface.
+await mcp.call_tool("browser_action", {"action": "navigate", "url": "https://example.com"})
 
-# Extension disconnected → automatic AppleScript fallback
-browser_navigate(port=8875, url="https://example.com")
-# Response: "Successfully navigated to https://example.com using AppleScript fallback.
-#            Note: Console log capture requires the browser extension.
-#            Install extension: mcp-browser quickstart"
+# If the WebSocket daemon/extension is unavailable, navigation may fall back to AppleScript on macOS,
+# depending on your `browser_control` settings.
 ```
 
 ### Force Extension Mode
@@ -163,8 +159,7 @@ browser_navigate(port=8875, url="https://example.com")
 
 ```python
 # This will fail with clear error if extension unavailable
-browser_navigate(port=8875, url="https://example.com")
-# Error: "No browser extension connected on port 8875. Install extension: mcp-browser quickstart"
+await mcp.call_tool("browser_action", {"action": "navigate", "url": "https://example.com"})
 ```
 
 ### Force AppleScript Mode
@@ -180,8 +175,7 @@ browser_navigate(port=8875, url="https://example.com")
 
 ```python
 # Always uses AppleScript, ignores extension
-browser_navigate(port=8875, url="https://example.com")
-# Uses Safari via AppleScript
+await mcp.call_tool("browser_action", {"action": "navigate", "url": "https://example.com"})
 ```
 
 ## Limitations & Workarounds
@@ -193,7 +187,7 @@ browser_navigate(port=8875, url="https://example.com")
 **Workarounds**:
 1. **Install Extension** (Recommended):
    ```bash
-   mcp-browser quickstart  # Interactive extension installation
+   mcp-browser extension install
    ```
 
 2. **Use JavaScript Injection** (AppleScript can execute JavaScript):
@@ -327,7 +321,8 @@ mcp-browser start
 ```bash
 # 1. Stop browser extension (remove or disable)
 # 2. Configure AppleScript mode
-cat > ~/.config/mcp-browser/config.json << EOF
+mkdir -p ~/.mcp-browser/config
+cat > ~/.mcp-browser/config/settings.json << EOF
 {
   "browser_control": {
     "mode": "applescript",
@@ -345,10 +340,11 @@ mcp-browser start
 **Test Extension Mode**:
 ```bash
 # 1. Install extension
-mcp-browser quickstart
+mcp-browser extension install
 
 # 2. Configure extension mode
-cat > ~/.config/mcp-browser/config.json << EOF
+mkdir -p ~/.mcp-browser/config
+cat > ~/.mcp-browser/config/settings.json << EOF
 {
   "browser_control": {
     "mode": "extension"
@@ -369,27 +365,27 @@ All methods automatically fall back to AppleScript when extension unavailable:
 # Navigation (supports fallback)
 await browser_controller.navigate(
     url="https://example.com",
-    port=8875  # Optional: None uses AppleScript
+    port=None  # Optional: omit to auto-select / use fallback
 )
 # Returns: {"success": bool, "method": "extension"|"applescript", "error": str}
 
 # Click element (supports fallback with CSS only)
 await browser_controller.click(
     selector=".button",  # CSS selector required for AppleScript
-    port=8875
+    port=None
 )
 
 # Fill form field (supports fallback)
 await browser_controller.fill_field(
     selector="input[name='email']",
     value="user@example.com",
-    port=8875
+    port=None
 )
 
 # Get element info (supports fallback)
 await browser_controller.get_element(
     selector=".heading",
-    port=8875
+    port=None
 )
 
 # Execute JavaScript (AppleScript only)

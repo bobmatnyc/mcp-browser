@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.39] - 2025-12-16
+
+### Fixed
+- Setup ALWAYS copies fresh extension files on every run
+  - Previously only synced manifest.json but kept old JavaScript files
+  - Now copies all extension files from package source to ensure code is updated
+- Updated all extension manifest versions to 2.2.39
+
 ## [2.2.38] - 2025-12-16
 
 ### Fixed

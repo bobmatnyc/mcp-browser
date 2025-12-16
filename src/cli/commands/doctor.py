@@ -329,7 +329,7 @@ def _check_server_status(project_path: str) -> dict:
         if server_project != os.path.normpath(os.path.abspath(project_path)):
             other_servers.append(f"{server_project} (port {server.get('port')})")
 
-    message = f"Not running for this project"
+    message = "Not running for this project"
     if other_servers:
         message += f"\n    → Found servers for: {', '.join(other_servers)}"
 

@@ -140,7 +140,7 @@ If planning to distribute outside development:
 - [ ] Enabled hardened runtime
 - [ ] Prepared for notarization
 
-See: [docs/SAFARI_EXTENSION.md](../docs/SAFARI_EXTENSION.md) - Code Signing section
+See: [docs/guides/SAFARI_EXTENSION.md](../../../docs/guides/SAFARI_EXTENSION.md) - Code Signing section
 
 ### For App Store Submission
 
@@ -152,7 +152,7 @@ If submitting to Mac App Store:
 - [ ] Privacy policy URL available
 - [ ] App description and metadata ready
 
-See: [docs/SAFARI_EXTENSION.md](../docs/SAFARI_EXTENSION.md) - Distribution section
+See: [docs/guides/SAFARI_EXTENSION.md](../../../docs/guides/SAFARI_EXTENSION.md) - Distribution section
 
 ## ✅ Verification Commands
 
@@ -219,23 +219,23 @@ Your Safari extension is working correctly when:
 - [x] Extension appears in Safari Settings → Extensions
 - [x] Extension icon shows in Safari toolbar
 - [x] Clicking icon shows popup with connection status
-- [x] Status shows "Connected" with port number (8875-8895)
+- [x] Status shows "Connected" with port number (8851-8899)
 - [x] Test message button generates console logs
 - [x] Console.log() on any page reaches MCP server
 - [x] All MCP Browser features work (navigation, DOM interaction, etc.)
 
 ## 📚 Additional Resources
 
-- **Complete Guide**: [docs/SAFARI_EXTENSION.md](../docs/SAFARI_EXTENSION.md)
+- **Complete Guide**: [docs/guides/SAFARI_EXTENSION.md](../../../docs/guides/SAFARI_EXTENSION.md)
 - **Safari Resources README**: [README.md](README.md)
 - **Apple Documentation**: [Safari Web Extensions](https://developer.apple.com/documentation/safariservices/safari_web_extensions)
-- **Main MCP Browser README**: [../README.md](../README.md)
+- **Main MCP Browser README**: [README.md](../../../README.md)
 
 ## 🆘 Getting Help
 
 If you encounter issues:
 
-1. **Check the comprehensive guide**: [docs/SAFARI_EXTENSION.md](../docs/SAFARI_EXTENSION.md)
+1. **Check the comprehensive guide**: [docs/guides/SAFARI_EXTENSION.md](../../../docs/guides/SAFARI_EXTENSION.md)
 2. **Review Common Issues section** in the guide
 3. **Check Console.app** for system errors
 4. **Use Safari Web Inspector** for extension debugging

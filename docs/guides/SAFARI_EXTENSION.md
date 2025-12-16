@@ -47,11 +47,17 @@ The native app acts as a container and can be minimal (just a simple UI explaini
 
 ## Quick Start
 
-Use the automated script to convert the Chrome extension:
+Use the automated script to convert the Chrome extension.
+
+Note: the converter expects a materialized web-extension directory. Depending on your workflow, that may be:
+- `mcp-browser-extension/` (created by `mcp-browser init --project`), or
+- `mcp-browser-extensions/chrome/` (created by `mcp-browser setup` or `make ext-deploy`)
+
+Update the script’s `CHROME_EXT_DIR` if your local directory name differs.
 
 ```bash
 # Navigate to the project root
-cd /Users/masa/Projects/mcp-browser
+cd /path/to/mcp-browser
 
 # Run the conversion script
 bash scripts/create-safari-extension.sh
@@ -76,8 +82,8 @@ xcode-select --install
 
 # Convert the extension (done by script)
 xcrun safari-web-extension-converter \
-  /Users/masa/Projects/mcp-browser/mcp-browser-extension \
-  --project-location /Users/masa/Projects/mcp-browser/mcp-browser-extension-safari \
+  mcp-browser-extension \
+  --project-location mcp-browser-extension-safari \
   --app-name "MCP Browser" \
   --bundle-identifier com.mcpbrowser.extension \
   --swift

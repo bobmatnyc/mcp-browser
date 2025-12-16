@@ -1,8 +1,7 @@
-# CODE_STRUCTURE.md - Architecture Analysis
+# CODE_STRUCTURE.md - Architecture Overview
 
-**Generated**: 2025-09-14
 **Architecture**: Service-Oriented Architecture (SOA) with Dependency Injection
-**Framework**: Custom AsyncIO + MCP Python SDK + Chrome Extension
+**Runtime**: asyncio + WebSocket daemon (browser) + MCP stdio server (assistant)
 
 ## Core Architecture Overview
 
@@ -30,7 +29,7 @@ async def create_browser_service(container):
 **Responsibility**: Browser connection management
 ```python
 # Port auto-discovery pattern
-for port in range(8875, 8895):
+for port in range(self.start_port, self.end_port + 1):
     try:
         server = await websockets.serve(handler, host, port)
         break  # Success
@@ -39,7 +38,7 @@ for port in range(8875, 8895):
 ```
 
 **Core Patterns**:
-- Port auto-discovery (8875-8895 range)
+- Port auto-discovery (default 8851-8899 range, configurable)
 - Event-driven handler registration
 - Connection lifecycle management
 - Concurrent broadcast messaging
@@ -64,6 +63,7 @@ await websocket.send(json.dumps({
 - Port-based connection tracking
 - Async navigation command dispatch
 - Memory-bounded deque for message storage
+- Request/response correlation for DOM + screenshot operations
 
 #### 3. StorageService (`src/services/storage_service.py`)
 **Responsibility**: JSONL persistence with rotation
@@ -86,22 +86,18 @@ async with self._get_file_lock(port):
 - JSONL format for streaming reads
 
 #### 4. MCPService (`src/services/mcp_service.py`)
-**Responsibility**: Claude Code integration
+**Responsibility**: MCP (stdio) integration for AI coding assistants
 ```python
 # Tool registration pattern
 @self.server.list_tools()
 async def handle_list_tools() -> list[Tool]:
-    return [
-        Tool(name="browser_navigate", ...),
-        Tool(name="browser_query_logs", ...),
-        Tool(name="browser_screenshot", ...)
-    ]
+    return [Tool(name="browser_action", ...), Tool(name="browser_query", ...), ...]
 
 # Tool execution pattern
 @self.server.call_tool()
 async def handle_call_tool(name: str, arguments: dict):
-    if name == "browser_navigate":
-        return await self._handle_navigate(arguments)
+    if name == "browser_action":
+        return await self._handle_browser_action(arguments)
 ```
 
 **Integration Points**:
@@ -110,24 +106,16 @@ async def handle_call_tool(name: str, arguments: dict):
 - Service dependency injection
 - Structured response formatting
 
-#### 5. ScreenshotService (`src/services/screenshot_service.py`)
-**Responsibility**: Playwright browser automation
-```python
-# Page management pattern
-async def _get_or_create_page(self, port: int) -> Page:
-    if port not in self._pages:
-        context = await self._browser.new_context(
-            viewport={'width': 1280, 'height': 720}
-        )
-        self._pages[port] = await context.new_page()
-    return self._pages[port]
-```
+#### 5. BrowserController (`src/services/browser_controller.py`)
+**Responsibility**: Unified browser control with extension/daemon/AppleScript fallbacks
 
-**Automation Patterns**:
-- Per-port Playwright page management
-- Headless Chromium with security flags
-- Base64 screenshot encoding
-- Async lifecycle management
+**Key Patterns**:
+- Extension-first control (via WebSocket daemon when available)
+- Optional AppleScript fallback on macOS (reduced feature set)
+- Capability detection to guide tool behavior
+
+#### 6. DOMInteractionService (`src/services/dom_interaction_service.py`)
+**Responsibility**: DOM manipulation and semantic extraction via extension protocol
 
 ## Data Models
 
@@ -168,7 +156,7 @@ console.log = function(...args) {
 ```javascript
 // WebSocket connection with retry
 function connectWebSocket() {
-    for (let port = 8875; port <= 8895; port++) {
+    for (let port = 8851; port <= 8899; port++) {
         try {
             ws = new WebSocket(`ws://localhost:${port}`);
             // Connection success handling
@@ -181,7 +169,12 @@ function connectWebSocket() {
 
 ## Service Orchestration
 
-### Main Entry Point (`src/cli/main.py`)
+### Main Entry Points
+
+- CLI: `src/cli/main.py` (Click commands)
+- Server orchestrator: `src/cli/utils/server.py` (`BrowserMCPServer`)
+
+### Orchestration (`BrowserMCPServer`)
 ```python
 class BrowserMCPServer:
     def _setup_services(self):
@@ -189,7 +182,7 @@ class BrowserMCPServer:
         self.container.register('storage_service', ...)
         self.container.register('websocket_service', ...)
         self.container.register('browser_service', create_browser_service)  # Depends on storage
-        self.container.register('mcp_service', create_mcp_service)  # Depends on browser + screenshot
+        self.container.register('mcp_service', create_mcp_service)  # Depends on browser + DOM + controller
 ```
 
 **Orchestration Patterns**:
@@ -216,7 +209,7 @@ class BrowserMCPServer:
 - **Bounded message buffers**: `deque(maxlen=1000)` prevents memory leaks
 - **File rotation**: Automatic 50MB limit with timestamp-based archives
 - **Connection tracking**: Weak references to prevent resource leaks
-- **Page lifecycle**: Playwright pages cleaned up per port
+- **Request tracking**: Timeouts + cleanup for screenshot/DOM requests
 
 ## Error Handling Patterns
 
@@ -243,7 +236,7 @@ finally:
 ## Performance Characteristics
 
 ### WebSocket Connections
-- **Port range**: 8875-8895 (21 available ports)
+- **Port range**: 8851-8899 by default (49 available ports; configurable)
 - **Connection lifecycle**: Automatic reconnection from extension
 - **Message batching**: Extension batches messages every 2-3 seconds
 - **Concurrent clients**: Supports multiple browser tabs per port
@@ -255,10 +248,9 @@ finally:
 - **Query optimization**: JSONL allows streaming reads
 
 ### Screenshot Performance
-- **Page reuse**: Playwright pages cached per port
-- **Headless mode**: No GUI overhead
-- **Concurrent captures**: Multiple screenshots can be taken simultaneously
-- **Memory management**: Pages closed when ports disconnect
+- **Mechanism**: Extension-backed screenshot capture (no Playwright service)
+- **Latency**: Depends on browser and page complexity
+- **Concurrency**: Requests are correlated and time out if no response
 
 ## Development Patterns
 
@@ -272,7 +264,8 @@ finally:
 1. Add tool definition to `MCPService._setup_tools()`
 2. Implement handler method with service delegation
 3. Add validation and error responses
-4. Test via Claude Code integration
+4. Update `docs/reference/MCP_TOOLS.md`
+5. Test via Claude Code integration
 
 ### Chrome Extension Modifications
 1. Update content script for new console capture patterns

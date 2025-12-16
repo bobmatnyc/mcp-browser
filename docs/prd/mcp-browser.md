@@ -71,11 +71,11 @@ mcp-browser eliminates the friction between browser-based development and AI cod
 ### 🚀 **Epic 1: Instant Setup & Connection**
 
 #### Story 1.1: Zero-Configuration Installation
-**As a developer, I want to install BrowserPYMCP with a single command so that I can start using it immediately without complex setup.**
+**As a developer, I want to install MCP Browser with a single command so that I can start using it immediately without complex setup.**
 
 **Acceptance Criteria:**
-- [ ] Installation via `pipx install browserpymcp` completes in <60 seconds
-- [ ] Service automatically starts and finds available port (8875-8895)
+- [ ] Installation via `pipx install mcp-browser` completes in <60 seconds
+- [ ] Service automatically starts and finds an available port (8851-8899)
 - [ ] Claude Code integration is automatically configured
 - [ ] Browser plugin works immediately without manual installation
 
@@ -85,7 +85,7 @@ mcp-browser eliminates the friction between browser-based development and AI cod
 - Installation success rate >99% across platforms
 
 #### Story 1.2: Automatic Browser Detection
-**As a developer, I want BrowserPYMCP to automatically detect my development servers so that I don't need to manually configure each project.**
+**As a developer, I want MCP Browser to automatically detect my development servers so that I don't need to manually configure each project.**
 
 **Acceptance Criteria:**
 - [ ] Automatically detects localhost ports (3000, 8080, 5173, etc.)
@@ -105,7 +105,7 @@ mcp-browser eliminates the friction between browser-based development and AI cod
 
 **Acceptance Criteria:**
 - [ ] All console messages (log, warn, error, debug) captured automatically
-- [ ] Messages organized by browser port in `~/.browserPYMCP/browser/[port]/`
+- [ ] Messages organized by browser port in `~/.mcp-browser/data/[port]/`
 - [ ] Real-time streaming to Claude Code via MCP tools
 - [ ] Configurable log levels and filtering
 
@@ -203,7 +203,7 @@ mcp-browser eliminates the friction between browser-based development and AI cod
 - Port switching commands complete in <1 second
 
 #### Story 4.2: Real-Time Status Monitoring
-**As a developer, I want visual confirmation that BrowserPYMCP is working correctly so that I can trust the integration.**
+**As a developer, I want visual confirmation that MCP Browser is working correctly so that I can trust the integration.**
 
 **Acceptance Criteria:**
 - [ ] Browser widget shows connection status (🟢 Connected, 🔴 Disconnected)
@@ -233,7 +233,7 @@ mcp-browser eliminates the friction between browser-based development and AI cod
 ### ⚡ **Epic 5: Performance & Reliability**
 
 #### Story 5.1: Automatic Service Management
-**As a developer, I want BrowserPYMCP to manage itself automatically so that I never have to think about service maintenance.**
+**As a developer, I want MCP Browser to manage itself automatically so that I never have to think about service maintenance.**
 
 **Acceptance Criteria:**
 - [ ] Automatic startup on system boot (optional)
@@ -247,11 +247,11 @@ mcp-browser eliminates the friction between browser-based development and AI cod
 - Memory usage stable over 24+ hour sessions
 
 #### Story 5.2: Intelligent Port Management
-**As a developer, I want BrowserPYMCP to automatically handle port conflicts so that it works reliably across different development environments.**
+**As a developer, I want MCP Browser to automatically handle port conflicts so that it works reliably across different development environments.**
 
 **Acceptance Criteria:**
-- [ ] Prefers port 8875, automatically finds alternatives if occupied
-- [ ] Detects existing BrowserPYMCP instances and gracefully reloads
+- [ ] Prefers the first available port in the default range (8851-8899)
+- [ ] Detects existing MCP Browser instances and gracefully reloads
 - [ ] Handles port conflicts with other development tools
 - [ ] Zero-downtime transitions during service updates
 
@@ -261,7 +261,7 @@ mcp-browser eliminates the friction between browser-based development and AI cod
 - Zero connection drops during port transitions
 
 #### Story 5.3: Cross-Platform Compatibility
-**As a developer, I want BrowserPYMCP to work consistently across all my development environments so that I can use it everywhere.**
+**As a developer, I want MCP Browser to work consistently across all my development environments so that I can use it everywhere.**
 
 **Acceptance Criteria:**
 - [ ] Works on Windows, macOS, and Linux

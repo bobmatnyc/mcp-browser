@@ -68,8 +68,9 @@ tests/
 ```
 docs/
 ├── README.md            # Documentation index and navigation
+├── STANDARDS.md         # Documentation standards (generic)
 ├── guides/             # User-facing guides
-│   ├── APPLESCRIPT_USAGE.md
+│   ├── APPLESCRIPT_FALLBACK.md
 │   ├── releases/       # Release documentation
 │   │   ├── RELEASE.md
 │   │   └── RELEASE_QUICK_REFERENCE.md
@@ -117,17 +118,14 @@ examples/
 **Content**: User-facing demos and examples
 **Purpose**: Help users understand how to use features
 
-### Extension (`mcp-browser-extension/`)
-```
-mcp-browser-extension/
-├── manifest.json
-├── background.js
-├── content.js
-└── ...
-```
+### Browser Extension
 
-**Purpose**: Chrome/Safari browser extension
-**Organization**: Standard browser extension structure
+There are a few distinct “extension” directories in this repo:
+
+- **Packaged assets**: `src/extension/` (shipped with the Python package; used by `mcp-browser extension …`)
+- **Multi-browser sources**: `src/extensions/{chrome,firefox,safari}/` (source-of-truth for unpacked extensions)
+- **Local deploy output** (gitignored): `mcp-browser-extensions/` (created by `make ext-deploy` and some setup helpers)
+- **Legacy project output** (gitignored): `mcp-browser-extension/` (created by `mcp-browser init --project`)
 
 ### Temporary (`tmp/`)
 ```
@@ -154,7 +152,7 @@ tmp/
 
 | File Type | Location | Examples |
 |-----------|----------|----------|
-| User guides | `docs/guides/` | APPLESCRIPT_USAGE.md |
+| User guides | `docs/guides/` | APPLESCRIPT_FALLBACK.md |
 | Release guides | `docs/guides/releases/` | RELEASE.md |
 | API reference | `docs/reference/` | API.md, PROJECT_ORGANIZATION.md |
 | Implementation | `docs/developer/` | *_IMPLEMENTATION_*.md, *_SUMMARY.md |
@@ -176,7 +174,7 @@ tmp/
 |-----------|----------|---------|
 | Test fixtures | `tests/fixtures/` | HTML for testing |
 | User examples | `examples/` | Demo pages |
-| Extension code | `mcp-browser-extension/` | Browser extension |
+| Extension sources | `src/extensions/` | Browser extension (unpacked sources) |
 
 ### Configuration Files
 
@@ -197,11 +195,11 @@ tmp/
 ### Documentation
 - **Root Level**: `UPPERCASE.md` (README.md, CHANGELOG.md)
 - **Subdirectories**: `Title_Case.md` or `lowercase.md`
-- **Multi-word**: Use underscores (`APPLESCRIPT_USAGE.md`)
+- **Multi-word**: Use underscores (`APPLESCRIPT_FALLBACK.md`)
 
 ### Directories
 - **Lowercase**: All directory names lowercase
-- **Multi-word**: Use hyphens (`mcp-browser-extension`)
+- **Multi-word**: Use hyphens (`mcp-browser-extensions`)
 - **Avoid**: Spaces, special characters, camelCase
 
 ## Git Integration
@@ -284,7 +282,7 @@ make lint
 
 ### Good Organization
 ```
-✓ docs/guides/APPLESCRIPT_USAGE.md
+✓ docs/guides/APPLESCRIPT_FALLBACK.md
 ✓ docs/reference/API.md
 ✓ docs/developer/IMPLEMENTATION.md
 ✓ tests/unit/test_service.py
@@ -295,7 +293,7 @@ make lint
 
 ### Bad Organization
 ```
-✗ APPLESCRIPT_USAGE.md (should be in docs/guides/)
+✗ APPLESCRIPT_FALLBACK.md (should be in docs/guides/)
 ✗ test_service.py (should be in tests/unit/)
 ✗ release.py (should be in scripts/)
 ✗ demo.html (should be in examples/)

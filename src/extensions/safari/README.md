@@ -152,13 +152,13 @@ After building the Safari extension:
 
 ## Related Documentation
 
-- [Complete Safari Extension Guide](../docs/SAFARI_EXTENSION.md)
+- [Complete Safari Extension Guide](../../../docs/guides/SAFARI_EXTENSION.md)
 - [Safari Web Extensions (Apple)](https://developer.apple.com/documentation/safariservices/safari_web_extensions)
 - [Converting Extensions for Safari](https://developer.apple.com/documentation/safariservices/safari_web_extensions/converting_a_web_extension_for_safari)
 
 ## Support
 
 For Safari-specific issues:
-- Check the comprehensive guide: `docs/SAFARI_EXTENSION.md`
+- Check the comprehensive guide: `docs/guides/SAFARI_EXTENSION.md`
 - Apple Developer Forums: Safari Extensions section
 - Open an issue on the GitHub repository

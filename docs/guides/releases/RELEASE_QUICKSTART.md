@@ -2,6 +2,8 @@
 
 Fast reference for releasing mcp-browser.
 
+Full guide: `docs/guides/releases/RELEASE.md`.
+
 ## 30-Second Release
 
 ```bash

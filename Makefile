@@ -108,10 +108,10 @@ dev-extension-manual: ## Show manual extension loading instructions
 dev-status: ## Show development environment status
 	@echo "$(BLUE)Development Environment Status$(NC)"
 	@echo "================================="
-	@echo -n "MCP Server: "
-	@curl -s http://localhost:8875 >/dev/null 2>&1 && echo "$(GREEN)Running$(NC)" || echo "$(RED)Stopped$(NC)"
-	@echo -n "Extension Icons: "
-	@test -f extension/icon-16.png && echo "$(GREEN)Present$(NC)" || echo "$(RED)Missing$(NC)"
+	@echo -n "Daemon: "
+	@$(PYTHON) -c "from src.cli.utils.daemon import get_server_status; running,pid,port=get_server_status(); print(f'$(GREEN)Running$(NC) (PID {pid}, port {port})' if running else '$(RED)Stopped$(NC)')"
+	@echo -n "Extension Sources: "
+	@test -f src/extensions/chrome/manifest.json && echo "$(GREEN)Present$(NC)" || echo "$(RED)Missing$(NC)"
 	@echo -n "Scripts: "
 	@test -x scripts/dev-full.sh && echo "$(GREEN)Executable$(NC)" || echo "$(RED)Not executable$(NC)"
 	@echo -n "Environment: "
@@ -284,9 +284,9 @@ health: ## Quick health check of all components
 	@echo -n "Python package: "
 	@$(PYTHON) -c "import src; print('✓ OK')" || echo "✗ FAIL"
 	@echo -n "Dependencies: "
-	@$(PYTHON) -c "import websockets, playwright, mcp; print('✓ OK')" || echo "✗ FAIL"
+	@$(PYTHON) -c "import websockets, mcp; print('✓ OK')" || echo "✗ FAIL"
 	@echo -n "Extension files: "
-	@test -f extension/manifest.json && echo "✓ OK" || echo "✗ FAIL"
+	@test -f src/extensions/chrome/manifest.json && echo "✓ OK" || echo "✗ FAIL"
 	@echo -n "Tests directory: "
 	@test -d tests && echo "✓ OK" || echo "✗ FAIL"
 
@@ -295,10 +295,16 @@ health: ## Quick health check of all components
 # ============================================================================
 docs: ## List available documentation
 	@echo "$(BLUE)Documentation available:$(NC)"
-	@echo "  README.md       - Project overview and installation"
-	@echo "  CLAUDE.md       - AI agent instructions"
-	@echo "  DEVELOPER.md    - Technical implementation details"
-	@echo "  CODE_STRUCTURE.md - Architecture analysis"
+	@echo "  README.md                       - Project overview"
+	@echo "  docs/README.md                  - Documentation index"
+	@echo "  docs/guides/INSTALLATION.md     - Install + first run"
+	@echo "  docs/guides/TROUBLESHOOTING.md  - Common problems"
+	@echo "  docs/guides/UNINSTALL.md        - Uninstall / cleanup"
+	@echo "  docs/reference/MCP_TOOLS.md     - MCP tool surface (authoritative)"
+	@echo "  docs/reference/CODE_STRUCTURE.md - Architecture overview"
+	@echo "  docs/developer/DEVELOPER.md     - Maintainer guide"
+	@echo "  docs/STANDARDS.md               - Documentation standards"
+	@echo "  CLAUDE.md                       - AI agent instructions"
 
 # ============================================================================
 # Deployment (legacy alias)

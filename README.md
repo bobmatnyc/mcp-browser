@@ -9,24 +9,27 @@ A professional Model Context Protocol (MCP) server that provides comprehensive b
 
 ## 🌟 Zero Documentation Required
 
-**Get started in under 30 seconds without reading any documentation:**
+**Get started without reading any documentation:**
 
 ```bash
 pip install mcp-browser
-mcp-browser quickstart
+mcp-browser extension install
+mcp-browser install
+mcp-browser start --background
 ```
 
-The interactive quickstart command will:
-- ✅ Guide you through installation and setup
-- ✅ Install and configure the Chrome extension
-- ✅ Set up Claude Code integration automatically
-- ✅ Test all features with interactive examples
-- ✅ Provide troubleshooting if anything goes wrong
+Load the extension in Chrome (one-time):
+- `chrome://extensions` → enable Developer mode → “Load unpacked” → select `~/mcp-browser-extensions/chrome/`
+
+Prefer an interactive wizard?
+```bash
+mcp-browser quickstart
+```
 
 **Need help anytime?** The CLI is completely self-documenting:
 ```bash
 mcp-browser --help          # See all commands
-mcp-browser quickstart      # Interactive setup guide
+mcp-browser reference       # Quick reference card
 mcp-browser doctor          # Diagnose and fix issues
 mcp-browser tutorial        # Step-by-step feature tour
 ```
@@ -35,45 +38,40 @@ mcp-browser tutorial        # Step-by-step feature tour
 
 ### Option 1: Zero-Config Installation (Recommended)
 ```bash
-# Install from PyPI and run interactive setup
 pip install mcp-browser
-mcp-browser quickstart
+mcp-browser extension install
+mcp-browser install
+mcp-browser start --background
 ```
 
 ### Option 2: Development Installation
 ```bash
-# Clone and install with automated setup
 git clone https://github.com/browserpymcp/mcp-browser.git
 cd mcp-browser
-./install.sh
-
-# Follow the interactive setup
-mcp-browser quickstart
+make install
+make ext-deploy
+mcp-browser start --background
 ```
 
-### That's it! The quickstart command handles:
-- ✅ Chrome extension installation guide
-- ✅ Claude Code integration setup
-- ✅ Server configuration and startup
-- ✅ Interactive feature demonstration
-- ✅ Troubleshooting any issues
+### Next: load the extension
+- Chrome: `chrome://extensions` → “Load unpacked” → `./mcp-browser-extensions/chrome/`
 
 ## ✨ Features
 
 ### Core Capabilities
 - **🎯 Advanced DOM Interaction**: Click elements, fill forms, submit data, select dropdowns, wait for elements
 - **📊 Console Log Capture**: Real-time capture from all browser tabs with advanced filtering
-- **📷 High-Quality Screenshots**: Automated browser viewport captures via Playwright
+- **📷 Screenshots**: Extension-backed viewport capture
 - **🌐 Smart Navigation**: Programmatic browser navigation with URL validation
-- **🔄 Auto-Discovery**: Dynamic port allocation (8875-8895) with collision avoidance
-- **🤖 AI-Ready**: 11 MCP tools optimized for Claude Code browser automation
+- **🔄 Auto-Discovery**: Dynamic port allocation (default 8851-8899) with collision avoidance
+- **🤖 AI-Ready**: 5 consolidated MCP tools optimized for efficient prompting
 
 ### Technical Architecture
 - **⚡ Service-Oriented Architecture (SOA)**: Clean separation with dependency injection
 - **🔗 WebSocket Communication**: Real-time bidirectional browser communication
 - **💾 JSONL Storage**: Automatic log rotation (50MB) with 7-day retention
 - **🎨 Chrome Extension**: Visual connection status with real-time monitoring
-- **🤖 Claude Code Integration**: 10 MCP tools for AI-driven browser automation
+- **🤖 MCP Integration**: Consolidated tool surface for AI-driven browser automation
 
 ### Installation & CLI
 - **📦 PyPI Distribution**: `pip install mcp-browser` for instant setup
@@ -90,8 +88,8 @@ The project follows a Service-Oriented Architecture (SOA) with dependency inject
 - **WebSocket Service**: Handles browser connections with port auto-discovery
 - **Storage Service**: Manages JSONL log files with rotation
 - **Browser Service**: Processes console messages and manages browser state
-- **Screenshot Service**: Playwright integration for screenshots
-- **MCP Service**: Exposes tools to Claude Code
+- **DOM Interaction**: DOM actions, extraction, and screenshots via extension protocol
+- **MCP Service**: Exposes tools to MCP clients (Claude Code/Desktop, etc.)
 
 ## 📦 Installation
 
@@ -102,23 +100,20 @@ The project follows a Service-Oriented Architecture (SOA) with dependency inject
 ### Method 1: PyPI Installation (Recommended)
 
 ```bash
-# Install from PyPI
 pip install mcp-browser
-
-# Run interactive setup (handles everything)
-mcp-browser quickstart
+mcp-browser extension install
+mcp-browser install
+mcp-browser start --background
 ```
 
 ### Method 2: Development Installation
 
 ```bash
-# Clone and install
 git clone https://github.com/browserpymcp/mcp-browser.git
 cd mcp-browser
-./install.sh
-
-# Run interactive setup
-mcp-browser quickstart
+make install
+make ext-deploy
+mcp-browser start --background
 ```
 
 ### Method 3: pipx Installation (Isolated)
@@ -126,18 +121,12 @@ mcp-browser quickstart
 ```bash
 # Install with pipx for complete isolation
 pipx install mcp-browser
-mcp-browser quickstart
+mcp-browser extension install
+mcp-browser install
+mcp-browser start --background
 ```
 
-> **📋 Note**: The project includes a smart launcher for dual deployment. When working in the project directory, it automatically uses the local development version. Outside the project, it uses the pipx-installed version. See [DEPLOYMENT.md](DEPLOYMENT.md) for details.
-
-### What the quickstart command does:
-- ✅ Verifies system requirements and dependencies
-- ✅ Guides Chrome extension installation with screenshots
-- ✅ Sets up Claude Code integration automatically
-- ✅ Tests all features with interactive examples
-- ✅ Configures optimal settings for your system
-- ✅ Provides troubleshooting for any issues
+Prefer an interactive wizard? Run `mcp-browser quickstart`.
 
 **Need detailed installation help?** See [INSTALLATION.md](docs/guides/INSTALLATION.md) for platform-specific instructions, troubleshooting, and alternative methods.
 
@@ -162,30 +151,29 @@ mcp-browser start --help   # Help for specific commands
 
 ```bash
 # Server control
-mcp-browser start          # Start the server
-mcp-browser stop           # Stop the server
-mcp-browser restart        # Restart (stop + start)
-mcp-browser status         # Check status (ports, PIDs, logs)
+mcp-browser start --background  # Start daemon in background (recommended)
+mcp-browser start               # Start in foreground (debugging)
+mcp-browser stop                # Stop daemon for current project
+mcp-browser status              # Status for current project
 
 # Installation management
-mcp-browser install        # Install/configure MCP integration
-mcp-browser uninstall      # Remove from Claude Code
-mcp-browser uninstall --target claude-desktop  # Remove from Claude Desktop
-mcp-browser uninstall --target both           # Remove from both
-
-# Monitoring and logs
-mcp-browser logs           # Last 50 lines
-mcp-browser logs 100       # Last 100 lines
-mcp-browser follow         # Real-time tail
+mcp-browser install              # Install/configure MCP integration
+mcp-browser uninstall            # Remove MCP config entry
 
 # MCP integration
-mcp-browser mcp            # Run in MCP mode for Claude Code
-mcp-browser test-mcp       # Test all MCP tools
+mcp-browser mcp                 # Run in MCP stdio mode (invoked by MCP clients)
 
 # Utilities
 mcp-browser version        # Show version info
-mcp-browser config         # Show configuration
-mcp-browser clean          # Clean old logs and data
+
+# Extension management
+mcp-browser extension install [--local]
+mcp-browser extension update [--local]
+mcp-browser extension path --check
+
+# Local testing (CLI)
+mcp-browser browser logs --limit 20
+mcp-browser browser extract content
 ```
 
 ### Uninstalling MCP Browser
@@ -222,10 +210,10 @@ mcp-browser uninstall --clean-all --yes
 
 | Flag | Description | What Gets Removed |
 |------|-------------|-------------------|
-| `--clean-local` | Clean project files | `./mcp-browser-extension/`, `./.mcp-browser/` |
+| `--clean-local` | Clean project files | `./mcp-browser-extensions/`, `./mcp-browser-extension/` (legacy), `./.mcp-browser/` |
 | `--clean-global` | Clean user data | `~/.mcp-browser/` (data, logs, config) |
-| `--clean-all` | Complete removal | All of the above + Playwright cache |
-| `--playwright` | Remove Playwright cache | `~/.cache/ms-playwright/` (or OS equivalent) |
+| `--clean-all` | Complete removal | MCP config + local + global data (add `--playwright` for caches) |
+| `--playwright` | Remove Playwright cache | `~/.cache/ms-playwright/` (or OS equivalent; optional) |
 | `--backup` / `--no-backup` | Control backup creation | Creates timestamped backup (default: enabled) |
 | `--dry-run` | Preview changes | Shows what would be removed without doing it |
 | `-y`, `--yes` | Skip confirmations | Removes without prompting (dangerous) |
@@ -273,68 +261,17 @@ pip uninstall mcp-browser
 pipx uninstall mcp-browser
 ```
 
-### 🛠️ MCP Tools Available in Claude Code
+### 🛠️ MCP Tools (MCP surface)
 
-MCP Browser provides **11 comprehensive tools** for advanced browser automation and interaction:
+MCP Browser exposes a consolidated tool surface optimized for AI assistants:
 
-#### Core Browser Control
-1. **`browser_navigate(port, url)`** - Navigate browser to a URL
-   - Port auto-discovery from active connections
-   - Full URL validation and error handling
-   - WebSocket command transmission
+- `browser_action` — navigate/click/fill/select/wait
+- `browser_query` — logs/element/capabilities
+- `browser_screenshot` — extension-backed screenshot capture
+- `browser_form` — fill/submit forms
+- `browser_extract` — readable content or semantic DOM extraction
 
-2. **`browser_query_logs(port, last_n, level_filter)`** - Query console logs with advanced filtering
-   - Filter by log level (error, warn, info, debug)
-   - Limit number of results (default: 50)
-   - Real-time and stored log retrieval
-   - JSONL format with timestamps
-
-3. **`browser_screenshot(port, url?)`** - Capture high-quality viewport screenshots
-   - Optional URL navigation before capture
-   - Playwright-powered rendering
-   - PNG format with metadata
-
-#### Advanced DOM Interaction & Automation
-4. **`browser_click(port, selector/xpath/text)`** - Intelligent element clicking
-   - CSS selectors, XPath expressions, or visible text
-   - Automatic element visibility waiting
-   - Click coordination and action verification
-
-5. **`browser_fill_field(port, selector/xpath, value)`** - Precise form field filling
-   - Support for text inputs, textareas, and password fields
-   - Automatic field clearing before input
-   - Value validation and error reporting
-
-6. **`browser_fill_form(port, form_data, submit?)`** - Bulk form filling automation
-   - Multiple fields filled in single operation
-   - Optional automatic form submission
-   - Field mapping by name, ID, or selector
-   - Batch operation with rollback on errors
-
-7. **`browser_submit_form(port, selector/xpath?)`** - Smart form submission
-   - Auto-detect forms or use specific selectors
-   - Handle both button clicks and form.submit()
-   - Wait for submission completion
-
-8. **`browser_get_element(port, selector/xpath/text)`** - Element information extraction
-   - Retrieve text content, attributes, and properties
-   - Element visibility and interaction state
-   - Bounding box and position data
-
-9. **`browser_wait_for_element(port, selector, timeout?)`** - Dynamic content handling
-   - Wait for elements to appear in DOM
-   - Configurable timeout (default: 10s)
-   - Essential for SPA and AJAX-heavy sites
-
-10. **`browser_select_option(port, selector, value/text/index)`** - Dropdown interaction
-    - Select by value, visible text, or index
-    - Support for both `<select>` and custom dropdowns
-    - Multiple selection handling
-
-11. **`browser_evaluate_js(port, code)`** - Execute JavaScript in browser
-    - Run custom JavaScript code in the browser context
-    - Return values and handle execution results
-    - Advanced automation and data extraction
+Tool schemas, examples, and legacy-name mapping: `docs/reference/MCP_TOOLS.md`.
 
 ### Chrome Extension Features
 
@@ -365,7 +302,7 @@ Full Safari support with native macOS app wrapper:
 #### Installation
 ```bash
 # Automated conversion from Chrome extension
-cd /Users/masa/Projects/mcp-browser
+cd /path/to/mcp-browser
 bash scripts/create-safari-extension.sh
 ```
 
@@ -382,7 +319,7 @@ bash scripts/create-safari-extension.sh
 - Needs App Sandbox capabilities for WebSocket connections
 - Distribution requires Apple Developer account for signing
 
-📚 **Complete Guide**: See [docs/SAFARI_EXTENSION.md](docs/SAFARI_EXTENSION.md) for:
+📚 **Complete Guide**: See [docs/guides/SAFARI_EXTENSION.md](docs/guides/SAFARI_EXTENSION.md) for:
 - Step-by-step setup instructions
 - Xcode project configuration
 - Code signing and notarization
@@ -392,62 +329,28 @@ bash scripts/create-safari-extension.sh
 
 ## 🗂️ File Structure
 
-### Project Structure
+### Repository structure
 ```
 mcp-browser/
-├── install.sh                # Automated installation
-├── setup-claude-code.sh      # Claude Code integration
-├── test_installation.sh      # Installation verification
-├── demo.sh                   # Feature demonstration
-├── mcp-browser              # Professional CLI entry point
-├── src/
-│   ├── cli/main.py          # Enhanced CLI with process management
-│   ├── container/           # Dependency injection container
-│   ├── services/            # Service layer (SOA)
-│   │   ├── browser_service.py
-│   │   ├── websocket_service.py
-│   │   ├── storage_service.py
-│   │   ├── mcp_service.py
-│   │   ├── screenshot_service.py
-│   │   └── dom_interaction_service.py
-│   └── models/              # Data models
-├── mcp-browser-extension/   # Chrome/Firefox extension
-├── mcp-browser-extension-safari-resources/  # Safari extension resources
-│   ├── manifest.json        # Safari-compatible manifest
-│   ├── background.js        # Cross-browser service worker
-│   ├── popup.html           # Safari-optimized popup
-│   └── popup.js             # Safari-compatible popup logic
-├── scripts/
-│   └── create-safari-extension.sh  # Safari extension converter
-├── docs/
-│   └── SAFARI_EXTENSION.md  # Complete Safari setup guide
-├── tmp/
-│   └── demo_dom_interaction.html  # Test page for DOM features
-└── requirements.txt
+├── src/                      # Python package (mcp_browser)
+│   ├── cli/                  # CLI commands and utilities
+│   ├── services/             # SOA services (WebSocket, MCP, storage, DOM, etc.)
+│   ├── extension/            # Packaged Chrome extension assets (used by CLI installer)
+│   └── extensions/           # Unpacked extension sources (chrome/firefox/safari)
+├── docs/                     # Documentation (start at docs/README.md)
+├── scripts/                  # Dev + release scripts
+├── tests/                    # Tests
+└── mcp-browser-extensions/   # Generated unpacked extensions (gitignored)
 ```
 
-### Runtime Structure
+### Runtime data
 ```
 ~/.mcp-browser/
-├── config/
-│   └── settings.json        # Configuration (auto-generated)
-├── logs/
-│   ├── mcp-browser.log      # Main server log
-│   └── [8875-8895]/         # Port-specific browser logs
-├── run/
-│   └── mcp-browser.pid      # Process ID tracking
-└── data/                    # JSONL storage with rotation
-    └── [port]/
-        ├── console.jsonl    # Current session logs
-        └── console_20240921_*.jsonl  # Rotated archives
+├── config/settings.json      # Configuration
+├── data/<port>/console.jsonl # Stored console logs (JSONL, rotated)
+├── logs/mcp-browser.log      # Main log
+└── server.pid                # Daemon registry (per-project entries)
 ```
-
-### Automated Installation Benefits
-- **Zero-configuration setup**: `./install.sh` handles everything automatically
-- **Virtual environment isolation**: No system Python pollution
-- **Port auto-discovery**: Finds available ports in 8875-8895 range
-- **Self-verification**: Built-in installation testing and validation
-- **Professional CLI**: Complete process management with status monitoring
 
 ## Development
 
@@ -475,47 +378,12 @@ make lint-fix
 make help
 ```
 
-### 🧪 Testing the Installation
+### Local smoke test
 
 ```bash
-# Run comprehensive installation test
-./test_installation.sh
-
-# Run feature demonstration
-./demo.sh
-
-# Test DOM interaction with demo page
-open tmp/demo_dom_interaction.html
-# Then use Claude Code tools to interact with the demo page:
-# - "Fill the username field with 'testuser'"
-# - "Click the test button"
-# - "Fill the entire form and submit it"
-# - "Select 'Canada' from the country dropdown"
-# - "Wait for the dynamic content to appear after clicking the button"
-```
-
-### ⚡ 5-Minute Complete Setup
-
-```bash
-# 1. Clone and install everything
-git clone https://github.com/browserpymcp/mcp-browser.git
-cd mcp-browser
-./install.sh  # Handles venv, dependencies, directories, CLI setup
-
-# 2. Load Chrome extension (30 seconds)
-# chrome://extensions/ → Developer mode → Load unpacked → select extension/
-
-# 3. Configure Claude Code integration
-./setup-claude-code.sh  # Auto-generates config, tests all tools
-
-# 4. Start and test immediately
-mcp-browser start
-open tmp/demo_dom_interaction.html
-# Ask Claude:
-# "Fill out the demo form with test data"
-# "Click the test button and wait for results"
-# "Select Canada from the country dropdown"
-# "Submit the form and capture the console output"
+make ext-deploy
+mcp-browser start --background
+mcp-browser demo
 ```
 
 ### Running Tests
@@ -532,33 +400,24 @@ make test-extension
 
 ## Configuration
 
-Environment variables:
-- `BROWSERPYMCP_PORT_START`: Starting port for auto-discovery (default: 8875)
-- `BROWSERPYMCP_PORT_END`: Ending port for auto-discovery (default: 8895)
-- `BROWSERPYMCP_LOG_LEVEL`: Logging level (default: INFO)
-- `BROWSERPYMCP_STORAGE_PATH`: Base storage path (default: ~/.browserPYMCP/browser)
+Default config file:
+- `~/.mcp-browser/config/settings.json`
+
+Use a custom config for a single invocation:
+```bash
+mcp-browser --config /path/to/settings.json start --background
+```
+
+Full details: `docs/guides/INSTALLATION.md`.
 
 ## Troubleshooting
 
-### Extension Not Connecting
+Start with:
+```bash
+mcp-browser doctor
+```
 
-1. Check server is running: `browserpymcp status`
-2. Verify port in extension popup (should show 8875-8895)
-3. Check Chrome DevTools console for errors
-4. Ensure localhost connections are allowed
-
-### No Console Logs Captured
-
-1. Verify extension is installed and enabled
-2. Refresh the target web page
-3. Check extension popup for connection status
-4. Look for test message: "[mcp-browser] Console capture initialized"
-
-### Screenshot Failures
-
-1. Ensure Playwright is installed: `playwright install chromium`
-2. Check system has required dependencies
-3. Verify port number matches an active browser
+Maintained guide: `docs/guides/TROUBLESHOOTING.md`.
 
 ## License
 
@@ -566,22 +425,16 @@ MIT License - see LICENSE file for details
 
 ## Documentation
 
-This project follows comprehensive documentation standards for optimal AI agent understanding:
+Start here:
+- `docs/README.md` (doc index)
+- `docs/guides/INSTALLATION.md` (install + first run)
+- `docs/reference/MCP_TOOLS.md` (authoritative MCP tool surface)
+- `docs/reference/CODE_STRUCTURE.md` (architecture overview)
+- `docs/developer/DEVELOPER.md` (maintainer guide)
 
-### For AI Agents (Claude Code)
-- **[CLAUDE.md](CLAUDE.md)** - Priority-based instructions for AI agents working on this codebase
-- **[CODE_STRUCTURE.md](CODE_STRUCTURE.md)** - Detailed architecture analysis and patterns
+Project-wide doc standards: `docs/STANDARDS.md`.
 
-### For Developers
-- **[DEVELOPER.md](DEVELOPER.md)** - Technical implementation guide with service interfaces
-- **[.claude-mpm/memories/](/.claude-mpm/memories/)** - Project patterns and architectural decisions
-
-### Quick Reference
-- **Installation & Usage**: This README.md (you are here)
-- **Deployment Options**: [DEPLOYMENT.md](DEPLOYMENT.md) - Dual deployment guide (local & system-wide)
-- **Development Setup**: `make help` or [DEVELOPER.md](DEVELOPER.md)
-- **Architecture Overview**: [CODE_STRUCTURE.md](CODE_STRUCTURE.md)
-- **AI Agent Instructions**: [CLAUDE.md](CLAUDE.md)
+AI agent instructions: `CLAUDE.md`.
 
 ## Contributing
 
@@ -598,5 +451,5 @@ All code must pass `make quality` before submission. The pre-commit hooks will a
 
 For issues and questions:
 - **GitHub Issues**: https://github.com/browserpymcp/mcp-browser/issues
-- **Documentation**: Start with [CLAUDE.md](CLAUDE.md) for AI agents or [DEVELOPER.md](DEVELOPER.md) for humans
-- **Architecture Questions**: See [CODE_STRUCTURE.md](CODE_STRUCTURE.md) for detailed analysis
+- **Documentation**: Start with `docs/README.md`
+- **Architecture Questions**: See `docs/reference/CODE_STRUCTURE.md`

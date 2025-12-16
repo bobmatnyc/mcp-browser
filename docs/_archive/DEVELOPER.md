@@ -1,4 +1,6 @@
-# DEVELOPER.md - Technical Implementation Guide
+# (Archived) DEVELOPER.md - Technical Implementation Guide
+
+This document is retained for historical context and may not match the current CLI and tool surface.
 
 **Architecture**: Service-Oriented Architecture (SOA) with Dependency Injection
 **Framework**: Python asyncio + MCP SDK + Chrome Extension

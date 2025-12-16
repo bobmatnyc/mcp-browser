@@ -3,7 +3,6 @@
 import asyncio
 import json
 import logging
-import time
 import uuid
 from datetime import datetime
 from typing import Any, Dict, Optional
@@ -29,9 +28,7 @@ class AsyncRequestResponseService:
     - Cancels futures for expired requests
     """
 
-    def __init__(
-        self, cleanup_interval: float = 30.0, request_timeout: float = 120.0
-    ):
+    def __init__(self, cleanup_interval: float = 30.0, request_timeout: float = 120.0):
         """Initialize async request/response service.
 
         Args:

@@ -2,6 +2,8 @@
 
 Quick reference for mcp-browser release automation.
 
+Full guide: `docs/guides/releases/RELEASE.md`.
+
 ## Setup (One-Time)
 
 ```bash

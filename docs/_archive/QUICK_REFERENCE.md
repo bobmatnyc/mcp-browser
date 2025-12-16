@@ -1,4 +1,8 @@
-# MCP Browser Quick Reference
+# (Archived) MCP Browser Quick Reference
+
+This document is retained for historical context and may not match the current CLI and tool surface.
+
+Use `docs/guides/QUICK_REFERENCE.md` for the maintained quick reference.
 
 ## Installation & Setup
 

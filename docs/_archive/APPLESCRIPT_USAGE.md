@@ -1,4 +1,6 @@
-# AppleScript Feature Usage Guide
+# AppleScript Feature Usage Guide (Archived)
+
+This guide is retained for historical context and may be stale. For current AppleScript fallback behavior and configuration, see `docs/guides/APPLESCRIPT_FALLBACK.md`.
 
 Complete user guide for using mcp-browser's AppleScript fallback feature on macOS.
 

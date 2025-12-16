@@ -74,13 +74,13 @@ with open(file_path, 'a') as f:
 **CRITICAL CHANGE (December 2024)**: Dashboard HTTP server completely removed.
 
 **Current Architecture:**
-- **WebSocket Server** (port 8875-8895): Browser extension communication
+- **WebSocket Server** (default ports 8851-8899): Browser extension communication
 - **MCP JSON-RPC** (stdio): Claude Code integration
 - **No HTTP Server**: Removed entirely, do not re-add
 
 ```python
 # ✅ CORRECT: WebSocket communication only
-websocket_service.start()  # Port 8875-8895
+websocket_service.start()  # Port 8851-8899
 
 # ❌ WRONG: HTTP server removed
 # app.run()  # Don't add HTTP endpoints!
@@ -112,7 +112,7 @@ websocket_service.start()  # Port 8875-8895
 ### Port Security
 - **Local-only binding**: WebSocket server binds to `localhost` only
 - **No authentication required**: Trusted local-only connections
-- **Port range**: 8875-8895 (auto-discovery prevents conflicts)
+- **Port range**: 8851-8899 (auto-discovery prevents conflicts)
 
 ---
 
@@ -158,7 +158,7 @@ websocket_service.start()  # Port 8875-8895
 ```
 
 ### Connection Lifecycle
-1. **Extension starts** → Tries ports 8875-8895
+1. **Extension starts** → Tries ports 8851-8899
 2. **Connection established** → Server tracks via `BrowserState`
 3. **Extension sends messages** → Server buffers and stores
 4. **Server sends commands** → Extension executes DOM/navigation
@@ -242,7 +242,7 @@ container.register('browser_service', create_browser_service, singleton=True)
 
 #### 1. WebSocketService
 **File**: `src/services/websocket_service.py`
-**Port**: Auto-discovers 8875-8895
+**Port**: Auto-discovers 8851-8899
 **Responsibility**: Browser extension communication
 
 ```python
@@ -283,43 +283,33 @@ async def _should_rotate(self, file_path: Path) -> bool:
 # Tool Registration Pattern
 @self.server.list_tools()
 async def handle_list_tools() -> list[Tool]:
-    return [Tool(name="browser_navigate", ...), ...]
+    return [Tool(name="browser_action", ...), Tool(name="browser_query", ...), ...]
 
 @self.server.call_tool()
 async def handle_call_tool(name: str, arguments: dict):
-    if name == "browser_navigate":
-        return await self._handle_navigate(arguments)
+    if name == "browser_action":
+        return await self._handle_browser_action(arguments)
 ```
 
-#### 5. ScreenshotService
-**File**: `src/services/screenshot_service.py`
-**Engine**: Playwright (Chromium headless)
-**Output**: Base64-encoded PNG
-
-#### 6. DOMInteractionService
+#### 5. DOMInteractionService
 **File**: `src/services/dom_interaction_service.py`
 **Responsibility**: Browser DOM manipulation via WebSocket commands
+
+Screenshot capture is extension-backed and handled via `browser_screenshot` in `src/services/mcp_service.py`.
 
 ---
 
 ## 🟡 IMPORTANT: MCP Tools
 
-### 11 MCP Tools Available to Claude Code
+### MCP Tools (consolidated)
 
-#### Core Browser Control
-1. **`browser_navigate(port, url)`** - Navigate to URL
-2. **`browser_query_logs(port, last_n, level_filter)`** - Query console logs
-3. **`browser_screenshot(port, url?)`** - Capture screenshot
+`mcp-browser` exposes 5 tools (see `docs/reference/MCP_TOOLS.md`):
 
-#### DOM Interaction
-4. **`browser_click(port, selector/xpath/text)`** - Click element
-5. **`browser_fill_field(port, selector/xpath, value)`** - Fill form field
-6. **`browser_fill_form(port, form_data, submit?)`** - Fill multiple fields
-7. **`browser_submit_form(port, selector/xpath?)`** - Submit form
-8. **`browser_get_element(port, selector/xpath/text)`** - Get element info
-9. **`browser_wait_for_element(port, selector, timeout?)`** - Wait for element
-10. **`browser_select_option(port, selector, value/text/index)`** - Select dropdown
-11. **`browser_evaluate_js(port, code)`** - Execute JavaScript
+1. **`browser_action`** - `navigate`, `click`, `fill`, `select`, `wait`
+2. **`browser_query`** - `logs`, `element`, `capabilities`
+3. **`browser_screenshot`** - Screenshot capture (extension-backed)
+4. **`browser_form`** - `fill`, `submit`
+5. **`browser_extract`** - `content`, `semantic_dom`
 
 ### Adding New MCP Tools
 **Pattern**:
@@ -357,7 +347,7 @@ if name == "browser_new_action":
 ### Three Extensions (Chrome, Firefox, Safari)
 **Source**: `src/extensions/`
 **Deployed**: `mcp-browser-extensions/`
-**Installed**: `~/.mcp-browser/extension/`
+**Installed (CLI)**: `~/mcp-browser-extensions/{browser}/` (or `./mcp-browser-extensions/{browser}/` for `--local`)
 
 ### Chrome Extension Architecture
 **Manifest V3**: Service worker + content scripts
@@ -365,7 +355,7 @@ if name == "browser_new_action":
 ```javascript
 // Background Service Worker (src/extensions/chrome/background.js)
 let ws = null;
-const PORT_RANGE = { start: 8875, end: 8895 };
+const PORT_RANGE = { start: 8851, end: 8899 };
 
 async function connectWebSocket() {
     for (let port = PORT_RANGE.start; port <= PORT_RANGE.end; port++) {
@@ -416,7 +406,7 @@ function captureMessage(level, args) {
 **Platform**: macOS only
 **Converter**: `safari-web-extension-converter`
 **Output**: Native macOS app wrapper
-**Guide**: `docs/SAFARI_EXTENSION.md`
+**Guide**: `docs/guides/SAFARI_EXTENSION.md`
 
 ```bash
 # Create Safari extension
@@ -606,22 +596,30 @@ make pre-commit              # Install pre-commit hooks
 README.md                    # Project overview, quick start, features
 CLAUDE.md                    # AI agent instructions (this file)
 docs/
-├── CODE_STRUCTURE.md        # Architecture deep dive
-├── DEVELOPER.md             # Technical implementation guide
-├── INSTALLATION.md          # Detailed installation guide
-├── QUICKSTART.md            # Getting started guide
-├── TROUBLESHOOTING.md       # Common issues and solutions
-├── SAFARI_EXTENSION.md      # Safari extension setup
-├── CDP_CONNECTION.md        # Chrome DevTools Protocol
-└── guides/                  # Specific guides
+├── README.md                # Docs index (start here)
+├── STANDARDS.md             # Documentation standards
+├── guides/                  # User-facing guides
+│   ├── INSTALLATION.md
+│   ├── QUICK_REFERENCE.md
+│   ├── TROUBLESHOOTING.md
+│   ├── UNINSTALL.md
+│   ├── SAFARI_EXTENSION.md
+│   └── releases/
+├── reference/               # Stable reference docs
+│   ├── CODE_STRUCTURE.md
+│   ├── MCP_TOOLS.md
+│   └── PROJECT_ORGANIZATION.md
+├── developer/               # Maintainer docs and summaries
+└── _archive/                # Historical (not maintained)
 ```
 
 ### Documentation Update Rules
 1. **README.md**: User-facing features and quick start
 2. **CLAUDE.md**: AI agent instructions and patterns
-3. **CODE_STRUCTURE.md**: Architecture changes
-4. **DEVELOPER.md**: Implementation patterns
-5. **CHANGELOG.md**: ALL user-visible changes
+3. **docs/reference/MCP_TOOLS.md**: MCP tool surface changes
+4. **docs/reference/CODE_STRUCTURE.md**: Architecture changes
+5. **docs/developer/DEVELOPER.md**: Maintainer workflows
+6. **CHANGELOG.md**: ALL user-visible changes
 
 ### Changelog Format
 ```markdown
@@ -661,11 +659,11 @@ self.config.retention_days = 7     # Increase for audit requirements
 ```
 
 ### WebSocket Connections
-**Current**: 8875-8895 (21 ports)
+**Current**: 8851-8899 (49 ports)
 ```python
 # Expand port range if needed
-PORT_START = 8875
-PORT_END = 8895  # Increase for more concurrent projects
+PORT_START = 8851
+PORT_END = 8899  # Increase for more concurrent projects
 ```
 
 ---
@@ -760,7 +758,7 @@ mcp-browser/
 ## 🎓 Learning Path for New Contributors
 
 ### Phase 1: Understand Architecture (1-2 hours)
-1. Read `docs/CODE_STRUCTURE.md` - Architecture overview
+1. Read `docs/reference/CODE_STRUCTURE.md` - Architecture overview
 2. Examine `src/container/service_container.py` - DI pattern
 3. Review `src/services/websocket_service.py` - WebSocket pattern
 4. Study `src/services/browser_service.py` - Message handling
@@ -843,9 +841,9 @@ make help                    # Build system help
 ### Documentation
 1. **This file (CLAUDE.md)**: AI agent instructions
 2. **`README.md`**: User guide and quick start
-3. **`docs/DEVELOPER.md`**: Technical implementation
-4. **`docs/CODE_STRUCTURE.md`**: Architecture details
-5. **`docs/TROUBLESHOOTING.md`**: Common issues
+3. **`docs/developer/DEVELOPER.md`**: Maintainer guide
+4. **`docs/reference/CODE_STRUCTURE.md`**: Architecture details
+5. **`docs/guides/TROUBLESHOOTING.md`**: Common issues
 
 ### Community
 - **GitHub Issues**: https://github.com/browserpymcp/mcp-browser/issues
@@ -856,7 +854,7 @@ make help                    # Build system help
 
 **End of AI Agent Instructions**
 
-This file is optimized for AI agents like Claude Code. For human developers, start with `README.md` and `docs/DEVELOPER.md`.
+This file is optimized for AI agents like Claude Code. For human developers, start with `README.md` and `docs/developer/DEVELOPER.md`.
 
 **Version**: 2.2.25
 **Generated**: 2025-12-15

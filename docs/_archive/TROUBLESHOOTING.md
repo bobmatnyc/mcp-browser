@@ -1,4 +1,8 @@
-# MCP Browser Troubleshooting Guide
+# (Archived) MCP Browser Troubleshooting Guide
+
+This document is retained for historical context and may not match the current CLI and tool surface.
+
+Use `docs/guides/TROUBLESHOOTING.md` for the maintained troubleshooting guide.
 
 ## Quick Diagnostics
 

@@ -17,8 +17,8 @@ Comprehensive release automation has been added to the mcp-browser Makefile, ena
 
 | File | Purpose |
 |------|---------|
-| `RELEASE.md` | Complete release automation guide |
-| `docs/RELEASE_CHEATSHEET.md` | Quick reference for release commands |
+| `docs/guides/releases/RELEASE.md` | Complete release automation guide |
+| `docs/guides/releases/RELEASE_CHEATSHEET.md` | Quick reference for release commands |
 | `.env.local.template` | Template for environment variables |
 | `RELEASE_AUTOMATION_SUMMARY.md` | This file |
 
