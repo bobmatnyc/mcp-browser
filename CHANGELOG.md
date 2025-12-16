@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.42] - 2025-12-16
+
+### Fixed
+- Server cleanup now checks ALL PIDs on a port, not just the first one
+  - `lsof -ti :port` returns both clients (Chrome) and servers (mcp-browser)
+  - Previously only checked first PID, which could be Chrome Helper, not mcp-browser
+  - Now iterates through all PIDs to find the actual mcp-browser server
+
 ## [2.2.41] - 2025-12-16
 
 ### Fixed

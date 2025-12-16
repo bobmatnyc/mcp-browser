@@ -327,7 +327,7 @@ def cleanup_project_servers(project_path: str) -> int:
         except OSError:
             sock.close()
 
-        # Find PID on this port
+        # Find PIDs on this port (may return multiple - clients + server)
         try:
             result = subprocess.run(
                 ["lsof", "-ti", f":{port}"],
@@ -338,43 +338,45 @@ def cleanup_project_servers(project_path: str) -> int:
             if result.returncode != 0 or not result.stdout.strip():
                 continue
 
-            pid = int(result.stdout.strip().split()[0])
+            # Check ALL PIDs returned (not just the first one)
+            pids = [int(p) for p in result.stdout.strip().split() if p.isdigit()]
 
-            # Check process command line for mcp-browser
-            proc_result = subprocess.run(
-                ["ps", "-p", str(pid), "-o", "command="],
-                capture_output=True,
-                text=True,
-                timeout=2,
-            )
-            cmd = proc_result.stdout.lower()
+            for pid in pids:
+                # Check process command line for mcp-browser
+                proc_result = subprocess.run(
+                    ["ps", "-p", str(pid), "-o", "command="],
+                    capture_output=True,
+                    text=True,
+                    timeout=2,
+                )
+                cmd = proc_result.stdout.lower()
 
-            # Must be mcp-browser process
-            if "mcp-browser" not in cmd and "mcp_browser" not in cmd:
-                continue
+                # Must be mcp-browser process
+                if "mcp-browser" not in cmd and "mcp_browser" not in cmd:
+                    continue
 
-            # Check if process cwd matches project (macOS)
-            cwd_result = subprocess.run(
-                ["lsof", "-a", "-p", str(pid), "-d", "cwd", "-Fn"],
-                capture_output=True,
-                text=True,
-                timeout=2,
-            )
-            # Parse cwd from lsof output (format: "n/path/to/dir")
-            for line in cwd_result.stdout.split("\n"):
-                if line.startswith("n/"):
-                    process_cwd = line[1:]  # Remove 'n' prefix
-                    if os.path.normpath(process_cwd) == normalized_path:
-                        # Kill this server
-                        try:
-                            os.kill(pid, 15)  # SIGTERM
-                            time.sleep(0.3)
-                            if is_process_running(pid):
-                                os.kill(pid, 9)  # SIGKILL
-                            killed += 1
-                        except (OSError, ProcessLookupError):
-                            pass
-                        break
+                # Check if process cwd matches project (macOS)
+                cwd_result = subprocess.run(
+                    ["lsof", "-a", "-p", str(pid), "-d", "cwd", "-Fn"],
+                    capture_output=True,
+                    text=True,
+                    timeout=2,
+                )
+                # Parse cwd from lsof output (format: "n/path/to/dir")
+                for line in cwd_result.stdout.split("\n"):
+                    if line.startswith("n/"):
+                        process_cwd = line[1:]  # Remove 'n' prefix
+                        if os.path.normpath(process_cwd) == normalized_path:
+                            # Kill this server
+                            try:
+                                os.kill(pid, 15)  # SIGTERM
+                                time.sleep(0.3)
+                                if is_process_running(pid):
+                                    os.kill(pid, 9)  # SIGKILL
+                                killed += 1
+                            except (OSError, ProcessLookupError):
+                                pass
+                            break  # Found and handled, move to next port
 
         except (subprocess.TimeoutExpired, ValueError, OSError):
             continue
