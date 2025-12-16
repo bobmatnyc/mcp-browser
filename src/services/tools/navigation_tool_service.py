@@ -4,7 +4,7 @@ Handles browser navigation operations with automatic WebSocket/AppleScript fallb
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 from mcp.types import TextContent
 
@@ -20,7 +20,9 @@ class NavigationToolService:
     """
 
     def __init__(
-        self, browser_service: Optional[Any] = None, browser_controller: Optional[Any] = None
+        self,
+        browser_service: Optional[Any] = None,
+        browser_controller: Optional[Any] = None,
     ) -> None:
         """Initialize with required services.
 
@@ -31,9 +33,7 @@ class NavigationToolService:
         self.browser_service = browser_service
         self.browser_controller = browser_controller
 
-    async def handle_navigate(
-        self, port: int, url: str
-    ) -> List[TextContent]:
+    async def handle_navigate(self, port: int, url: str) -> List[TextContent]:
         """Navigate browser to URL with automatic fallback.
 
         Args:

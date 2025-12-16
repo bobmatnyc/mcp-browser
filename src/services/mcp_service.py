@@ -9,12 +9,20 @@ This module provides 5 consolidated MCP tools for browser control:
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from mcp.server import Server
 from mcp.types import ImageContent, TextContent, Tool
 
-from .tools import NavigationToolService, PortResolver, ScreenshotToolService
+from .tools import (
+    CapabilityToolService,
+    DOMToolService,
+    FormToolService,
+    LogQueryToolService,
+    NavigationToolService,
+    PortResolver,
+    ScreenshotToolService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,12 +65,26 @@ class MCPService:
         self.screenshot_tool_service = ScreenshotToolService(
             browser_service=browser_service
         )
+        self.dom_tool_service = DOMToolService(
+            dom_interaction_service=dom_interaction_service,
+            port_resolver=self.port_resolver,
+        )
+        self.form_tool_service = FormToolService(
+            dom_interaction_service=dom_interaction_service,
+            port_resolver=self.port_resolver,
+        )
+        self.log_query_tool_service = LogQueryToolService(
+            browser_service=browser_service
+        )
+        self.capability_tool_service = CapabilityToolService(
+            capability_detector=capability_detector
+        )
         # Initialize server with version info
         self.server = Server(
             name="mcp-browser",
             version="2.0.0",  # Major version bump for consolidated tools
             instructions="Browser control and console log capture for web automation. "
-                        "Uses 5 consolidated tools for efficient interaction.",
+            "Uses 5 consolidated tools for efficient interaction.",
         )
         self._setup_tools()
 
@@ -77,7 +99,7 @@ class MCPService:
                 Tool(
                     name="browser_action",
                     description="Perform browser actions: navigate to URL, click elements, "
-                                "fill single form field, select dropdown option, or wait for element",
+                    "fill single form field, select dropdown option, or wait for element",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -313,7 +335,6 @@ class MCPService:
             else:
                 return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
-
     # ========================================================================
     # Consolidated Handler: browser_action (navigate, click, fill, select, wait)
     # ========================================================================
@@ -356,141 +377,19 @@ class MCPService:
 
     async def _action_click(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle click action."""
-        if not self.dom_interaction_service:
-            return [TextContent(type="text", text="DOM interaction service not available")]
-
-        port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
-        if port is None:
-            return [TextContent(type="text", text=port_warning or "No port available")]
-
-        result = await self.dom_interaction_service.click(
-            port=port,
-            selector=arguments.get("selector"),
-            xpath=arguments.get("xpath"),
-            text=arguments.get("text"),
-            index=arguments.get("index", 0),
-        )
-
-        if result.get("success"):
-            element_info = result.get("elementInfo", {})
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Clicked {element_info.get('tagName', 'element')} "
-                    f"'{element_info.get('text', '')[:50]}'",
-                )
-            ]
-        else:
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Click failed: {result.get('error', 'Unknown error')}",
-                )
-            ]
+        return await self.dom_tool_service.handle_click(arguments)
 
     async def _action_fill(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle fill action (single field)."""
-        if not self.dom_interaction_service:
-            return [TextContent(type="text", text="DOM interaction service not available")]
-
-        value = arguments.get("value")
-        if value is None:
-            return [TextContent(type="text", text="Error: 'value' is required for fill action")]
-
-        port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
-        if port is None:
-            return [TextContent(type="text", text=port_warning or "No port available")]
-
-        result = await self.dom_interaction_service.fill_field(
-            port=port,
-            value=value,
-            selector=arguments.get("selector"),
-            xpath=arguments.get("xpath"),
-            index=arguments.get("index", 0),
-        )
-
-        if result.get("success"):
-            return [TextContent(type="text", text=f"Filled field with: {value}")]
-        else:
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Fill failed: {result.get('error', 'Unknown error')}",
-                )
-            ]
+        return await self.dom_tool_service.handle_fill(arguments)
 
     async def _action_select(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle select action (dropdown)."""
-        if not self.dom_interaction_service:
-            return [TextContent(type="text", text="DOM interaction service not available")]
-
-        selector = arguments.get("selector")
-        if not selector:
-            return [TextContent(type="text", text="Error: 'selector' is required for select action")]
-
-        port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
-        if port is None:
-            return [TextContent(type="text", text=port_warning or "No port available")]
-
-        result = await self.dom_interaction_service.select_option(
-            port=port,
-            selector=selector,
-            option_value=arguments.get("option_value"),
-            option_text=arguments.get("option_text"),
-            option_index=arguments.get("option_index"),
-        )
-
-        if result.get("success"):
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Selected: {result.get('selectedText', '')} "
-                    f"(value: {result.get('selectedValue', '')})",
-                )
-            ]
-        else:
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Select failed: {result.get('error', 'Unknown error')}",
-                )
-            ]
+        return await self.dom_tool_service.handle_select(arguments)
 
     async def _action_wait(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle wait action."""
-        if not self.dom_interaction_service:
-            return [TextContent(type="text", text="DOM interaction service not available")]
-
-        selector = arguments.get("selector")
-        if not selector:
-            return [TextContent(type="text", text="Error: 'selector' is required for wait action")]
-
-        port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
-        if port is None:
-            return [TextContent(type="text", text=port_warning or "No port available")]
-
-        timeout = arguments.get("timeout", 5000)
-
-        result = await self.dom_interaction_service.wait_for_element(
-            port=port, selector=selector, timeout=timeout
-        )
-
-        if result.get("success"):
-            element_info = result.get("elementInfo", {})
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Element appeared: {element_info.get('tagName', 'element')} "
-                    f"'{selector}'",
-                )
-            ]
-        else:
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Wait timeout ({timeout}ms): {result.get('error', '')}",
-                )
-            ]
+        return await self.dom_tool_service.handle_wait(arguments)
 
     # ========================================================================
     # Consolidated Handler: browser_query (logs, element, capabilities)
@@ -528,106 +427,22 @@ class MCPService:
         last_n = arguments.get("last_n", 100)
         level_filter = arguments.get("level_filter")
 
-        if not self.browser_service:
-            return [TextContent(type="text", text="Browser service not available")]
-
-        messages = await self.browser_service.query_logs(
+        # Delegate to log query tool service
+        result = await self.log_query_tool_service.handle_query_logs(
             port=port, last_n=last_n, level_filter=level_filter
         )
 
-        if not messages:
-            return [TextContent(type="text", text=f"No console logs found for port {port}")]
-
-        # Format messages
-        log_lines = []
-        for msg in messages:
-            timestamp = msg.timestamp.strftime("%H:%M:%S.%f")[:-3]
-            level = msg.level.value.upper()
-            log_lines.append(f"[{timestamp}] [{level}] {msg.message}")
-            if msg.stack_trace:
-                log_lines.append(f"  Stack: {msg.stack_trace[:200]}")
-
-        return [
-            TextContent(
-                type="text",
-                text=f"Console logs (last {len(messages)}):\n\n" + "\n".join(log_lines),
-            )
-        ]
+        return [TextContent(type="text", text=result["formatted_text"])]
 
     async def _query_element(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle element query."""
-        if not self.dom_interaction_service:
-            return [TextContent(type="text", text="DOM interaction service not available")]
-
-        port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
-        if port is None:
-            return [TextContent(type="text", text=port_warning or "No port available")]
-
-        result = await self.dom_interaction_service.get_element(
-            port=port,
-            selector=arguments.get("selector"),
-            xpath=arguments.get("xpath"),
-            text=arguments.get("text"),
-        )
-
-        if result.get("success"):
-            el = result.get("elementInfo", {})
-            info = (
-                f"Element: {el.get('tagName', 'unknown')}\n"
-                f"  ID: {el.get('id', 'none')}\n"
-                f"  Class: {el.get('className', 'none')}\n"
-                f"  Text: {el.get('text', '')[:100]}\n"
-                f"  Visible: {el.get('isVisible', False)}\n"
-                f"  Enabled: {el.get('isEnabled', False)}"
-            )
-            if el.get("value"):
-                info += f"\n  Value: {el['value']}"
-            if el.get("href"):
-                info += f"\n  Href: {el['href']}"
-            return [TextContent(type="text", text=info)]
-        else:
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Element not found: {result.get('error', 'Unknown error')}",
-                )
-            ]
+        return await self.dom_tool_service.handle_get_element(arguments)
 
     async def _query_capabilities(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle capabilities query."""
-        if not self.capability_detector:
-            return [
-                TextContent(
-                    type="text",
-                    text="Capability detection not available",
-                )
-            ]
-
-        try:
-            report = await self.capability_detector.get_capability_report()
-
-            lines = [
-                "# Browser Control Capabilities",
-                "",
-                f"**Summary:** {report['summary']}",
-                "",
-                "## Available",
-            ]
-
-            for cap in report.get("capabilities", []):
-                lines.append(f"- {cap}")
-
-            lines.extend(["", "## Methods", ""])
-            for method_name, method_info in report.get("methods", {}).items():
-                status = "Available" if method_info["available"] else "Unavailable"
-                lines.append(f"**{method_name.title()}**: {status}")
-                lines.append(f"  {method_info['description']}")
-
-            return [TextContent(type="text", text="\n".join(lines))]
-
-        except Exception as e:
-            logger.exception("Failed to get capabilities")
-            return [TextContent(type="text", text=f"Capability check failed: {str(e)}")]
+        # Delegate to capability tool service
+        result = await self.capability_tool_service.handle_get_capabilities()
+        return [TextContent(type="text", text=result["formatted_text"])]
 
     # ========================================================================
     # Standalone Handler: browser_screenshot
@@ -643,13 +458,13 @@ class MCPService:
 
         # Delegate to screenshot tool service
         url = arguments.get("url")
-        result = await self.screenshot_tool_service.handle_screenshot(port=port, url=url)
+        result = await self.screenshot_tool_service.handle_screenshot(
+            port=port, url=url
+        )
 
         if result.get("success"):
             return [
-                ImageContent(
-                    type="image", data=result["data"], mimeType="image/png"
-                )
+                ImageContent(type="image", data=result["data"], mimeType="image/png")
             ]
         else:
             error_msg = result.get("error", "Unknown error")
@@ -688,63 +503,11 @@ class MCPService:
 
     async def _form_fill(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle form fill (multiple fields)."""
-        if not self.dom_interaction_service:
-            return [TextContent(type="text", text="DOM interaction service not available")]
-
-        form_data = arguments.get("form_data")
-        if not form_data:
-            return [TextContent(type="text", text="Error: 'form_data' is required for fill action")]
-
-        port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
-        if port is None:
-            return [TextContent(type="text", text=port_warning or "No port available")]
-
-        submit = arguments.get("submit", False)
-
-        result = await self.dom_interaction_service.fill_form(
-            port=port, form_data=form_data, submit=submit
-        )
-
-        if result.get("success"):
-            filled = len(result.get("fields", {}))
-            submitted = result.get("submitted", False)
-            msg = f"Filled {filled} fields"
-            if submit and submitted:
-                msg += " and submitted form"
-            return [TextContent(type="text", text=msg)]
-        else:
-            errors = result.get("errors", [])
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Form fill failed: {'; '.join(errors)}",
-                )
-            ]
+        return await self.form_tool_service.handle_fill_form(arguments)
 
     async def _form_submit(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle form submit."""
-        if not self.dom_interaction_service:
-            return [TextContent(type="text", text="DOM interaction service not available")]
-
-        port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
-        if port is None:
-            return [TextContent(type="text", text=port_warning or "No port available")]
-
-        result = await self.dom_interaction_service.submit_form(
-            port=port,
-            selector=arguments.get("selector"),
-            xpath=arguments.get("xpath"),
-        )
-
-        if result.get("success"):
-            return [TextContent(type="text", text="Form submitted")]
-        else:
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Submit failed: {result.get('error', 'Unknown error')}",
-                )
-            ]
+        return await self.form_tool_service.handle_submit_form(arguments)
 
     # ========================================================================
     # Consolidated Handler: browser_extract (content, semantic_dom)
@@ -807,13 +570,22 @@ class MCPService:
             if text:
                 max_chars = 50000
                 if len(text) > max_chars:
-                    text = text[:max_chars] + f"\n\n[Truncated {len(text) - max_chars:,} chars]"
+                    text = (
+                        text[:max_chars]
+                        + f"\n\n[Truncated {len(text) - max_chars:,} chars]"
+                    )
                 lines.append(text)
             else:
                 lines.append("[No readable content extracted]")
 
             if content.get("fallback"):
-                lines.extend(["", "---", "*Fallback extraction - page may not be optimized for reading*"])
+                lines.extend(
+                    [
+                        "",
+                        "---",
+                        "*Fallback extraction - page may not be optimized for reading*",
+                    ]
+                )
 
             return [TextContent(type="text", text="\n".join(lines))]
         else:
@@ -824,7 +596,9 @@ class MCPService:
                 )
             ]
 
-    async def _extract_semantic_dom(self, arguments: Dict[str, Any]) -> List[TextContent]:
+    async def _extract_semantic_dom(
+        self, arguments: Dict[str, Any]
+    ) -> List[TextContent]:
         """Handle semantic DOM extraction."""
         if not self.browser_service:
             return [TextContent(type="text", text="Browser service not available")]
@@ -888,7 +662,11 @@ class MCPService:
         if links and options.get("include_links", True):
             lines.append(f"## Links ({len(links)})")
             for link in links[:50]:
-                text = link.get("text", "").strip()[:80] or link.get("ariaLabel", "") or "[no text]"
+                text = (
+                    link.get("text", "").strip()[:80]
+                    or link.get("ariaLabel", "")
+                    or "[no text]"
+                )
                 href = link.get("href", "")
                 lines.append(f"- {text}")
                 if href and not href.startswith("javascript:"):
@@ -902,7 +680,12 @@ class MCPService:
         if forms and options.get("include_forms", True):
             lines.append(f"## Forms ({len(forms)})")
             for form in forms:
-                name = form.get("name") or form.get("id") or form.get("ariaLabel") or "[unnamed]"
+                name = (
+                    form.get("name")
+                    or form.get("id")
+                    or form.get("ariaLabel")
+                    or "[unnamed]"
+                )
                 lines.append(f"### {name}")
                 if form.get("action"):
                     lines.append(f"  Action: {form.get('action')}")
@@ -913,7 +696,12 @@ class MCPService:
                     for field in fields:
                         ftype = field.get("type", "text")
                         fname = field.get("name") or field.get("id") or "[unnamed]"
-                        label = field.get("label") or field.get("ariaLabel") or field.get("placeholder") or ""
+                        label = (
+                            field.get("label")
+                            or field.get("ariaLabel")
+                            or field.get("placeholder")
+                            or ""
+                        )
                         req = " (required)" if field.get("required") else ""
                         if label:
                             lines.append(f"    - {fname} ({ftype}): {label}{req}")

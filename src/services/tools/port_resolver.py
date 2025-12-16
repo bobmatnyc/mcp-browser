@@ -110,7 +110,11 @@ class PortResolver:
             for server in registry.get("servers", []):
                 pid = server.get("pid")
                 port = server.get("port")
-                if pid is not None and is_process_running(pid) and isinstance(port, int):
+                if (
+                    pid is not None
+                    and is_process_running(pid)
+                    and isinstance(port, int)
+                ):
                     return port
             return None
         except Exception as e:

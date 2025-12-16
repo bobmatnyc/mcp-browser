@@ -1,7 +1,7 @@
 """Screenshot tool service for MCP browser control."""
 
-from typing import Any, Dict, Optional
 import logging
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
