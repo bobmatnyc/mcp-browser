@@ -137,6 +137,7 @@ async function updateCurrentTabStatus(tabId) {
   const tabStatusIndicator = document.getElementById('tab-status-indicator');
   const tabStatusText = document.getElementById('tab-status-text');
   const tabInfoElement = document.getElementById('tab-info');
+  const disconnectButton = document.getElementById('disconnect-button');
 
   try {
     // Get current tab info
@@ -150,6 +151,10 @@ async function updateCurrentTabStatus(tabId) {
       if (tabInfoElement) {
         tabInfoElement.textContent = 'Cannot connect on browser internal pages';
         tabInfoElement.style.display = 'block';
+      }
+      // Hide disconnect button on restricted pages
+      if (disconnectButton) {
+        disconnectButton.style.display = 'none';
       }
       return;
     }
@@ -173,6 +178,12 @@ async function updateCurrentTabStatus(tabId) {
         tabInfoElement.textContent = `Tab: ${tabTitle}`;
         tabInfoElement.style.display = 'block';
       }
+
+      // Show disconnect button
+      if (disconnectButton) {
+        disconnectButton.style.display = 'block';
+        disconnectButton.dataset.port = currentTabConnection.assignedPort;
+      }
     } else {
       // Tab is not connected
       tabStatusIndicator.className = 'status-indicator disconnected';
@@ -181,6 +192,11 @@ async function updateCurrentTabStatus(tabId) {
       // Hide tab info when not connected
       if (tabInfoElement) {
         tabInfoElement.style.display = 'none';
+      }
+
+      // Hide disconnect button
+      if (disconnectButton) {
+        disconnectButton.style.display = 'none';
       }
     }
   } catch (error) {
@@ -191,6 +207,11 @@ async function updateCurrentTabStatus(tabId) {
     // Hide tab info on error
     if (tabInfoElement) {
       tabInfoElement.style.display = 'none';
+    }
+
+    // Hide disconnect button on error
+    if (disconnectButton) {
+      disconnectButton.style.display = 'none';
     }
   }
 }
@@ -215,19 +236,18 @@ async function updateBackendList(status) {
     return;
   }
 
-  let isCurrentTabConnected = false;
+  let currentTabPort = null;
 
   if (currentTab) {
     const tabConnectionsResponse = await sendMessage({ type: 'get_tab_connections' });
     const tabConnections = tabConnectionsResponse?.tabConnections || [];
     const currentTabConnection = tabConnections.find(tc => tc.tabId === currentTab.id);
-    isCurrentTabConnected = currentTabConnection && currentTabConnection.assignedPort;
+    currentTabPort = currentTabConnection?.assignedPort || null;
   }
 
-  // Show backend list only if:
-  // 1. There are available backends
-  // 2. Current tab is not connected
-  if (availableServers.length > 0 && !isCurrentTabConnected) {
+  // Show backend list if there are available backends
+  // Changed: Now shows even when connected (to allow switching servers)
+  if (availableServers.length > 0) {
     backendListContainer.style.display = 'block';
 
     // Clear any error message since we found servers
@@ -242,12 +262,17 @@ async function updateBackendList(status) {
       const item = document.createElement('div');
       item.className = 'backend-item';
 
+      // Check if this backend is currently connected
+      const isConnected = currentTabPort === server.port;
+      const buttonText = isConnected ? 'Connected' : 'Connect';
+      const buttonDisabled = isConnected ? 'disabled' : '';
+
       item.innerHTML = `
         <div class="backend-info">
           <div class="backend-name" title="${server.projectPath || 'No path specified'}">${server.projectName || 'Unknown Project'}</div>
           <div class="backend-port">Port ${server.port}</div>
         </div>
-        <button class="backend-connect-btn" data-port="${server.port}">Connect</button>
+        <button class="backend-connect-btn" data-port="${server.port}" ${buttonDisabled}>${buttonText}</button>
       `;
 
       // Add click handler to connect button
@@ -271,6 +296,41 @@ async function updateBackendList(status) {
   } else {
     // Hide backend list if connected or no backends available
     backendListContainer.style.display = 'none';
+  }
+}
+
+/**
+ * Handle disconnecting current tab from backend
+ */
+async function handleDisconnect() {
+  const disconnectBtn = document.getElementById('disconnect-button');
+  const port = parseInt(disconnectBtn.dataset.port);
+
+  try {
+    disconnectBtn.disabled = true;
+    disconnectBtn.textContent = '🔌 Disconnecting...';
+
+    console.log('[Popup] Disconnecting from port', port);
+
+    // Send disconnect message to background
+    const response = await chrome.runtime.sendMessage({
+      type: 'disconnect',
+      port: port
+    });
+
+    if (response && (response.disconnected || response.received)) {
+      console.log('[Popup] Disconnected from port', port);
+      // Refresh UI
+      await loadDashboard();
+    } else {
+      throw new Error('Failed to disconnect');
+    }
+  } catch (error) {
+    console.error('[Popup] Disconnect failed:', error);
+    showError(`Failed to disconnect: ${error.message}`);
+  } finally {
+    disconnectBtn.disabled = false;
+    disconnectBtn.textContent = '🔌 Disconnect';
   }
 }
 
@@ -638,6 +698,7 @@ Timestamp: ${new Date().toISOString()}
 
 // Event Listeners
 document.getElementById('scan-button').addEventListener('click', handleScanBackends);
+document.getElementById('disconnect-button').addEventListener('click', handleDisconnect);
 document.getElementById('gear-icon').addEventListener('click', toggleTechnicalPanel);
 document.getElementById('close-tech-panel').addEventListener('click', toggleTechnicalPanel);
 document.getElementById('copy-debug-btn').addEventListener('click', copyDebugInfo);

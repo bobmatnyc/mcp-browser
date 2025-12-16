@@ -133,6 +133,15 @@
       background: rgba(255, 193, 7, 0.3);
     }
 
+    .disconnect-button {
+      background: rgba(220, 53, 69, 0.3);
+      margin-top: 8px;
+    }
+
+    .disconnect-button:hover {
+      background: rgba(200, 35, 51, 0.5);
+    }
+
     .error-message {
       background: rgba(244, 67, 54, 0.2);
       border: 1px solid rgba(244, 67, 54, 0.5);
@@ -439,6 +448,9 @@
       </span>
     </div>
     <div id="tab-info" class="tab-info" style="display: none;"></div>
+    <button id="disconnect-button" class="action-button disconnect-button" style="display: none;">
+      🔌 Disconnect
+    </button>
   </div>
 
   <!-- Backend Selection List (shown when backends available but not connected) -->
