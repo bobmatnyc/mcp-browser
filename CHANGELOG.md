@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.32] - 2025-12-16
+
+### Fixed
+- Python 3.14 compatibility fixes
+  - Fixed `asyncio.get_event_loop()` deprecation in ServiceContainer
+  - Replaced deprecated `asyncio.iscoroutinefunction` with `inspect.iscoroutinefunction`
+  - Fixed `websockets.exceptions.ConnectionRefused` deprecation (now OSError)
+- Made `py-mcp-installer` import optional to prevent test failures when not installed
+- Updated Makefile to prefer `.venv/bin/python` over system Python
+
+### Removed
+- Removed outdated `test_implementation.py` that tested deprecated ScreenshotService
+
 ## [2.2.31] - 2025-12-16
 
 ### Fixed
@@ -168,8 +181,8 @@ Users upgrading from previous versions should run `mcp-browser uninstall --playw
 - Safari and Google Chrome support via AppleScript automation
 - BrowserController service for unified browser control interface
 - Configuration modes: `auto` (default), `extension`, `applescript`
-- Comprehensive AppleScript fallback documentation (docs/APPLESCRIPT_FALLBACK.md)
-- Quick start guide for AppleScript setup (APPLESCRIPT_QUICK_START.md)
+- Comprehensive AppleScript fallback documentation (`docs/guides/APPLESCRIPT_FALLBACK.md`)
+- Quick start guide for AppleScript setup (`docs/_archive/APPLESCRIPT_QUICK_START.md`) (archived)
 - macOS permission setup instructions and troubleshooting
 
 ### Features
