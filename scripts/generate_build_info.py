@@ -86,8 +86,9 @@ def update_manifest_version(extension_dir: Path, build_info: dict) -> str:
     build_parts = build_info["build"].split(".")
     hhmm = int(build_parts[3]) if len(build_parts) >= 4 else 0
 
-    # Get base version (first 3 parts)
-    base_version = manifest.get("version", "1.0.0")
+    # CRITICAL: Use current package version from build_info, NOT old manifest version
+    # This ensures extensions always have correct version from _version.py
+    base_version = build_info["version"]
     version_parts = base_version.split(".")[:3]  # Take only first 3 parts
 
     # Create 4-part version: X.Y.Z.HHMM
@@ -128,7 +129,9 @@ def main():
         extension_dir = Path(sys.argv[1])
     else:
         # Default to mcp-browser-extensions/chrome
-        extension_dir = Path(__file__).parent.parent / "mcp-browser-extensions" / "chrome"
+        extension_dir = (
+            Path(__file__).parent.parent / "mcp-browser-extensions" / "chrome"
+        )
 
     if not extension_dir.exists():
         print(f"Error: Extension directory not found: {extension_dir}", file=sys.stderr)

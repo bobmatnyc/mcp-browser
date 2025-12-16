@@ -74,9 +74,7 @@ def setup(skip_mcp: bool, force: bool):
         task = progress.add_task("Installing browser extension...", total=1)
         if install_extension(force):
             steps_completed += 1
-            progress.update(
-                task, completed=1, description="✓ Extension installed"
-            )
+            progress.update(task, completed=1, description="✓ Extension installed")
         else:
             progress.update(
                 task, description="⚠ Extension not found (skip if not needed)"
@@ -241,6 +239,22 @@ def install_extension(force: bool = False) -> bool:
 
             # Copy extension
             shutil.copytree(source_dir, target_dir)
+
+            # Sync extension version with package version
+            from ..._version import __version__
+
+            manifest_path = target_dir / "manifest.json"
+            if manifest_path.exists():
+                try:
+                    with open(manifest_path, "r") as f:
+                        manifest = json.load(f)
+                    manifest["version"] = __version__
+                    with open(manifest_path, "w") as f:
+                        json.dump(manifest, f, indent=2)
+                except Exception:
+                    # Non-fatal: version sync failed but extension still deployed
+                    pass
+
             installed_count += 1
             console.print(f"[dim]  Installed {browser} extension[/dim]")
         except Exception:

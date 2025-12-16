@@ -292,6 +292,80 @@ def cleanup_unregistered_servers() -> int:
     return killed
 
 
+def find_orphaned_project_server(project_path: str) -> Optional[dict]:
+    """Find server running for this project but not in registry.
+
+    Scans ports 8851-8899 for mcp-browser processes and checks if they
+    were started from the specified project directory.
+
+    Args:
+        project_path: Absolute path to the project directory
+
+    Returns:
+        Dictionary with 'pid', 'port', 'project_path' or None if not found
+    """
+    normalized_path = os.path.normpath(os.path.abspath(project_path))
+
+    for port in range(PORT_RANGE_START, PORT_RANGE_END + 1):
+        # Check if port is in use
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            sock.bind(("127.0.0.1", port))
+            sock.close()
+            continue  # Port available, no server
+        except OSError:
+            sock.close()
+
+        # Find PID on this port
+        try:
+            result = subprocess.run(
+                ["lsof", "-ti", f":{port}"],
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            if result.returncode != 0 or not result.stdout.strip():
+                continue
+
+            pid = int(result.stdout.strip().split()[0])
+
+            # Check process command line for mcp-browser
+            proc_result = subprocess.run(
+                ["ps", "-p", str(pid), "-o", "command="],
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            cmd = proc_result.stdout.lower()
+
+            # Must be mcp-browser process
+            if "mcp-browser" not in cmd and "mcp_browser" not in cmd:
+                continue
+
+            # Check if process cwd matches project (macOS)
+            cwd_result = subprocess.run(
+                ["lsof", "-a", "-p", str(pid), "-d", "cwd", "-Fn"],
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            # Parse cwd from lsof output (format: "n/path/to/dir")
+            for line in cwd_result.stdout.split("\n"):
+                if line.startswith("n/"):
+                    process_cwd = line[1:]  # Remove 'n' prefix
+                    if os.path.normpath(process_cwd) == normalized_path:
+                        return {
+                            "pid": pid,
+                            "port": port,
+                            "project_path": project_path,
+                        }
+
+        except (subprocess.TimeoutExpired, ValueError, OSError):
+            continue
+
+    return None
+
+
 def get_server_status(
     project_path: Optional[str] = None,
 ) -> Tuple[bool, Optional[int], Optional[int]]:
@@ -362,6 +436,15 @@ def start_daemon(
 
         # Remove old registry entry
         remove_project_server(project_path)
+    else:
+        # Check for orphaned server not in registry
+        orphaned = find_orphaned_project_server(project_path)
+        if orphaned:
+            # Add to registry and reuse
+            add_project_server(
+                orphaned["pid"], orphaned["port"], orphaned["project_path"]
+            )
+            return True, orphaned["pid"], orphaned["port"]
 
     # Find available port if not specified
     if port is None:
