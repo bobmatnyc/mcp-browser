@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.38] - 2025-12-16
+
+### Fixed
+- Broken import in display.py that caused CLI to fail when installed via pip
+  - Changed `from src._version` to `from mcp_browser._version`
+
 ## [2.2.37] - 2025-12-16
 
 ### Fixed
