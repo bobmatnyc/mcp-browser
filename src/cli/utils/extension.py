@@ -117,7 +117,7 @@ def open_chrome_extensions_page() -> bool:
         import subprocess
 
         # AppleScript to open chrome://extensions in Chrome
-        script = '''
+        script = """
         tell application "Google Chrome"
             activate
             if (count of windows) = 0 then
@@ -125,7 +125,7 @@ def open_chrome_extensions_page() -> bool:
             end if
             set URL of active tab of window 1 to "chrome://extensions"
         end tell
-        '''
+        """
 
         result = subprocess.run(
             ["osascript", "-e", script],
@@ -153,11 +153,11 @@ def is_chrome_running() -> bool:
     try:
         import subprocess
 
-        script = '''
+        script = """
         tell application "System Events"
             return (exists process "Google Chrome")
         end tell
-        '''
+        """
 
         result = subprocess.run(
             ["osascript", "-e", script],

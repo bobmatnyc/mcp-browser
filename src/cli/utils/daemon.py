@@ -295,8 +295,10 @@ def cleanup_unregistered_servers() -> int:
 def cleanup_project_servers(project_path: str) -> int:
     """Kill ALL mcp-browser servers running for this project.
 
-    Scans all ports in range, checks process cwd, and kills any
-    mcp-browser server started from this project directory.
+    Scans all ports in range (8851-8899) and kills ANY mcp-browser process
+    found on those ports, regardless of cwd. This ensures a clean slate
+    before starting a new server, preventing duplicate servers.
+
     Also removes entries from registry.
 
     Args:
@@ -311,12 +313,15 @@ def cleanup_project_servers(project_path: str) -> int:
     # First, remove from registry
     registry = read_service_registry()
     registry["servers"] = [
-        s for s in registry.get("servers", [])
-        if os.path.normpath(os.path.abspath(s.get("project_path", ""))) != normalized_path
+        s
+        for s in registry.get("servers", [])
+        if os.path.normpath(os.path.abspath(s.get("project_path", "")))
+        != normalized_path
     ]
     save_server_registry(registry)
 
-    # Then scan all ports for orphaned processes
+    # Then scan all ports and kill ALL mcp-browser processes
+    # (We no longer check cwd to ensure we catch orphaned servers)
     for port in range(PORT_RANGE_START, PORT_RANGE_END + 1):
         # Check if port is in use
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -343,40 +348,37 @@ def cleanup_project_servers(project_path: str) -> int:
 
             for pid in pids:
                 # Check process command line for mcp-browser
-                proc_result = subprocess.run(
-                    ["ps", "-p", str(pid), "-o", "command="],
-                    capture_output=True,
-                    text=True,
-                    timeout=2,
-                )
-                cmd = proc_result.stdout.lower()
+                try:
+                    proc_result = subprocess.run(
+                        ["ps", "-p", str(pid), "-o", "command="],
+                        capture_output=True,
+                        text=True,
+                        timeout=2,
+                    )
+                    if proc_result.returncode != 0:
+                        continue
 
-                # Must be mcp-browser process
-                if "mcp-browser" not in cmd and "mcp_browser" not in cmd:
+                    cmd = proc_result.stdout.lower()
+
+                    # Must be mcp-browser process
+                    if "mcp-browser" not in cmd and "mcp_browser" not in cmd:
+                        continue
+
+                    # CRITICAL FIX: Kill ALL mcp-browser processes on port range
+                    # regardless of cwd. This prevents duplicate servers.
+                    try:
+                        os.kill(pid, 15)  # SIGTERM
+                        time.sleep(0.3)
+                        if is_process_running(pid):
+                            os.kill(pid, 9)  # SIGKILL
+                        killed += 1
+                    except (OSError, ProcessLookupError):
+                        # Process already dead, that's fine
+                        pass
+
+                except (subprocess.TimeoutExpired, subprocess.SubprocessError):
+                    # Skip processes we can't check
                     continue
-
-                # Check if process cwd matches project (macOS)
-                cwd_result = subprocess.run(
-                    ["lsof", "-a", "-p", str(pid), "-d", "cwd", "-Fn"],
-                    capture_output=True,
-                    text=True,
-                    timeout=2,
-                )
-                # Parse cwd from lsof output (format: "n/path/to/dir")
-                for line in cwd_result.stdout.split("\n"):
-                    if line.startswith("n/"):
-                        process_cwd = line[1:]  # Remove 'n' prefix
-                        if os.path.normpath(process_cwd) == normalized_path:
-                            # Kill this server
-                            try:
-                                os.kill(pid, 15)  # SIGTERM
-                                time.sleep(0.3)
-                                if is_process_running(pid):
-                                    os.kill(pid, 9)  # SIGKILL
-                                killed += 1
-                            except (OSError, ProcessLookupError):
-                                pass
-                            break  # Found and handled, move to next port
 
         except (subprocess.TimeoutExpired, ValueError, OSError):
             continue

@@ -422,7 +422,11 @@ class BrowserMCPServer:
 
         # Try to connect to running WebSocket daemon for extension communication
         daemon_client = None
-        from .daemon import get_project_server, read_service_registry, is_process_running
+        from .daemon import (
+            get_project_server,
+            is_process_running,
+            read_service_registry,
+        )
 
         # First try to find server for current project
         project_server = get_project_server(os.getcwd())

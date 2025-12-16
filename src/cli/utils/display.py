@@ -2,9 +2,8 @@
 
 import sys
 
-from rich.console import Console
-
 from mcp_browser._version import get_version_info
+from rich.console import Console
 
 # Create console for rich output
 console = Console()

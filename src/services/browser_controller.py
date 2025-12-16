@@ -297,9 +297,13 @@ class BrowserController:
             f"browser={self.preferred_browser}, fallback={self.fallback_enabled}"
         )
 
-    async def _has_cdp_connection(self) -> bool:
-        """Check if CDP browser is connected (legacy stub - always returns False)."""
-        return False
+    # NOTE: CDP/Playwright support was removed in v2.2.29 to prevent memory leaks.
+    # Navigation and all browser control now works exclusively through:
+    # 1. Extension (WebSocket) - preferred, full features
+    # 2. AppleScript (macOS) - fallback for basic operations
+    #
+    # The optional `mcp-browser connect` CLI command still references CDP for
+    # documentation purposes but is not used in the normal MCP flow.
 
     async def execute_action(
         self, action: str, port: Optional[int] = None, **kwargs
