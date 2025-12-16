@@ -322,21 +322,19 @@ def start_daemon(
     """
     Start server as background daemon for the current project.
 
-    If a server is already running for this project, it will be stopped
-    and restarted on the same port to ensure consistency.
+    If a server is already running for this project and no specific port
+    is requested, the existing server will be reused. Otherwise, the old
+    server will be stopped and restarted on the requested port.
 
     Args:
-        port: Specific port to use, or None to auto-select
+        port: Specific port to use, or None to auto-select/reuse existing
 
     Returns:
         (success, pid, port) tuple
     """
-    # Clean up any stale processes first to enforce one server per project
-    cleanup_stale_servers()
-
     project_path = os.getcwd()
 
-    # Check if server already exists for this project
+    # Check if server already exists for this project FIRST
     existing_server = get_project_server(project_path)
 
     if existing_server:
@@ -348,12 +346,13 @@ def start_daemon(
         if port is None and is_process_running(existing_pid):
             return True, existing_pid, existing_port
 
-        # Otherwise, kill the old server and restart on same port (or new port if specified)
+        # If specific port requested or process is dead, clean up THIS project's server only
         try:
-            os.kill(existing_pid, 15)  # SIGTERM
-            time.sleep(0.5)
             if is_process_running(existing_pid):
-                os.kill(existing_pid, 9)  # SIGKILL
+                os.kill(existing_pid, 15)  # SIGTERM
+                time.sleep(0.5)
+                if is_process_running(existing_pid):
+                    os.kill(existing_pid, 9)  # SIGKILL
         except (OSError, ProcessLookupError):
             pass
 
