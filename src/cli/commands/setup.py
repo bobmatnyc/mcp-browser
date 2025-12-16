@@ -184,15 +184,16 @@ def init_configuration(force: bool = False) -> bool:
 
 
 def install_extension(force: bool = False) -> bool:
-    """Install all browser extensions to visible project directory.
+    """Install all browser extensions to project and global directories.
 
-    Copies the unpacked extensions to ./mcp-browser-extensions/{browser}/
-    for easy loading in browser developer mode.
+    Copies the unpacked extensions to:
+      1. ./mcp-browser-extensions/{browser}/ (project-local)
+      2. ~/.mcp-browser/extension/ (global - for existing Chrome installs)
 
     Installs:
-      - Chrome extension (./mcp-browser-extensions/chrome/)
-      - Firefox extension (./mcp-browser-extensions/firefox/)
-      - Safari extension (./mcp-browser-extensions/safari/)
+      - Chrome extension (both locations)
+      - Firefox extension (project-local only)
+      - Safari extension (project-local only)
 
     Args:
         force: Force reinstallation even if already installed
@@ -228,24 +229,18 @@ def install_extension(force: bool = False) -> bool:
             # Skip browsers without source (not an error)
             continue
 
-        # Copy extension if needed (new install or force)
-        if not target_dir.exists() or force:
-            try:
-                # Remove existing if force
-                if target_dir.exists():
-                    shutil.rmtree(target_dir)
-
-                # Copy extension
-                shutil.copytree(source_dir, target_dir)
-                console.print(f"[dim]  Installed {browser} extension[/dim]")
-            except Exception:
-                console.print(
-                    f"[yellow]  Failed to install {browser} extension[/yellow]"
-                )
-                continue
-
-        # ALWAYS sync version (even if extension already existed)
-        sync_extension_version(target_dir)
+        # ALWAYS copy fresh extension files (not just sync version)
+        # This ensures extension code is updated on every setup, not just manifest.json
+        try:
+            if target_dir.exists():
+                shutil.rmtree(target_dir)
+            shutil.copytree(source_dir, target_dir)
+            # Sync version after copying
+            sync_extension_version(target_dir)
+            console.print(f"[dim]  Updated {browser} extension[/dim]")
+        except Exception as e:
+            console.print(f"[yellow]  Failed to install {browser} extension: {e}[/yellow]")
+            continue
 
         installed_count += 1
 
