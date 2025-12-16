@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-browser"
-version = "2.2.45"
+version = "2.2.46"
 description = "Browser control and console log capture for AI coding assistants via MCP"
 readme = "README.md"
 authors = [
