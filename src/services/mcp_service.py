@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 from mcp.server import Server
 from mcp.types import ImageContent, TextContent, Tool
 
-from .tools import PortResolver
+from .tools import NavigationToolService, PortResolver, ScreenshotToolService
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,13 @@ class MCPService:
         self.browser_controller = browser_controller
         self.capability_detector = capability_detector
         self.port_resolver = PortResolver()
+        self.navigation_tool_service = NavigationToolService(
+            browser_service=browser_service,
+            browser_controller=browser_controller,
+        )
+        self.screenshot_tool_service = ScreenshotToolService(
+            browser_service=browser_service
+        )
         # Initialize server with version info
         self.server = Server(
             name="mcp-browser",
@@ -341,52 +348,11 @@ class MCPService:
     async def _action_navigate(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle navigation action."""
         url = arguments.get("url")
-        if not url:
-            return [TextContent(type="text", text="Error: 'url' is required for navigate action")]
-
         port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
 
-        # Try BrowserController first for automatic fallback support
-        if self.browser_controller:
-            result = await self.browser_controller.navigate(url=url, port=port)
-
-            if result["success"]:
-                method = result.get("method", "extension")
-                if method == "applescript":
-                    return [
-                        TextContent(
-                            type="text",
-                            text=f"Navigated to {url} using AppleScript fallback.\n"
-                            f"Note: Console log capture requires the browser extension.",
-                        )
-                    ]
-                else:
-                    return [
-                        TextContent(
-                            type="text",
-                            text=f"Navigated to {url} on port {port}",
-                        )
-                    ]
-            else:
-                error_msg = result.get("error", "Unknown error")
-                return [TextContent(type="text", text=f"Navigation failed: {error_msg}")]
-
-        # Fallback to direct browser_service
-        if not self.browser_service:
-            return [TextContent(type="text", text="Browser service not available")]
-
-        success = await self.browser_service.navigate_browser(port, url)
-        if success:
-            return [TextContent(type="text", text=f"Navigated to {url} on port {port}")]
-        else:
-            return [
-                TextContent(
-                    type="text",
-                    text=f"Navigation failed on port {port}. No active connection.",
-                )
-            ]
+        return await self.navigation_tool_service.handle_navigate(port, url)
 
     async def _action_click(self, arguments: Dict[str, Any]) -> List[TextContent]:
         """Handle click action."""
@@ -675,23 +641,25 @@ class MCPService:
         if port is None:
             return [TextContent(type="text", text=port_warning or "No port available")]
 
-        # Use extension-based screenshot only (no Playwright fallback)
-        if self.browser_service:
-            result = await self.browser_service.capture_screenshot_via_extension(port)
-            if result and result.get("success"):
-                return [
-                    ImageContent(
-                        type="image", data=result["data"], mimeType="image/png"
-                    )
-                ]
+        # Delegate to screenshot tool service
+        url = arguments.get("url")
+        result = await self.screenshot_tool_service.handle_screenshot(port=port, url=url)
 
-        return [
-            TextContent(
-                type="text",
-                text=f"Screenshot capture failed for port {port}. "
-                f"Ensure browser extension is connected.",
-            )
-        ]
+        if result.get("success"):
+            return [
+                ImageContent(
+                    type="image", data=result["data"], mimeType="image/png"
+                )
+            ]
+        else:
+            error_msg = result.get("error", "Unknown error")
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Screenshot capture failed for port {port}: {error_msg}. "
+                    f"Ensure browser extension is connected.",
+                )
+            ]
 
     # ========================================================================
     # Consolidated Handler: browser_form (fill, submit)

@@ -316,128 +316,532 @@ class PortSelector {
 }
 
 /**
+ * WebSocketClient - Manages individual WebSocket connection lifecycle
+ * Handles connection setup, heartbeat, message queuing, and reconnection
+ */
+class WebSocketClient {
+  constructor(port, projectInfo = null) {
+    this.port = port;
+    this.ws = null;
+    this.projectId = projectInfo?.project_id || null;
+    this.projectName = projectInfo?.project_name || projectInfo?.projectName || `Port ${port}`;
+    this.projectPath = projectInfo?.project_path || projectInfo?.projectPath || '';
+    this.messageQueue = [];
+    this.connectionReady = false;
+    this.lastSequence = 0;
+    this.reconnectAttempts = 0;
+    this.heartbeatInterval = null;
+    this.lastPongTime = Date.now();
+    this.pendingGapRecovery = false;
+    this.outOfOrderBuffer = [];
+    this.intentionallyClosed = false;
+    this.onMessage = null;
+    this.onClose = null;
+    this.onReady = null;
+  }
+
+  async connect() {
+    const ws = new WebSocket(`ws://localhost:${this.port}`);
+    this.ws = ws;
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        ws.close();
+        reject(new Error(`Connection timeout for port ${this.port}`));
+      }, 3000);
+
+      ws.onopen = async () => {
+        clearTimeout(timeout);
+        console.log(`[WebSocketClient] Connected to port ${this.port}`);
+
+        // Load last sequence
+        const storageKey = `mcp_last_sequence_${this.port}`;
+        const result = await chrome.storage.local.get(storageKey);
+        this.lastSequence = result[storageKey] || 0;
+
+        // Send connection_init
+        const initMessage = {
+          type: 'connection_init',
+          lastSequence: this.lastSequence,
+          extensionVersion: chrome.runtime.getManifest().version,
+          capabilities: ['console_capture', 'dom_interaction']
+        };
+
+        try {
+          ws.send(JSON.stringify(initMessage));
+          console.log(`[WebSocketClient] Sent connection_init for port ${this.port}`);
+        } catch (e) {
+          console.error(`[WebSocketClient] Failed to send connection_init:`, e);
+          reject(e);
+          return;
+        }
+
+        ws.onmessage = (event) => this._handleMessage(event);
+        ws.onerror = (error) => console.error(`[WebSocketClient] Error:`, error);
+        resolve();
+      };
+
+      ws.onerror = (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      };
+
+      ws.onclose = () => {
+        clearTimeout(timeout);
+        reject(new Error(`Connection closed for port ${this.port}`));
+      };
+    });
+  }
+
+  async disconnect() {
+    this.intentionallyClosed = true;
+    this._stopHeartbeat();
+
+    if (this.ws) {
+      try {
+        this.ws.close();
+      } catch (e) {
+        console.error(`[WebSocketClient] Error closing WebSocket:`, e);
+      }
+    }
+
+    await this._saveState();
+  }
+
+  async send(message) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN && this.connectionReady) {
+      try {
+        this.ws.send(JSON.stringify(message));
+        return true;
+      } catch (e) {
+        console.error(`[WebSocketClient] Failed to send message:`, e);
+        return false;
+      }
+    } else {
+      this._queueMessage(message);
+      return false;
+    }
+  }
+
+  _queueMessage(message) {
+    this.messageQueue.push(message);
+    if (this.messageQueue.length > MAX_QUEUE_SIZE) {
+      this.messageQueue.shift();
+    }
+  }
+
+  async _handleMessage(event) {
+    try {
+      const data = JSON.parse(event.data);
+
+      if (data.type === 'connection_ack') {
+        await this._handleConnectionAck(data);
+        return;
+      }
+
+      if (data.type === 'pong') {
+        this.lastPongTime = Date.now();
+        return;
+      }
+
+      if (data.type === 'gap_recovery_response') {
+        await this._handleGapRecovery(data);
+        return;
+      }
+
+      if (data.sequence !== undefined) {
+        const shouldProcess = this._checkSequenceGap(data.sequence);
+        if (!shouldProcess) return;
+        this.lastSequence = data.sequence;
+      }
+
+      if (this.onMessage) {
+        this.onMessage(data);
+      }
+    } catch (error) {
+      console.error(`[WebSocketClient] Failed to parse message:`, error);
+    }
+  }
+
+  async _handleConnectionAck(data) {
+    console.log(`[WebSocketClient] Connection acknowledged for port ${this.port}`);
+    this.connectionReady = true;
+
+    if (data.project_id) {
+      this.projectId = data.project_id;
+      this.projectName = data.project_name || this.projectName;
+      this.projectPath = data.project_path || this.projectPath;
+    }
+
+    if (data.replay && Array.isArray(data.replay)) {
+      for (const msg of data.replay) {
+        if (msg.sequence !== undefined && msg.sequence > this.lastSequence) {
+          this.lastSequence = msg.sequence;
+        }
+      }
+    }
+
+    if (data.currentSequence !== undefined) {
+      this.lastSequence = data.currentSequence;
+      await this._saveSequence();
+    }
+
+    this._startHeartbeat();
+    await this._flushMessageQueue();
+
+    if (this.onReady) {
+      this.onReady(data);
+    }
+  }
+
+  async _handleGapRecovery(data) {
+    this.pendingGapRecovery = false;
+    if (data.messages && Array.isArray(data.messages)) {
+      for (const msg of data.messages) {
+        if (msg.sequence !== undefined && msg.sequence > this.lastSequence) {
+          this.lastSequence = msg.sequence;
+        }
+      }
+      await this._saveSequence();
+      this._processBufferedMessages();
+    }
+  }
+
+  _checkSequenceGap(incomingSequence) {
+    if (!GAP_DETECTION_ENABLED || incomingSequence === undefined) {
+      return true;
+    }
+
+    const expectedSequence = this.lastSequence + 1;
+    if (incomingSequence === expectedSequence) return true;
+    if (incomingSequence <= this.lastSequence) return false;
+
+    const gapSize = incomingSequence - expectedSequence;
+    if (gapSize > MAX_GAP_SIZE) return true;
+
+    if (!this.pendingGapRecovery) {
+      this._requestGapRecovery(expectedSequence, incomingSequence - 1);
+    }
+
+    this.outOfOrderBuffer.push({ sequence: incomingSequence });
+    if (this.outOfOrderBuffer.length > 100) {
+      this.outOfOrderBuffer = [];
+      this.pendingGapRecovery = false;
+    }
+
+    return false;
+  }
+
+  _requestGapRecovery(fromSequence, toSequence) {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+
+    this.pendingGapRecovery = true;
+    try {
+      this.ws.send(JSON.stringify({
+        type: 'gap_recovery',
+        fromSequence,
+        toSequence
+      }));
+    } catch (e) {
+      console.error(`[WebSocketClient] Failed to request gap recovery:`, e);
+      this.pendingGapRecovery = false;
+    }
+  }
+
+  _processBufferedMessages() {
+    if (this.outOfOrderBuffer.length === 0) return;
+
+    this.outOfOrderBuffer.sort((a, b) => a.sequence - b.sequence);
+    const stillBuffered = [];
+
+    for (const item of this.outOfOrderBuffer) {
+      if (item.sequence === this.lastSequence + 1) {
+        this.lastSequence = item.sequence;
+      } else if (item.sequence > this.lastSequence + 1) {
+        stillBuffered.push(item);
+      }
+    }
+
+    this.outOfOrderBuffer = stillBuffered;
+  }
+
+  _startHeartbeat() {
+    this._stopHeartbeat();
+
+    this.heartbeatInterval = setInterval(() => {
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        this._stopHeartbeat();
+        return;
+      }
+
+      const timeSinceLastPong = Date.now() - this.lastPongTime;
+      if (timeSinceLastPong > HEARTBEAT_INTERVAL + PONG_TIMEOUT) {
+        console.warn(`[WebSocketClient] Heartbeat timeout - no pong for ${timeSinceLastPong}ms`);
+        this.ws.close();
+        return;
+      }
+
+      try {
+        this.ws.send(JSON.stringify({ type: 'heartbeat', timestamp: Date.now() }));
+      } catch (e) {
+        console.warn(`[WebSocketClient] Heartbeat failed:`, e);
+      }
+    }, HEARTBEAT_INTERVAL);
+  }
+
+  _stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  async _flushMessageQueue() {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+
+    while (this.messageQueue.length > 0) {
+      const message = this.messageQueue.shift();
+      try {
+        this.ws.send(JSON.stringify(message));
+      } catch (e) {
+        console.error(`[WebSocketClient] Failed to send queued message:`, e);
+        this.messageQueue.unshift(message);
+        break;
+      }
+    }
+  }
+
+  async _saveState() {
+    await this._saveSequence();
+    if (this.messageQueue.length > 0) {
+      const queueKey = `mcp_message_queue_${this.port}`;
+      await chrome.storage.local.set({ [queueKey]: this.messageQueue.slice(-MAX_QUEUE_SIZE) });
+    }
+  }
+
+  async _saveSequence() {
+    const storageKey = `mcp_last_sequence_${this.port}`;
+    await chrome.storage.local.set({ [storageKey]: this.lastSequence });
+  }
+}
+
+/**
+ * TabRegistry - Manages tab-to-connection associations
+ */
+class TabRegistry {
+  constructor() {
+    this.tabConnections = new Map(); // tabId -> port
+    this.connectionTabs = new Map(); // port -> Set(tabId)
+    this.pendingTabs = new Map(); // tabId -> { url, awaitingAssignment }
+  }
+
+  assignTab(tabId, port) {
+    const previousPort = this.tabConnections.get(tabId);
+    if (previousPort && previousPort !== port) {
+      const prevTabs = this.connectionTabs.get(previousPort);
+      if (prevTabs) {
+        prevTabs.delete(tabId);
+      }
+    }
+
+    this.tabConnections.set(tabId, port);
+
+    if (!this.connectionTabs.has(port)) {
+      this.connectionTabs.set(port, new Set());
+    }
+    this.connectionTabs.get(port).add(tabId);
+
+    return true;
+  }
+
+  removeTab(tabId) {
+    const port = this.tabConnections.get(tabId);
+    if (port) {
+      const tabs = this.connectionTabs.get(port);
+      if (tabs) {
+        tabs.delete(tabId);
+      }
+      this.tabConnections.delete(tabId);
+    }
+  }
+
+  getPortForTab(tabId) {
+    return this.tabConnections.get(tabId) || null;
+  }
+
+  getTabsForPort(port) {
+    return this.connectionTabs.get(port) || new Set();
+  }
+
+  addPendingTab(tabId, url) {
+    this.pendingTabs.set(tabId, { url, awaitingAssignment: true });
+  }
+
+  removePendingTab(tabId) {
+    this.pendingTabs.delete(tabId);
+  }
+
+  getPendingTabs() {
+    return this.pendingTabs;
+  }
+
+  getPendingCount() {
+    return this.pendingTabs.size;
+  }
+}
+
+/**
+ * MessageRouter - Routes messages between tabs and connections
+ */
+class MessageRouter {
+  constructor(tabRegistry) {
+    this.tabRegistry = tabRegistry;
+    this.unroutedMessages = [];
+  }
+
+  async routeMessage(tabId, message, sendFn) {
+    const port = this.tabRegistry.getPortForTab(tabId);
+    if (!port) {
+      this.unroutedMessages.push({ tabId, message, timestamp: Date.now() });
+      if (this.unroutedMessages.length > 1000) {
+        this.unroutedMessages = this.unroutedMessages.slice(-1000);
+      }
+      return false;
+    }
+
+    const enrichedMessage = {
+      ...message,
+      tabId: tabId,
+      routedAt: Date.now()
+    };
+
+    return await sendFn(port, enrichedMessage);
+  }
+
+  async flushUnroutedMessages(tabId, sendFn) {
+    const messagesToFlush = this.unroutedMessages.filter(item => item.tabId === tabId);
+    if (messagesToFlush.length === 0) return;
+
+    const port = this.tabRegistry.getPortForTab(tabId);
+    if (!port) return;
+
+    for (const { message } of messagesToFlush) {
+      await sendFn(port, message);
+    }
+
+    this.unroutedMessages = this.unroutedMessages.filter(item => item.tabId !== tabId);
+  }
+}
+
+/**
  * ConnectionManager - Manages multiple simultaneous WebSocket connections
- * Supports N connections with per-connection state, heartbeat, and message queuing
+ * Refactored to thin orchestration layer delegating to specialized classes
  */
 class ConnectionManager {
   constructor() {
-    this.connections = new Map(); // port -> connection object
-    this.tabConnections = new Map(); // tabId -> port
-    this.primaryPort = null; // Currently active/primary connection for badge display
-    this.pendingTabs = new Map(); // tabId → { url, awaitingAssignment }
-    this.unroutedMessages = []; // Messages without a backend
-    this.domainPortMap = {}; // domain → port (cached associations)
-    this.urlPatternRules = []; // { pattern: RegExp, port: number }[]
-    this.portSelector = new PortSelector(this); // Smart port selection
+    this.clients = new Map(); // port -> WebSocketClient
+    this.tabRegistry = new TabRegistry();
+    this.messageRouter = new MessageRouter(this.tabRegistry);
+    this.primaryPort = null;
+    this.domainPortMap = {};
+    this.urlPatternRules = [];
+    this.portSelector = new PortSelector(this);
+  }
+
+  // Backward compatibility getters
+  get connections() {
+    const compatMap = new Map();
+    for (const [port, client] of this.clients.entries()) {
+      compatMap.set(port, {
+        ws: client.ws,
+        port: client.port,
+        projectId: client.projectId,
+        projectName: client.projectName,
+        projectPath: client.projectPath,
+        tabs: this.tabRegistry.getTabsForPort(port),
+        messageQueue: client.messageQueue,
+        connectionReady: client.connectionReady,
+        lastSequence: client.lastSequence,
+        reconnectAttempts: client.reconnectAttempts,
+        heartbeatInterval: client.heartbeatInterval,
+        lastPongTime: client.lastPongTime,
+        pendingGapRecovery: client.pendingGapRecovery,
+        outOfOrderBuffer: client.outOfOrderBuffer,
+        intentionallyClosed: client.intentionallyClosed
+      });
+    }
+    return compatMap;
+  }
+
+  get tabConnections() {
+    return this.tabRegistry.tabConnections;
+  }
+
+  get pendingTabs() {
+    return this.tabRegistry.pendingTabs;
+  }
+
+  get unroutedMessages() {
+    return this.messageRouter.unroutedMessages;
+  }
+
+  set unroutedMessages(value) {
+    this.messageRouter.unroutedMessages = value;
   }
 
   /**
    * Create or return existing connection for a port
    * @param {number} port - Port number to connect to
    * @param {Object} projectInfo - Optional project information
-   * @returns {Promise<Object>} Connection object
+   * @returns {Promise<Object>} Connection object (compatibility wrapper)
    */
   async connectToBackend(port, projectInfo = null) {
     console.log(`[ConnectionManager] Connecting to port ${port}...`);
 
     // Check connection limit
-    if (!this.connections.has(port) && this.connections.size >= MAX_CONNECTIONS) {
+    if (!this.clients.has(port) && this.clients.size >= MAX_CONNECTIONS) {
       throw new Error(`Maximum connections (${MAX_CONNECTIONS}) reached`);
     }
 
     // Return existing connection if already connected
-    if (this.connections.has(port)) {
-      const conn = this.connections.get(port);
-      if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
+    if (this.clients.has(port)) {
+      const client = this.clients.get(port);
+      if (client.ws && client.ws.readyState === WebSocket.OPEN) {
         console.log(`[ConnectionManager] Reusing existing connection to port ${port}`);
-        return conn;
+        return this._clientToConnectionCompat(client);
       }
       // Clean up stale connection
       await this.disconnectBackend(port);
     }
 
-    // Create new connection object
-    const connection = {
-      ws: null,
-      port: port,
-      projectId: projectInfo?.project_id || null,
-      projectName: projectInfo?.project_name || projectInfo?.projectName || `Port ${port}`,
-      projectPath: projectInfo?.project_path || projectInfo?.projectPath || '',
-      tabs: new Set(),
-      messageQueue: [],
-      connectionReady: false,
-      lastSequence: 0,
-      reconnectAttempts: 0,
-      heartbeatInterval: null,
-      lastPongTime: Date.now(),
-      pendingGapRecovery: false,
-      outOfOrderBuffer: [],
-      intentionallyClosed: false  // Flag to prevent reconnect on intentional close
-    };
-
     try {
-      // Create WebSocket
-      const ws = new WebSocket(`ws://localhost:${port}`);
-      connection.ws = ws;
+      // Create new WebSocketClient
+      const client = new WebSocketClient(port, projectInfo);
 
-      // Wait for connection to open
-      await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          ws.close();
-          reject(new Error(`Connection timeout for port ${port}`));
-        }, 3000);
+      // Set up event handlers
+      client.onMessage = (data) => this._handleServerMessage(client, data);
+      client.onReady = async (data) => {
+        if (data.project_id) {
+          await updatePortProjectMapping(port, {
+            project_id: data.project_id,
+            project_name: data.project_name,
+            project_path: data.project_path
+          });
+        }
+        updateBadgeStatus();
+        if (this.primaryPort === port) {
+          this._updateGlobalStatus();
+        }
+      };
 
-        ws.onopen = async () => {
-          clearTimeout(timeout);
-          console.log(`[ConnectionManager] WebSocket opened for port ${port}`);
+      // Connect
+      await client.connect();
 
-          // CRITICAL: Set up message handler BEFORE sending any messages
-          // This prevents race conditions where server responses arrive before handler is ready
-          // NOTE: We only set up onmessage here, NOT onclose (that stays as the reject handler until fully connected)
-          this._setupMessageHandler(connection);
+      // Set up close handler with reconnect logic
+      this._setupCloseHandler(client);
 
-          // Load last sequence from storage
-          const storageKey = `mcp_last_sequence_${port}`;
-          const result = await chrome.storage.local.get(storageKey);
-          connection.lastSequence = result[storageKey] || 0;
-
-          // Send connection_init handshake
-          const initMessage = {
-            type: 'connection_init',
-            lastSequence: connection.lastSequence,
-            extensionVersion: chrome.runtime.getManifest().version,
-            capabilities: ['console_capture', 'dom_interaction']
-          };
-
-          try {
-            ws.send(JSON.stringify(initMessage));
-            console.log(`[ConnectionManager] Sent connection_init for port ${port} with lastSequence: ${connection.lastSequence}`);
-          } catch (e) {
-            console.error(`[ConnectionManager] Failed to send connection_init for port ${port}:`, e);
-            reject(e);
-            return;
-          }
-
-          resolve();
-        };
-
-        ws.onerror = (error) => {
-          clearTimeout(timeout);
-          console.error(`[ConnectionManager] Connection error for port ${port}:`, error);
-          reject(error);
-        };
-
-        ws.onclose = () => {
-          clearTimeout(timeout);
-          reject(new Error(`Connection closed for port ${port}`));
-        };
-      });
-
-      // Now set up the full handlers including reconnect logic (after promise resolved)
-      this._setupCloseHandler(connection);
-
-      // Store connection
-      this.connections.set(port, connection);
+      // Store client
+      this.clients.set(port, client);
 
       // Set as primary if it's the first connection
       if (!this.primaryPort) {
@@ -447,13 +851,33 @@ class ConnectionManager {
       // Process any pending tabs waiting for assignment
       await this.processPendingTabs(port);
 
-      console.log(`[ConnectionManager] Successfully connected to port ${port} (${connection.projectName})`);
-      return connection;
+      console.log(`[ConnectionManager] Successfully connected to port ${port} (${client.projectName})`);
+      return this._clientToConnectionCompat(client);
 
     } catch (error) {
       console.error(`[ConnectionManager] Failed to connect to port ${port}:`, error);
       throw error;
     }
+  }
+
+  _clientToConnectionCompat(client) {
+    return {
+      ws: client.ws,
+      port: client.port,
+      projectId: client.projectId,
+      projectName: client.projectName,
+      projectPath: client.projectPath,
+      tabs: this.tabRegistry.getTabsForPort(client.port),
+      messageQueue: client.messageQueue,
+      connectionReady: client.connectionReady,
+      lastSequence: client.lastSequence,
+      reconnectAttempts: client.reconnectAttempts,
+      heartbeatInterval: client.heartbeatInterval,
+      lastPongTime: client.lastPongTime,
+      pendingGapRecovery: client.pendingGapRecovery,
+      outOfOrderBuffer: client.outOfOrderBuffer,
+      intentionallyClosed: client.intentionallyClosed
+    };
   }
 
   /**
@@ -463,59 +887,33 @@ class ConnectionManager {
   async disconnectBackend(port) {
     console.log(`[ConnectionManager] Disconnecting from port ${port}...`);
 
-    const connection = this.connections.get(port);
-    if (!connection) {
+    const client = this.clients.get(port);
+    if (!client) {
       console.log(`[ConnectionManager] No connection found for port ${port}`);
       return;
     }
 
-    // Mark as intentionally closed to prevent auto-reconnect
-    connection.intentionallyClosed = true;
+    // Disconnect client (handles cleanup)
+    await client.disconnect();
 
-    // Stop heartbeat
-    if (connection.heartbeatInterval) {
-      clearInterval(connection.heartbeatInterval);
-      connection.heartbeatInterval = null;
-    }
-
-    // Close WebSocket
-    if (connection.ws) {
-      try {
-        connection.ws.close();
-      } catch (e) {
-        console.error(`[ConnectionManager] Error closing WebSocket for port ${port}:`, e);
-      }
-    }
-
-    // Save last sequence
-    const storageKey = `mcp_last_sequence_${port}`;
-    await chrome.storage.local.set({ [storageKey]: connection.lastSequence });
-
-    // Save message queue if not empty
-    if (connection.messageQueue.length > 0) {
-      const queueKey = `mcp_message_queue_${port}`;
-      await chrome.storage.local.set({ [queueKey]: connection.messageQueue.slice(-MAX_QUEUE_SIZE) });
-    }
-
-    // Clean up storage keys to prevent memory leaks
+    // Clean up storage keys
     await chrome.storage.local.remove([
       `mcp_message_queue_${port}`,
       `mcp_last_sequence_${port}`
     ]);
 
-    // Remove all tab associations
-    for (const [tabId, tabPort] of this.tabConnections.entries()) {
-      if (tabPort === port) {
-        this.tabConnections.delete(tabId);
-      }
+    // Remove tab associations
+    const tabs = this.tabRegistry.getTabsForPort(port);
+    for (const tabId of tabs) {
+      this.tabRegistry.removeTab(tabId);
     }
 
-    // Remove connection
-    this.connections.delete(port);
+    // Remove client
+    this.clients.delete(port);
 
     // Update primary port if this was primary
     if (this.primaryPort === port) {
-      const remainingPorts = Array.from(this.connections.keys());
+      const remainingPorts = Array.from(this.clients.keys());
       this.primaryPort = remainingPorts.length > 0 ? remainingPorts[0] : null;
     }
 
@@ -528,11 +926,10 @@ class ConnectionManager {
    * @returns {Object|null} Connection object or null
    */
   getConnectionForTab(tabId) {
-    const port = this.tabConnections.get(tabId);
-    if (!port) {
-      return null;
-    }
-    return this.connections.get(port) || null;
+    const port = this.tabRegistry.getPortForTab(tabId);
+    if (!port) return null;
+    const client = this.clients.get(port);
+    return client ? this._clientToConnectionCompat(client) : null;
   }
 
   /**
@@ -542,34 +939,17 @@ class ConnectionManager {
    */
   assignTabToConnection(tabId, port) {
     console.log(`[ConnectionManager] assignTabToConnection called: tabId=${tabId}, port=${port}`);
-    console.log(`[ConnectionManager] Available connections:`, Array.from(this.connections.keys()));
+    console.log(`[ConnectionManager] Available connections:`, Array.from(this.clients.keys()));
 
-    const connection = this.connections.get(port);
-    if (!connection) {
+    const client = this.clients.get(port);
+    if (!client) {
       console.warn(`[ConnectionManager] Cannot assign tab ${tabId} to port ${port} - connection not found`);
-      console.warn(`[ConnectionManager] tabConnections Map:`, Array.from(this.tabConnections.entries()));
       return false;
     }
 
-    // Remove from previous connection if exists
-    const previousPort = this.tabConnections.get(tabId);
-    if (previousPort && previousPort !== port) {
-      const prevConn = this.connections.get(previousPort);
-      if (prevConn) {
-        prevConn.tabs.delete(tabId);
-      }
-      console.log(`[ConnectionManager] Removed tab ${tabId} from previous port ${previousPort}`);
-      // Note: We'll show the new border below, no need to hide here
-    }
-
-    // Assign to new connection
-    connection.tabs.add(tabId);
-    this.tabConnections.set(tabId, port);
+    // Use TabRegistry to handle assignment
+    this.tabRegistry.assignTab(tabId, port);
     console.log(`[ConnectionManager] Assigned tab ${tabId} to port ${port}`);
-    console.log(`[ConnectionManager] tabConnections Map after assignment:`, Array.from(this.tabConnections.entries()));
-
-    // NOTE: Border is now shown only during command execution, not on connection
-    // See executeCommandOnTab() for border flash logic
 
     // Update badge for the newly connected tab (if it's active)
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -586,18 +966,9 @@ class ConnectionManager {
    * @param {number} tabId - Tab ID
    */
   removeTab(tabId) {
-    const port = this.tabConnections.get(tabId);
-    if (port) {
-      const connection = this.connections.get(port);
-      if (connection) {
-        connection.tabs.delete(tabId);
-        console.log(`[ConnectionManager] Removed tab ${tabId} from port ${port}`);
-      }
-      this.tabConnections.delete(tabId);
-
-      // Hide control border when tab is disconnected
-      this._sendTabMessage(tabId, { type: 'hide_control_border' });
-    }
+    this.tabRegistry.removeTab(tabId);
+    this._sendTabMessage(tabId, { type: 'hide_control_border' });
+    console.log(`[ConnectionManager] Removed tab ${tabId}`);
   }
 
   /**
@@ -622,13 +993,13 @@ class ConnectionManager {
    * @returns {Promise<boolean>} Success status
    */
   async sendMessage(tabId, message) {
-    const connection = this.getConnectionForTab(tabId);
-    if (!connection) {
+    const port = this.tabRegistry.getPortForTab(tabId);
+    if (!port) {
       console.warn(`[ConnectionManager] No connection found for tab ${tabId}, message queued`);
       return false;
     }
-
-    return this._sendToConnection(connection, message);
+    const client = this.clients.get(port);
+    return client ? await client.send(message) : false;
   }
 
   /**
@@ -638,11 +1009,11 @@ class ConnectionManager {
    */
   async broadcastToAll(message) {
     let successCount = 0;
-    for (const connection of this.connections.values()) {
-      const success = await this._sendToConnection(connection, message);
+    for (const client of this.clients.values()) {
+      const success = await client.send(message);
       if (success) successCount++;
     }
-    console.log(`[ConnectionManager] Broadcast sent to ${successCount}/${this.connections.size} connections`);
+    console.log(`[ConnectionManager] Broadcast sent to ${successCount}/${this.clients.size} connections`);
     return successCount;
   }
 
@@ -651,15 +1022,15 @@ class ConnectionManager {
    * @returns {Array} Array of connection info objects
    */
   getActiveConnections() {
-    return Array.from(this.connections.values()).map(conn => ({
-      port: conn.port,
-      projectId: conn.projectId,
-      projectName: conn.projectName,
-      projectPath: conn.projectPath,
-      tabCount: conn.tabs.size,
-      queueSize: conn.messageQueue.length,
-      ready: conn.connectionReady,
-      isPrimary: conn.port === this.primaryPort
+    return Array.from(this.clients.values()).map(client => ({
+      port: client.port,
+      projectId: client.projectId,
+      projectName: client.projectName,
+      projectPath: client.projectPath,
+      tabCount: this.tabRegistry.getTabsForPort(client.port).size,
+      queueSize: client.messageQueue.length,
+      ready: client.connectionReady,
+      isPrimary: client.port === this.primaryPort
     }));
   }
 
@@ -669,8 +1040,8 @@ class ConnectionManager {
    * @returns {number|null} Port number or null
    */
   getFirstActivePort() {
-    for (const [port, conn] of this.connections) {
-      if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
+    for (const [port, client] of this.clients) {
+      if (client.ws && client.ws.readyState === WebSocket.OPEN) {
         return port;
       }
     }
@@ -687,18 +1058,16 @@ class ConnectionManager {
   async registerTab(tabId, url) {
     console.log(`[ConnectionManager] Registering tab ${tabId} with URL: ${url}`);
 
-    // Use PortSelector for intelligent port selection
     const selectedPort = await this.portSelector.selectPort(tabId, url);
 
     if (selectedPort) {
       // Ensure connection exists
-      if (!this.connections.has(selectedPort)) {
+      if (!this.clients.has(selectedPort)) {
         try {
           await this.connectToBackend(selectedPort);
         } catch (error) {
           console.error(`[ConnectionManager] Failed to connect to selected port ${selectedPort}:`, error);
-          // Mark as pending if connection fails
-          this.pendingTabs.set(tabId, { url, awaitingAssignment: true });
+          this.tabRegistry.addPendingTab(tabId, url);
           this._updatePendingBadge();
           return false;
         }
@@ -725,7 +1094,7 @@ class ConnectionManager {
 
     // No port found - mark as pending
     console.log(`[ConnectionManager] Tab ${tabId} marked as pending assignment (no port available)`);
-    this.pendingTabs.set(tabId, { url, awaitingAssignment: true });
+    this.tabRegistry.addPendingTab(tabId, url);
     this._updatePendingBadge();
     return false;
   }
@@ -795,28 +1164,10 @@ class ConnectionManager {
    * @returns {Promise<boolean>} Success status
    */
   async routeMessage(tabId, message) {
-    const connection = this.getConnectionForTab(tabId);
-
-    if (!connection) {
-      console.warn(`[ConnectionManager] No connection for tab ${tabId}, queueing message`);
-      this.unroutedMessages.push({ tabId, message, timestamp: Date.now() });
-
-      // Enforce max size to prevent memory leak (1000 messages)
-      if (this.unroutedMessages.length > 1000) {
-        this.unroutedMessages = this.unroutedMessages.slice(-1000);
-      }
-
-      return false;
-    }
-
-    // Add routing metadata
-    const enrichedMessage = {
-      ...message,
-      tabId: tabId,
-      routedAt: Date.now()
-    };
-
-    return this._sendToConnection(connection, enrichedMessage);
+    return await this.messageRouter.routeMessage(tabId, message, async (port, msg) => {
+      const client = this.clients.get(port);
+      return client ? await client.send(msg) : false;
+    });
   }
 
   /**
@@ -825,17 +1176,15 @@ class ConnectionManager {
    * @returns {Promise<void>}
    */
   async processPendingTabs(port) {
-    if (this.pendingTabs.size === 0) {
-      return;
-    }
+    const pendingTabs = this.tabRegistry.getPendingTabs();
+    if (pendingTabs.size === 0) return;
 
-    console.log(`[ConnectionManager] Processing ${this.pendingTabs.size} pending tabs for port ${port}`);
+    console.log(`[ConnectionManager] Processing ${pendingTabs.size} pending tabs for port ${port}`);
 
-    for (const [tabId, { url }] of this.pendingTabs.entries()) {
-      // Try to register this tab again
+    for (const [tabId, { url }] of pendingTabs.entries()) {
       const assigned = await this.registerTab(tabId, url);
       if (assigned) {
-        this.pendingTabs.delete(tabId);
+        this.tabRegistry.removePendingTab(tabId);
       }
     }
 
@@ -848,24 +1197,10 @@ class ConnectionManager {
    * @returns {Promise<void>}
    */
   async flushUnroutedMessages(tabId) {
-    const connection = this.getConnectionForTab(tabId);
-    if (!connection) {
-      return;
-    }
-
-    const messagesToFlush = this.unroutedMessages.filter(item => item.tabId === tabId);
-    if (messagesToFlush.length === 0) {
-      return;
-    }
-
-    console.log(`[ConnectionManager] Flushing ${messagesToFlush.length} unrouted messages for tab ${tabId}`);
-
-    for (const { message } of messagesToFlush) {
-      await this._sendToConnection(connection, message);
-    }
-
-    // Remove flushed messages
-    this.unroutedMessages = this.unroutedMessages.filter(item => item.tabId !== tabId);
+    await this.messageRouter.flushUnroutedMessages(tabId, async (port, msg) => {
+      const client = this.clients.get(port);
+      return client ? await client.send(msg) : false;
+    });
   }
 
   /**
@@ -937,10 +1272,10 @@ class ConnectionManager {
    * @private
    */
   _updatePendingBadge() {
-    if (this.pendingTabs.size > 0) {
-      setIconState('yellow', `MCP Browser: ${this.pendingTabs.size} tab(s) awaiting assignment`);
+    const pendingCount = this.tabRegistry.getPendingCount();
+    if (pendingCount > 0) {
+      setIconState('yellow', `MCP Browser: ${pendingCount} tab(s) awaiting assignment`);
     } else {
-      // Restore normal icon state
       this._updateGlobalStatus();
     }
   }
@@ -951,8 +1286,8 @@ class ConnectionManager {
    */
   getConnectionCount() {
     let activeCount = 0;
-    for (const conn of this.connections.values()) {
-      if (conn.ws && conn.ws.readyState === WebSocket.OPEN && conn.connectionReady) {
+    for (const client of this.clients.values()) {
+      if (client.ws && client.ws.readyState === WebSocket.OPEN && client.connectionReady) {
         activeCount++;
       }
     }
@@ -1361,26 +1696,22 @@ class ConnectionManager {
    * @private
    */
   _updateGlobalStatus() {
-    // Update legacy connectionStatus for backward compatibility
-    const primaryConn = this.primaryPort ? this.connections.get(this.primaryPort) : null;
-
-    // Count active connections for badge
+    const primaryClient = this.primaryPort ? this.clients.get(this.primaryPort) : null;
     const activeConnections = this.getConnectionCount();
 
-    if (primaryConn && primaryConn.connectionReady) {
+    if (primaryClient && primaryClient.connectionReady) {
       connectionStatus.connected = true;
-      connectionStatus.port = primaryConn.port;
-      connectionStatus.projectName = primaryConn.projectName;
-      connectionStatus.projectPath = primaryConn.projectPath;
+      connectionStatus.port = primaryClient.port;
+      connectionStatus.projectName = primaryClient.projectName;
+      connectionStatus.projectPath = primaryClient.projectPath;
       connectionStatus.lastError = null;
       extensionState = 'connected';
-    } else if (this.connections.size > 0) {
-      // At least one connection exists
-      const anyConn = Array.from(this.connections.values())[0];
+    } else if (this.clients.size > 0) {
+      const anyClient = Array.from(this.clients.values())[0];
       connectionStatus.connected = true;
-      connectionStatus.port = anyConn.port;
-      connectionStatus.projectName = anyConn.projectName;
-      connectionStatus.projectPath = anyConn.projectPath;
+      connectionStatus.port = anyClient.port;
+      connectionStatus.projectName = anyClient.projectName;
+      connectionStatus.projectPath = anyClient.projectPath;
       extensionState = 'connected';
     } else {
       connectionStatus.connected = false;
@@ -1390,7 +1721,6 @@ class ConnectionManager {
       extensionState = activeServers.size > 0 ? 'idle' : 'idle';
     }
 
-    // Update icon with connection status - green when connected, yellow when idle, red on error
     if (activeConnections > 0) {
       setIconState('green', `MCP Browser: Connected (${activeConnections} connection${activeConnections > 1 ? 's' : ''})`);
     } else if (extensionState === 'error' || connectionStatus.lastError) {
