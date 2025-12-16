@@ -4,7 +4,7 @@ import sys
 
 from rich.console import Console
 
-from ..._version import get_version_info
+from mcp_browser._version import get_version_info
 
 # Create console for rich output
 console = Console()
