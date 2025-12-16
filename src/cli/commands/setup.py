@@ -373,17 +373,23 @@ def install_mcp(force: bool = False) -> bool:
 def start_server_for_setup() -> Optional[int]:
     """Start the server in background for setup.
 
+    Cleans up any duplicate servers for this project before starting.
+
     Returns:
         Port number if started, None if failed
     """
-    from ..utils.daemon import get_server_status, start_daemon
+    from ..utils.daemon import (
+        get_server_status,
+        start_daemon,
+        cleanup_project_servers,
+    )
 
-    # Check if already running
-    is_running, _, port = get_server_status()
-    if is_running:
-        return port
+    project_path = os.getcwd()
 
-    # Start daemon
+    # Clean up ALL servers for this project first (handles duplicates)
+    cleanup_project_servers(project_path)
+
+    # Now start fresh
     success, _, port = start_daemon()
     if success:
         return port
