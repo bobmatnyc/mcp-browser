@@ -121,7 +121,7 @@ class ServiceContainer:
             return factory(**params)
 
         # If it's a function, check if it's async
-        if asyncio.iscoroutinefunction(factory):
+        if inspect.iscoroutinefunction(factory):
             return await factory(self)
         else:
             return factory(self)
@@ -138,8 +138,24 @@ class ServiceContainer:
         Note:
             This should only be used when async is not available.
         """
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(self.get(name))
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running loop, create a new one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(self.get(name))
+            finally:
+                loop.close()
+                asyncio.set_event_loop(None)
+        else:
+            # Loop is running, we can't use run_until_complete
+            # This shouldn't happen in sync context, but handle gracefully
+            raise RuntimeError(
+                "get_sync cannot be called from within a running event loop. "
+                "Use 'await container.get(name)' instead."
+            )
 
     def has(self, name: str) -> bool:
         """Check if a service is registered.
@@ -193,7 +209,7 @@ class ServiceContainer:
                     services[name] = self.get_sync(name)
                 return func(*args, **services, **kwargs)
 
-            if asyncio.iscoroutinefunction(func):
+            if inspect.iscoroutinefunction(func):
                 return async_wrapper
             else:
                 return sync_wrapper

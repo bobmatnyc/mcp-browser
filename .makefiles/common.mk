@@ -80,8 +80,10 @@ TESTS_DIR := tests
 # Check if command exists in PATH
 command-exists = $(shell command -v $(1) 2>/dev/null)
 
-# Get Python binary (prefer python3 over python)
-PYTHON := $(or $(call command-exists,python3),$(call command-exists,python))
+# Get Python binary
+# Priority: 1) .venv/bin/python (if exists), 2) python3, 3) python
+VENV_PYTHON := $(wildcard .venv/bin/python)
+PYTHON := $(or $(VENV_PYTHON),$(call command-exists,python3),$(call command-exists,python))
 
 # Get current version (if VERSION file exists)
 ifneq (,$(wildcard $(VERSION_FILE)))

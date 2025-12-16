@@ -1,16 +1,7 @@
 #!/usr/bin/env python3
 """Test script to verify auto-start functionality."""
 
-import sys
-from pathlib import Path
-
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
-
-from cli.utils.daemon import (  # noqa: E402
-    ensure_server_running,
-    get_server_status,
-)
+from src.cli.utils.daemon import ensure_server_running, get_server_status
 
 
 def test_auto_start():

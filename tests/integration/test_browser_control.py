@@ -86,9 +86,10 @@ async def test_browser_control():
 
             print(f"\n[{datetime.now().strftime('%H:%M:%S')}] === Test Complete ===")
 
-    except websockets.exceptions.ConnectionRefused:
+    except OSError as e:
+        # Connection refused is an OSError in newer websockets versions
         print(
-            f"[{datetime.now().strftime('%H:%M:%S')}] ERROR: Connection refused. Is the server running?"
+            f"[{datetime.now().strftime('%H:%M:%S')}] ERROR: Connection failed ({e}). Is the server running?"
         )
         return False
     except Exception as e:

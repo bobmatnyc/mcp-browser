@@ -7,9 +7,20 @@ installation needs to the py-mcp-installer-service API.
 import shutil
 import sys
 from pathlib import Path
-from typing import Dict, List, Literal, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional
 
-from py_mcp_installer import MCPServerConfig, Platform
+# Optional import - py-mcp-installer may not be installed
+try:
+    from py_mcp_installer import MCPServerConfig, Platform
+
+    HAS_MCP_INSTALLER = True
+except ImportError:
+    HAS_MCP_INSTALLER = False
+    MCPServerConfig = None  # type: ignore
+    Platform = None  # type: ignore
+
+if TYPE_CHECKING:
+    from py_mcp_installer import MCPServerConfig, Platform
 
 
 def detect_installation_type() -> Literal["pipx", "pip", "dev"]:
@@ -101,12 +112,21 @@ def get_command_args(install_type: Optional[str] = None) -> List[str]:
     return ["mcp"]
 
 
-def get_mcp_browser_config() -> MCPServerConfig:
+def get_mcp_browser_config() -> Any:
     """Get the default MCPServerConfig for mcp-browser.
 
     Returns:
         MCPServerConfig with auto-detected command and args
+
+    Raises:
+        ImportError: If py-mcp-installer is not installed
     """
+    if not HAS_MCP_INSTALLER:
+        raise ImportError(
+            "py-mcp-installer is required for this function. "
+            "Install it with: pip install py-mcp-installer"
+        )
+
     install_type = detect_installation_type()
     command = get_command_path()
     args = get_command_args(install_type)
@@ -120,7 +140,7 @@ def get_mcp_browser_config() -> MCPServerConfig:
     )
 
 
-def map_target_to_platforms(target: str) -> List[Platform]:
+def map_target_to_platforms(target: str) -> List[Any]:
     """Map mcp-browser target names to py-mcp-installer Platforms.
 
     Args:
@@ -128,7 +148,16 @@ def map_target_to_platforms(target: str) -> List[Platform]:
 
     Returns:
         List of Platform enums
+
+    Raises:
+        ImportError: If py-mcp-installer is not installed
     """
+    if not HAS_MCP_INSTALLER:
+        raise ImportError(
+            "py-mcp-installer is required for this function. "
+            "Install it with: pip install py-mcp-installer"
+        )
+
     mapping = {
         "claude-code": [Platform.CLAUDE_CODE],
         "claude-desktop": [Platform.CLAUDE_DESKTOP],
@@ -146,7 +175,7 @@ def map_target_to_platforms(target: str) -> List[Platform]:
     return mapping.get(target.lower(), [])
 
 
-def get_platform_display_name(platform: Platform) -> str:
+def get_platform_display_name(platform: Any) -> str:
     """Get user-friendly display name for a platform.
 
     Args:
@@ -154,7 +183,16 @@ def get_platform_display_name(platform: Platform) -> str:
 
     Returns:
         Human-readable platform name
+
+    Raises:
+        ImportError: If py-mcp-installer is not installed
     """
+    if not HAS_MCP_INSTALLER:
+        raise ImportError(
+            "py-mcp-installer is required for this function. "
+            "Install it with: pip install py-mcp-installer"
+        )
+
     names = {
         Platform.CLAUDE_CODE: "Claude Code",
         Platform.CLAUDE_DESKTOP: "Claude Desktop",
