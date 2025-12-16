@@ -2,6 +2,7 @@
 
 import json
 import os
+import platform
 import shutil
 import sys
 from pathlib import Path
@@ -13,7 +14,12 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from ..utils import console
 from ..utils.daemon import get_config_dir
-from ..utils.extension import sync_extension_version
+from ..utils.extension import (
+    check_extension_version_sync,
+    is_chrome_running,
+    open_chrome_extensions_page,
+    sync_extension_version,
+)
 
 
 @click.command()
@@ -108,9 +114,13 @@ def setup(skip_mcp: bool, force: bool):
     # Summary and browser connection prompt
     console.print()
     if steps_completed >= total_steps:
+        # Check if extension versions are synced
+        extension_message = _check_and_handle_extension_reload()
+
         console.print(
             Panel(
                 "[bold green]✓ Setup Complete![/bold green]\n\n"
+                f"{extension_message}"
                 "[bold yellow]→ Install a browser extension:[/bold yellow]\n"
                 "   [bold]Chrome:[/bold]\n"
                 "     1. Open [cyan]chrome://extensions/[/cyan]\n"
@@ -138,6 +148,73 @@ def setup(skip_mcp: bool, force: bool):
                 title="Setup Incomplete",
                 border_style="yellow",
             )
+        )
+
+
+def _check_and_handle_extension_reload() -> str:
+    """Check if Chrome extension needs reload and try to automate it.
+
+    Returns:
+        Message string to display to user about extension reload status
+    """
+    is_synced, version_info = check_extension_version_sync()
+
+    # If all extensions are synced, no action needed
+    if is_synced:
+        return ""
+
+    # Check if Chrome extension needs reload
+    chrome_version = version_info.get("chrome")
+    package_version = version_info.get("package")
+
+    if not chrome_version:
+        # Chrome extension not deployed yet
+        return ""
+
+    if chrome_version == package_version:
+        # Chrome extension is already synced
+        return ""
+
+    # Chrome extension is out of sync - needs reload
+    console.print()
+    console.print(
+        f"[yellow]⚠ Extension version mismatch detected:[/yellow]\n"
+        f"   Package: [cyan]{package_version}[/cyan]\n"
+        f"   Chrome extension: [cyan]{chrome_version}[/cyan]"
+    )
+
+    # Try to automate reload on macOS if Chrome is running
+    if platform.system() == "Darwin" and is_chrome_running():
+        console.print(
+            "\n[dim]Attempting to open Chrome extensions page for reload...[/dim]"
+        )
+
+        if open_chrome_extensions_page():
+            return (
+                "[bold red]⚠ EXTENSION RELOAD REQUIRED[/bold red]\n\n"
+                "[yellow]The Chrome extensions page has been opened.[/yellow]\n"
+                "[yellow]Please click the reload icon (↻) on the MCP Browser extension.[/yellow]\n\n"
+            )
+        else:
+            return (
+                "[bold red]⚠ EXTENSION RELOAD REQUIRED[/bold red]\n\n"
+                "[yellow]Extension files updated but Chrome couldn't be automated.[/yellow]\n"
+                "[yellow]Manually reload:[/yellow]\n"
+                "   1. Open [cyan]chrome://extensions/[/cyan]\n"
+                "   2. Find 'MCP Browser' extension\n"
+                "   3. Click the reload icon (↻)\n\n"
+            )
+    else:
+        # Non-macOS or Chrome not running
+        platform_note = (
+            "" if platform.system() == "Darwin" else " (automation macOS-only)"
+        )
+        return (
+            f"[bold red]⚠ EXTENSION RELOAD REQUIRED{platform_note}[/bold red]\n\n"
+            "[yellow]Extension files updated. Please reload in Chrome:[/yellow]\n"
+            "   1. Open [cyan]chrome://extensions/[/cyan]\n"
+            "   2. Find 'MCP Browser' extension\n"
+            "   3. Click the reload icon (↻)\n\n"
         )
 
 

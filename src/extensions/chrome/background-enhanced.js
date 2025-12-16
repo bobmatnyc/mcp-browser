@@ -467,6 +467,30 @@ class WebSocketClient {
     console.log(`[WebSocketClient] Connection acknowledged for port ${this.port}`);
     this.connectionReady = true;
 
+    // Check for version mismatch
+    if (data.serverVersion) {
+      const extensionVersion = chrome.runtime.getManifest().version;
+      if (extensionVersion !== data.serverVersion) {
+        console.warn(
+          `[WebSocketClient] Version mismatch detected!\n` +
+          `  Extension: ${extensionVersion}\n` +
+          `  Server: ${data.serverVersion}\n` +
+          `  Please reload the extension: chrome://extensions/`
+        );
+
+        // Show notification to user
+        chrome.notifications.create({
+          type: 'basic',
+          iconUrl: 'icons/icon128-yellow.png',
+          title: 'MCP Browser: Extension Reload Required',
+          message: `Extension (v${extensionVersion}) doesn't match server (v${data.serverVersion}). ` +
+                   `Please reload the extension in chrome://extensions/`,
+          priority: 2,
+          requireInteraction: true
+        });
+      }
+    }
+
     if (data.project_id) {
       this.projectId = data.project_id;
       this.projectName = data.project_name || this.projectName;

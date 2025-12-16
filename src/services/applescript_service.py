@@ -573,6 +573,47 @@ Note: Console log capture requires the browser extension.
                 "data": None,
             }
 
+    async def open_chrome_extensions_page(self) -> Dict[str, Any]:
+        """Open chrome://extensions page in Chrome.
+
+        This is useful for prompting users to reload extensions after updates.
+
+        Returns:
+            {"success": bool, "error": str, "data": dict}
+        """
+        if not self.is_macos:
+            return {
+                "success": False,
+                "error": "AppleScript is only available on macOS",
+                "data": None,
+            }
+
+        script = """
+        tell application "Google Chrome"
+            activate
+            if (count of windows) = 0 then
+                make new window
+            end if
+            set URL of active tab of window 1 to "chrome://extensions"
+        end tell
+        """
+
+        result = await self._execute_applescript(script)
+
+        if result["success"]:
+            logger.info("Opened chrome://extensions page")
+            return {
+                "success": True,
+                "error": None,
+                "data": {"message": "Chrome extensions page opened"},
+            }
+        else:
+            return {
+                "success": False,
+                "error": result.get("error", "Unknown error"),
+                "data": None,
+            }
+
     async def _execute_applescript(self, script: str) -> Dict[str, Any]:
         """Execute AppleScript and return result.
 

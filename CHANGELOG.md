@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.44] - 2025-12-16
+
+### Added
+- Setup command now auto-opens Chrome extensions page on macOS when extension version mismatch detected
+  - After `pipx upgrade`, running `mcp-browser setup` detects stale extension versions
+  - On macOS with Chrome running, automatically opens `chrome://extensions/` for easy reload
+  - Shows clear version mismatch warning with reload instructions
+- Extension now shows browser notification when connected to a newer server version
+  - Alerts user to reload extension when server has been upgraded
+
 ## [2.2.43] - 2025-12-16
 
 ### Fixed
