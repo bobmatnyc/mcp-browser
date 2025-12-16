@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.40] - 2025-12-16
+
+### Fixed
+- Setup now cleans up ALL duplicate servers for current project before starting
+  - Previously, running setup multiple times could accumulate orphan servers (e.g., mcp-browser on 8851, 8854)
+  - Added `cleanup_project_servers()` that scans port range 8851-8899 and kills any servers running from the same project directory
+  - Uses `lsof -a -p PID -d cwd -Fn` to detect process working directory for accurate orphan detection
+
 ## [2.2.39] - 2025-12-16
 
 ### Fixed
