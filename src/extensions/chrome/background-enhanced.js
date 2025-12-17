@@ -919,8 +919,8 @@ class ConnectionManager {
         if (this.primaryPort === port) {
           this._updateGlobalStatus();
         }
-        // Show green connection border on the active tab when connected
-        this._showConnectionBorderOnAllTabs();
+        // NOTE: Don't show border on connect - only show when commands are sent
+        // This ensures the border appears only on the actual controlled tab
       };
 
       // Connect
@@ -2300,30 +2300,22 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-// Listen for navigation completion to show border on newly loaded pages
+// Re-show border on the controlled tab after navigation completes
+// This ensures the border persists through form submissions and page loads
 chrome.webNavigation.onCompleted.addListener((details) => {
-  // Only process main frame navigations
+  // Only handle main frame, not iframes
   if (details.frameId !== 0) return;
 
   const tabId = details.tabId;
 
-  // Check if this tab is the controlled tab OR was navigated via a command
-  const shouldShowBorder = (tabId === controlledTabId) || navigatingTabs.has(tabId);
-
-  if (shouldShowBorder) {
-    console.log(`[MCP Browser] Navigation completed for tab ${tabId}, showing connection border (controlled: ${tabId === controlledTabId})`);
-
-    // Small delay to ensure content script is fully loaded
-    setTimeout(() => {
-      chrome.tabs.sendMessage(tabId, { type: 'show_connection_border' }, (response) => {
-        if (chrome.runtime.lastError) {
-          console.debug(`[MCP Browser] Could not show border after navigation on tab ${tabId}:`, chrome.runtime.lastError.message);
-        }
-      });
-
-      // Remove from tracking set if it was there
-      navigatingTabs.delete(tabId);
-    }, 100); // 100ms delay for content script injection
+  // Only show border if this is the controlled tab
+  if (controlledTabId !== null && controlledTabId === tabId) {
+    console.log(`[MCP Browser] Navigation completed on controlled tab ${tabId}, re-showing border`);
+    chrome.tabs.sendMessage(tabId, { type: 'show_connection_border' }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.debug(`[MCP Browser] Could not re-show border on tab ${tabId}:`, chrome.runtime.lastError.message);
+      }
+    });
   }
 });
 
@@ -2817,38 +2809,52 @@ async function autoConnect() {
 function handleServerMessage(data, connection = null) {
   console.log(`[MCP Browser] Handling server message:`, data.type);
 
-  // Find tabs assigned to this connection
-  let targetTabIds = [];
+  const port = connection?.port;
 
-  if (connection) {
-    // Get tabs assigned to this connection's port
-    const port = connection.port;
+  // Strategy: Find the ONE tab that should receive this command
+  // Priority 1: The controlled tab (if still valid and connected)
+  // Priority 2: A tab assigned to this connection's port
+  // Priority 3: The active tab in the last focused window (and assign it)
+
+  // Check if controlledTabId is still valid for this connection
+  if (controlledTabId !== null) {
+    const controlledTabPort = connectionManager.tabConnections.get(controlledTabId);
+    if (controlledTabPort === port || controlledTabPort === undefined) {
+      // controlledTabId is either assigned to this port or unassigned - use it
+      console.log(`[MCP Browser] Using controlled tab ${controlledTabId} for command: ${data.type}`);
+      executeCommandOnTab(controlledTabId, data, connection);
+      return;
+    }
+  }
+
+  // Find a tab assigned to this connection's port
+  if (port) {
     for (const [tabId, tabPort] of connectionManager.tabConnections.entries()) {
       if (tabPort === port) {
-        targetTabIds.push(tabId);
-      }
-    }
-    console.log(`[MCP Browser] Found ${targetTabIds.length} tab(s) assigned to port ${port}:`, targetTabIds);
-  }
-
-  // Fallback to active tab if no tabs assigned to this connection
-  if (targetTabIds.length === 0) {
-    console.warn(`[MCP Browser] No tabs assigned to connection (port ${connection?.port}), falling back to active tab`);
-    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-      const activeTab = tabs[0];
-      if (!activeTab) {
-        console.warn('[MCP Browser] No active tab found for command:', data.type);
+        console.log(`[MCP Browser] Found assigned tab ${tabId} for port ${port}`);
+        executeCommandOnTab(tabId, data, connection);
         return;
       }
-      await executeCommandOnTab(activeTab.id, data, connection);
-    });
-    return;
+    }
   }
 
-  // Execute command on all assigned tabs
-  for (const tabId of targetTabIds) {
-    executeCommandOnTab(tabId, data, connection);
-  }
+  // No assigned tab found - use the active tab in last focused window and assign it
+  console.log(`[MCP Browser] No assigned tab found, using active tab in last focused window`);
+  chrome.tabs.query({ active: true, lastFocusedWindow: true }, async (tabs) => {
+    const activeTab = tabs[0];
+    if (!activeTab) {
+      console.warn('[MCP Browser] No active tab found for command:', data.type);
+      return;
+    }
+
+    // Assign this tab to the connection so future commands go here
+    if (port) {
+      console.log(`[MCP Browser] Assigning active tab ${activeTab.id} to port ${port}`);
+      connectionManager.assignTabToConnection(activeTab.id, port);
+    }
+
+    await executeCommandOnTab(activeTab.id, data, connection);
+  });
 }
 
 /**
@@ -2872,13 +2878,22 @@ async function executeCommandOnTab(tabId, data, connection = null) {
   // This ensures green border persists across all navigations (including form submissions)
   const controlCommands = ['navigate', 'click', 'fill_field', 'scroll', 'dom_command'];
   if (controlCommands.includes(data.type)) {
+    // If switching to a different tab, hide border on the old one first
+    if (controlledTabId !== null && controlledTabId !== tabId) {
+      console.log(`[MCP Browser] Switching control from tab ${controlledTabId} to tab ${tabId}`);
+      chrome.tabs.sendMessage(controlledTabId, { type: 'hide_connection_border' }, (response) => {
+        if (chrome.runtime.lastError) {
+          // Old tab may be closed, ignore error
+        }
+      });
+    }
     controlledTabId = tabId;
     console.log(`[MCP Browser] Tab ${tabId} set as controlled tab`);
   }
 
-  // Show border flash for browser commands (not for passive commands like get_page_content or query_logs)
-  // Note: 'navigate' is excluded here because border will be shown AFTER navigation completes
-  const borderCommands = ['click', 'fill_field', 'scroll'];
+  // Show border for ALL control commands including navigate
+  // Tab targeting has been fixed in handleServerMessage to be reliable
+  const borderCommands = ['navigate', 'click', 'fill_field', 'scroll'];
   const actionCommandTypes = ['click', 'fill', 'submit', 'scroll_to', 'check_checkbox', 'select_option'];
 
   // Check if should show border: either direct command or dom_command with action type
@@ -2886,18 +2901,12 @@ async function executeCommandOnTab(tabId, data, connection = null) {
     (data.type === 'dom_command' && data.command && actionCommandTypes.includes(data.command.type));
 
   if (shouldShowBorder) {
-    // Show persistent green connection border on the controlled tab
+    // Show persistent green connection border on this specific tab
     chrome.tabs.sendMessage(tabId, { type: 'show_connection_border' }, (response) => {
       if (chrome.runtime.lastError) {
         console.debug(`[MCP Browser] Could not show border on tab ${tabId}:`, chrome.runtime.lastError.message);
       }
     });
-  }
-
-  // Special handling for navigation: track tab to show border AFTER navigation completes
-  if (data.type === 'navigate') {
-    navigatingTabs.add(tabId);
-    console.log(`[MCP Browser] Tab ${tabId} marked for post-navigation border`);
   }
 
     switch (data.type) {
