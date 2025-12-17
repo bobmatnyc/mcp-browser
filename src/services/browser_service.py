@@ -60,6 +60,33 @@ class BrowserService:
         # Extract server port from connection_info (listening port for user-facing API)
         server_port = connection_info.get("server_port", client_port)
 
+        # SINGLE-CONNECTION MODE: Disconnect any existing browser connections
+        # Only ONE browser tab should be connected at a time
+        existing_connections = await self.browser_state.get_active_connections()
+        for existing_port, existing_conn in existing_connections.items():
+            if existing_conn.is_active and existing_conn.websocket:
+                logger.info(
+                    f"Disconnecting existing browser connection on port {existing_port} "
+                    f"(new connection from port {client_port})"
+                )
+                try:
+                    # Send disconnect message before closing
+                    await existing_conn.websocket.send(
+                        json.dumps(
+                            {
+                                "type": "disconnect",
+                                "reason": "new_connection",
+                                "message": "Another browser tab has connected",
+                                "timestamp": datetime.now().isoformat(),
+                            }
+                        )
+                    )
+                    await existing_conn.websocket.close()
+                except Exception as e:
+                    logger.warning(
+                        f"Error closing existing connection on port {existing_port}: {e}"
+                    )
+
         # Add connection to state with both ports
         await self.browser_state.add_connection(
             port=client_port,

@@ -406,6 +406,86 @@
     }
   }
 
+  /**
+   * Show persistent green border when WebSocket connection is ACTIVE
+   * Border stays visible the entire time connection is established
+   */
+  function showConnectionBorder() {
+    // Remove any existing connection border first
+    const existingBorder = document.getElementById('mcp-browser-connection-border');
+    if (existingBorder) {
+      return; // Already showing, don't recreate
+    }
+
+    // Create persistent green border for active connection
+    const border = document.createElement('div');
+    border.id = 'mcp-browser-connection-border';
+    border.style.cssText = `
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      border: 8px solid #22c55e;
+      box-shadow: inset 0 0 20px rgba(34, 197, 94, 0.7);
+      pointer-events: none;
+      z-index: 2147483646;
+      box-sizing: border-box;
+      opacity: 1;
+    `;
+    document.body.appendChild(border);
+    console.log('[MCP Browser] Connection border shown (persistent)');
+  }
+
+  /**
+   * Hide persistent green border when WebSocket connection is CLOSED
+   */
+  function hideConnectionBorder() {
+    const border = document.getElementById('mcp-browser-connection-border');
+    if (border && border.parentNode) {
+      border.remove();
+      console.log('[MCP Browser] Connection border hidden');
+    }
+  }
+
+  /**
+   * Show blue border flash when receiving message FROM server (download)
+   * Quick flash animation (~500ms) to indicate incoming message activity
+   */
+  function showDownloadBorder() {
+    // Remove any existing download border first to reset animation
+    const existingBorder = document.getElementById('mcp-browser-download-border');
+    if (existingBorder) {
+      existingBorder.remove();
+    }
+
+    // Create blue border for download activity
+    const border = document.createElement('div');
+    border.id = 'mcp-browser-download-border';
+    border.style.cssText = `
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      border: 8px solid #3b82f6;
+      box-shadow: inset 0 0 20px rgba(59, 130, 246, 0.7);
+      pointer-events: none;
+      z-index: 2147483647;
+      box-sizing: border-box;
+      opacity: 1;
+      transition: opacity 300ms ease-out;
+    `;
+    document.body.appendChild(border);
+    console.log('[MCP Browser] Download border shown');
+
+    // Quick flash - fade out after 200ms, remove after transition completes
+    setTimeout(() => {
+      if (border && border.parentNode) {
+        border.style.opacity = '0';
+        setTimeout(() => {
+          if (border && border.parentNode) {
+            border.remove();
+          }
+        }, 300); // Match transition duration
+      }
+    }, 200); // Brief visibility before fade starts
+  }
+
   // Listen for commands from background
   // Wrap in try-catch to handle extension context invalidation
   try {
@@ -430,6 +510,21 @@
 
           case 'hide_control_border':
             hideControlBorder();
+            sendResponse({ success: true });
+            break;
+
+          case 'show_connection_border':
+            showConnectionBorder();
+            sendResponse({ success: true });
+            break;
+
+          case 'hide_connection_border':
+            hideConnectionBorder();
+            sendResponse({ success: true });
+            break;
+
+          case 'show_download_border':
+            showDownloadBorder();
             sendResponse({ success: true });
             break;
 
@@ -477,14 +572,21 @@
               fillElement.focus();
               fillElement.value = '';
 
-              // Simulate typing for better compatibility
-              for (const char of actualRequest.params.value) {
-                fillElement.value += char;
-                domHelpers.triggerEvent(fillElement, 'input');
-                await new Promise(resolve => setTimeout(resolve, 20));
+              // Set value directly (char-by-char typing causes issues with autocomplete sites like Google)
+              fillElement.value = actualRequest.params.value;
+
+              // Trigger events using native input setter to work with React/Vue
+              const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+              const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+
+              const setter = fillElement.tagName.toLowerCase() === 'textarea' ? nativeTextAreaValueSetter : nativeInputValueSetter;
+              if (setter) {
+                setter.call(fillElement, actualRequest.params.value);
               }
 
-              domHelpers.triggerEvent(fillElement, 'change');
+              // Trigger input and change events
+              fillElement.dispatchEvent(new Event('input', { bubbles: true }));
+              fillElement.dispatchEvent(new Event('change', { bubbles: true }));
               fillElement.blur();
             }
 

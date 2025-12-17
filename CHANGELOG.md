@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Chrome Extension**: Fixed character duplication bug in fill functionality
+  - When filling text fields, characters were being doubled (e.g., "mcp-browser" became "mccpp--bbrroowwsseerr")
+  - Root cause: `chrome.tabs.sendMessage()` was broadcasting to ALL frames, causing multiple content scripts to type simultaneously
+  - Fix: Added `{ frameId: 0 }` option to target only the main frame, preventing duplicate execution in iframes
+  - Affects: `background-enhanced.js` dom_command handler and `_sendTabMessage()` helper
+
 ## [2.2.46] - 2025-12-16
 
 

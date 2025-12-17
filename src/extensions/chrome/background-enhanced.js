@@ -114,6 +114,12 @@ const MAX_CONNECTIONS = 10;
 // Active ports to content scripts for keepalive
 const activePorts = new Map(); // tabId -> port
 
+// Track tabs that are being navigated (for post-navigation border)
+const navigatingTabs = new Set(); // Set of tabIds that should show border after navigation
+
+// Track the currently controlled tab (receives commands from MCP)
+let controlledTabId = null;
+
 // LEGACY: Single connection fallback (deprecated)
 let currentConnection = null;
 let messageQueue = [];
@@ -450,6 +456,27 @@ class WebSocketClient {
     }
   }
 
+  /**
+   * Show border feedback on all active tabs
+   * @param {string} borderType - Border type: 'show_download_border'
+   */
+  _showBorderOnActiveTabs(borderType) {
+    chrome.tabs.query({ active: true }, (tabs) => {
+      if (!tabs || tabs.length === 0) return;
+
+      tabs.forEach(tab => {
+        if (tab.id) {
+          chrome.tabs.sendMessage(tab.id, { type: borderType }, (response) => {
+            // Ignore errors (tab may not have content script)
+            if (chrome.runtime.lastError) {
+              // Silent fail - not all tabs have content script loaded
+            }
+          });
+        }
+      });
+    });
+  }
+
   _queueMessage(message) {
     this.messageQueue.push(message);
     if (this.messageQueue.length > MAX_QUEUE_SIZE) {
@@ -464,6 +491,8 @@ class WebSocketClient {
       // Animate icon for non-heartbeat messages only (avoid excessive visual noise)
       if (data.type !== 'pong' && data.type !== 'heartbeat') {
         animateIconActivity('receive');
+        // Show download border on active tabs
+        this._showBorderOnActiveTabs('show_download_border');
       }
 
       if (data.type === 'connection_ack') {
@@ -890,6 +919,8 @@ class ConnectionManager {
         if (this.primaryPort === port) {
           this._updateGlobalStatus();
         }
+        // Show green connection border on the active tab when connected
+        this._showConnectionBorderOnAllTabs();
       };
 
       // Connect
@@ -1036,7 +1067,8 @@ class ConnectionManager {
    * @private
    */
   _sendTabMessage(tabId, message) {
-    chrome.tabs.sendMessage(tabId, message, (response) => {
+    // Send to main frame only (frameId: 0) to prevent duplicate execution in iframes
+    chrome.tabs.sendMessage(tabId, message, { frameId: 0 }, (response) => {
       if (chrome.runtime.lastError) {
         // Tab might not be ready or doesn't exist - this is normal
         console.debug(`[ConnectionManager] Could not send message to tab ${tabId}:`, chrome.runtime.lastError.message);
@@ -1435,6 +1467,9 @@ class ConnectionManager {
           // Update badge to show connected state
           updateBadgeStatus();
 
+          // NOTE: Connection border removed - now only shown when commands are sent to specific tabs
+          // Border will appear via show_control_border when navigate/click/fill/etc commands are sent
+
           // Update status if this is primary connection
           if (this.primaryPort === port) {
             this._updateGlobalStatus();
@@ -1507,6 +1542,9 @@ class ConnectionManager {
 
       // Update badge to show disconnected state
       updateBadgeStatus();
+
+      // Hide persistent connection border on all tabs
+      this._hideConnectionBorderOnAllTabs();
 
       // Stop heartbeat
       if (connection.heartbeatInterval) {
@@ -1788,6 +1826,57 @@ class ConnectionManager {
     } else {
       setIconState('yellow', 'MCP Browser: Scanning for servers...');
     }
+  }
+
+  /**
+   * Show persistent connection border ONLY on the active focused tab
+   * Called when WebSocket connection is established
+   * @private
+   */
+  _showConnectionBorderOnAllTabs() {
+    // Only show border on the ACTIVE tab in the CURRENT window
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs || tabs.length === 0) return;
+
+      const activeTab = tabs[0]; // Should only be one active tab per window
+      if (activeTab && activeTab.id) {
+        chrome.tabs.sendMessage(activeTab.id, { type: 'show_connection_border' }, (response) => {
+          // Ignore errors (tab may not have content script)
+          if (chrome.runtime.lastError) {
+            // Silent fail - not all tabs have content script loaded
+            console.debug('[ConnectionManager] Could not show connection border on tab:', chrome.runtime.lastError.message);
+          } else {
+            console.log(`[ConnectionManager] Showed connection border on active tab ${activeTab.id}`);
+          }
+        });
+      }
+    });
+  }
+
+  /**
+   * Hide persistent connection border on all tabs
+   * Called when WebSocket connection is closed
+   * @private
+   */
+  _hideConnectionBorderOnAllTabs() {
+    // Clear the controlled tab ID on disconnect
+    controlledTabId = null;
+
+    chrome.tabs.query({}, (tabs) => {
+      if (!tabs || tabs.length === 0) return;
+
+      tabs.forEach(tab => {
+        if (tab.id) {
+          chrome.tabs.sendMessage(tab.id, { type: 'hide_connection_border' }, (response) => {
+            // Ignore errors (tab may not have content script)
+            if (chrome.runtime.lastError) {
+              // Silent fail - not all tabs have content script loaded
+            }
+          });
+        }
+      });
+    });
+    console.log('[ConnectionManager] Sent hide_connection_border to all tabs, cleared controlledTabId');
   }
 }
 
@@ -2198,12 +2287,43 @@ function updateBadgeForTab(tabId) {
 // Listen for tab activation to update badge per-tab
 chrome.tabs.onActivated.addListener((activeInfo) => {
   updateBadgeForTab(activeInfo.tabId);
+
+  // NOTE: Tab switch border removed - border only shows when commands are sent
+  // When a browser command (navigate, click, fill, etc.) is sent to a specific tab,
+  // show_control_border will be sent to THAT tab only (see handleBrowserCommand)
 });
 
 // Listen for tab updates (URL changes) to update badge
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tab.active) {
     updateBadgeForTab(tabId);
+  }
+});
+
+// Listen for navigation completion to show border on newly loaded pages
+chrome.webNavigation.onCompleted.addListener((details) => {
+  // Only process main frame navigations
+  if (details.frameId !== 0) return;
+
+  const tabId = details.tabId;
+
+  // Check if this tab is the controlled tab OR was navigated via a command
+  const shouldShowBorder = (tabId === controlledTabId) || navigatingTabs.has(tabId);
+
+  if (shouldShowBorder) {
+    console.log(`[MCP Browser] Navigation completed for tab ${tabId}, showing connection border (controlled: ${tabId === controlledTabId})`);
+
+    // Small delay to ensure content script is fully loaded
+    setTimeout(() => {
+      chrome.tabs.sendMessage(tabId, { type: 'show_connection_border' }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.debug(`[MCP Browser] Could not show border after navigation on tab ${tabId}:`, chrome.runtime.lastError.message);
+        }
+      });
+
+      // Remove from tracking set if it was there
+      navigatingTabs.delete(tabId);
+    }, 100); // 100ms delay for content script injection
   }
 });
 
@@ -2748,8 +2868,17 @@ async function executeCommandOnTab(tabId, data, connection = null) {
     return;
   }
 
+  // Track this tab as the controlled tab for any control commands
+  // This ensures green border persists across all navigations (including form submissions)
+  const controlCommands = ['navigate', 'click', 'fill_field', 'scroll', 'dom_command'];
+  if (controlCommands.includes(data.type)) {
+    controlledTabId = tabId;
+    console.log(`[MCP Browser] Tab ${tabId} set as controlled tab`);
+  }
+
   // Show border flash for browser commands (not for passive commands like get_page_content or query_logs)
-  const borderCommands = ['navigate', 'click', 'fill_field', 'scroll'];
+  // Note: 'navigate' is excluded here because border will be shown AFTER navigation completes
+  const borderCommands = ['click', 'fill_field', 'scroll'];
   const actionCommandTypes = ['click', 'fill', 'submit', 'scroll_to', 'check_checkbox', 'select_option'];
 
   // Check if should show border: either direct command or dom_command with action type
@@ -2757,14 +2886,36 @@ async function executeCommandOnTab(tabId, data, connection = null) {
     (data.type === 'dom_command' && data.command && actionCommandTypes.includes(data.command.type));
 
   if (shouldShowBorder) {
-    chrome.tabs.sendMessage(tabId, { type: 'show_control_border' }, (response) => {
+    // Show persistent green connection border on the controlled tab
+    chrome.tabs.sendMessage(tabId, { type: 'show_connection_border' }, (response) => {
       if (chrome.runtime.lastError) {
         console.debug(`[MCP Browser] Could not show border on tab ${tabId}:`, chrome.runtime.lastError.message);
       }
     });
   }
 
+  // Special handling for navigation: track tab to show border AFTER navigation completes
+  if (data.type === 'navigate') {
+    navigatingTabs.add(tabId);
+    console.log(`[MCP Browser] Tab ${tabId} marked for post-navigation border`);
+  }
+
     switch (data.type) {
+      case 'disconnect':
+        // Server is disconnecting this client (e.g., another tab connected)
+        console.log(`[MCP Browser] Server requested disconnect: ${data.reason || 'unknown reason'}`);
+        // Hide connection border on this tab
+        chrome.tabs.sendMessage(tabId, { type: 'hide_connection_border' }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.debug(`[MCP Browser] Could not hide border on tab ${tabId}:`, chrome.runtime.lastError.message);
+          }
+        });
+        // Close the WebSocket connection if we have one
+        if (connection && connection.ws) {
+          connection.ws.close();
+        }
+        break;
+
       case 'navigate':
         // Navigate to a URL
         console.log(`[MCP Browser] Navigating to: ${data.url}`);
@@ -3169,7 +3320,8 @@ async function executeCommandOnTab(tabId, data, connection = null) {
         // Forward DOM command to content script
         console.log(`[MCP Browser] Forwarding DOM command: ${data.command?.type} (request ${data.requestId})`);
         try {
-          chrome.tabs.sendMessage(tabId, data, (response) => {
+          // Send to main frame only (frameId: 0) to prevent duplicate execution in iframes
+          chrome.tabs.sendMessage(tabId, data, { frameId: 0 }, (response) => {
             if (chrome.runtime.lastError) {
               console.error(`[MCP Browser] Failed to send DOM command to tab ${tabId}:`, chrome.runtime.lastError.message);
               // Send error response back to server
