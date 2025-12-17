@@ -50,7 +50,7 @@ async function loadDashboard() {
     const currentTab = tabs[0];
 
     // Update UI smoothly (only update changed elements)
-    updateOverallStatus(status);
+    await updateOverallStatus(status);
     if (currentTab) {
       await updateCurrentTabStatus(currentTab.id);
     }
@@ -69,7 +69,7 @@ async function loadDashboard() {
 /**
  * Update overall server status indicators
  */
-function updateOverallStatus(status) {
+async function updateOverallStatus(status) {
   const statusIndicator = document.getElementById('status-indicator');
   const statusText = document.getElementById('status-text');
   const messageCount = document.getElementById('message-count');
@@ -81,20 +81,32 @@ function updateOverallStatus(status) {
     return;
   }
 
+  // Check if current tab is restricted
+  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  const currentTab = tabs[0];
+  const onRestrictedPage = currentTab && isRestrictedPage(currentTab.url);
+
   // Update server connection status
   const activeCount = status.totalConnections || 0;
 
-  // Only update if changed (prevent flashing)
-  const newStatusClass = activeCount > 0 ? 'status-indicator connected' : 'status-indicator disconnected';
-  if (statusIndicator.className !== newStatusClass) {
-    statusIndicator.className = newStatusClass;
+  let newStatusClass;
+  let newStatusText;
+
+  if (activeCount > 0) {
+    newStatusClass = 'status-indicator connected';
+    newStatusText = activeCount === 1 ? 'Server Connected' : `${activeCount} Servers Connected`;
+  } else if (onRestrictedPage) {
+    // On restricted pages, show neutral status instead of "disconnected"
+    newStatusClass = 'status-indicator warning';
+    newStatusText = 'Navigate to a website';
+  } else {
+    newStatusClass = 'status-indicator disconnected';
+    newStatusText = 'Not Connected';
   }
 
-  let newStatusText;
-  if (activeCount > 0) {
-    newStatusText = activeCount === 1 ? 'Server Connected' : `${activeCount} Servers Connected`;
-  } else {
-    newStatusText = 'Server Disconnected';
+  // Only update if changed (prevent flashing)
+  if (statusIndicator.className !== newStatusClass) {
+    statusIndicator.className = newStatusClass;
   }
 
   if (statusText.textContent !== newStatusText) {
@@ -147,9 +159,9 @@ async function updateCurrentTabStatus(tabId) {
     // Check if this is a restricted page
     if (currentTab && isRestrictedPage(currentTab.url)) {
       tabStatusIndicator.className = 'status-indicator warning';
-      tabStatusText.textContent = 'Restricted page';
+      tabStatusText.textContent = 'Browser page';
       if (tabInfoElement) {
-        tabInfoElement.textContent = 'Cannot connect on browser internal pages';
+        tabInfoElement.textContent = 'Navigate to a website to use MCP Browser';
         tabInfoElement.style.display = 'block';
       }
       // Hide disconnect button on restricted pages
