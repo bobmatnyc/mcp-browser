@@ -661,7 +661,8 @@ async def _step_dom_interaction(port: int) -> Optional[str]:
                     if data.get("type") in ("connection_ack", "server_info_response"):
                         continue
 
-                    if data.get("type") == "fill_result":
+                    # Handle both old (fill_result) and new (dom_command_response) formats
+                    if data.get("type") in ("fill_result", "dom_command_response"):
                         success = data.get("success", False)
                         if success:
                             console.print(
