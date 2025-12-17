@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.47] - 2025-12-16
+
+
 ### Fixed
 - **Chrome Extension**: Fixed character duplication bug in fill functionality
   - When filling text fields, characters were being doubled (e.g., "mcp-browser" became "mccpp--bbrroowwsseerr")
