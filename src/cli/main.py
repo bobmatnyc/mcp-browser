@@ -6,6 +6,7 @@ Provides console log capture, navigation control, and screenshot capabilities.
 
 import asyncio
 import json
+import platform
 import sys
 from pathlib import Path
 
@@ -63,6 +64,25 @@ def cli(ctx, version, debug, config):
     For detailed help on any command, use:
       mcp-browser COMMAND --help
     """
+    # Check platform compatibility
+    if platform.system() == "Windows":
+        console.print(
+            Panel.fit(
+                "[bold red]⚠️  Windows Not Supported[/bold red]\n\n"
+                "MCP Browser is not compatible with Windows due to:\n"
+                "  • AppleScript dependencies for browser automation\n"
+                "  • Extension compatibility issues\n\n"
+                "[bold]Supported Platforms:[/bold]\n"
+                "  • macOS (recommended - full AppleScript integration)\n"
+                "  • Linux (Chrome/Chromium/Firefox support)\n\n"
+                "For more information, see:\n"
+                "  [cyan]https://github.com/browserpymcp/mcp-browser[/cyan]",
+                title="Platform Compatibility",
+                border_style="red",
+            )
+        )
+        sys.exit(1)
+
     ctx.ensure_object(dict)
     ctx.obj["debug"] = debug
     ctx.obj["config_file"] = config

@@ -55,9 +55,17 @@ make ext-deploy
 
 ## Requirements
 
+**Supported Platforms:**
+- macOS (recommended - full AppleScript integration)
+- Linux (Chrome/Chromium/Firefox support)
+
+**Not Supported:**
+- Windows (due to AppleScript dependencies and extension compatibility issues)
+
+**Software Requirements:**
 - Python 3.10+
 - Chrome/Chromium (for the extension)
-- Optional (macOS fallback): Automation permissions for AppleScript control
+- Optional (macOS): Automation permissions for AppleScript control
 
 ## Post-install setup
 

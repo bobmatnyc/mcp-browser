@@ -34,10 +34,10 @@ async def check_system_requirements() -> List[Tuple[str, bool, str]]:
         )
     )
 
-    # Chrome/Chromium
+    # Chrome/Chromium (Windows paths included but not checked on unsupported platform)
     chrome_paths = [
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",  # macOS
-        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",  # Windows
+        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",  # Windows (legacy)
         "/usr/bin/google-chrome",  # Linux
         "/usr/bin/chromium",  # Linux Chromium
     ]

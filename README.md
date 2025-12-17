@@ -93,9 +93,18 @@ The project follows a Service-Oriented Architecture (SOA) with dependency inject
 
 ## 📦 Installation
 
+### Platform Support
+**Supported:**
+- macOS (recommended - full AppleScript integration)
+- Linux (Chrome/Chromium/Firefox support)
+
+**Not Supported:**
+- Windows (incompatible due to AppleScript dependencies)
+
 ### Prerequisites
 - **Python 3.10+** (with pip)
 - **Chrome/Chromium** browser
+- **macOS or Linux** operating system
 
 ### Method 1: PyPI Installation (Recommended)
 

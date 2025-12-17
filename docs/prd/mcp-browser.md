@@ -264,15 +264,17 @@ mcp-browser eliminates the friction between browser-based development and AI cod
 **As a developer, I want MCP Browser to work consistently across all my development environments so that I can use it everywhere.**
 
 **Acceptance Criteria:**
-- [ ] Works on Windows, macOS, and Linux
-- [ ] Compatible with Chrome, Firefox, Safari, and Edge
+- [ ] Works on macOS and Linux
+- [ ] Compatible with Chrome, Firefox, Safari (macOS), and Chromium
 - [ ] Supports common development frameworks (React, Vue, Angular, etc.)
 - [ ] Consistent behavior across different Python versions
 
 **Success Metrics:**
-- 100% compatibility with target platforms
+- 100% compatibility with target platforms (macOS, Linux)
 - <5% performance variance across operating systems
 - Zero platform-specific bugs in core functionality
+
+**Note:** Windows is not officially supported due to AppleScript dependencies and extension compatibility issues.
 
 ---
 
