@@ -19,7 +19,7 @@ from ...services import (
 )
 from ...services.dom_interaction_service import DOMInteractionService
 from ...services.storage_service import StorageConfig
-from .validation import CONFIG_FILE, DATA_DIR, LOG_DIR
+from .validation import CONFIG_FILE, LOG_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -56,9 +56,13 @@ class BrowserMCPServer:
         Returns:
             Configuration dictionary
         """
+        # Use project-local data directory by default
+        project_data_dir = Path.cwd() / ".mcp-browser" / "data"
+        project_data_dir.mkdir(parents=True, exist_ok=True)
+
         default_config = {
             "storage": {
-                "base_path": str(DATA_DIR),
+                "base_path": str(project_data_dir),
                 "max_file_size_mb": 50,
                 "retention_days": 7,
             },
@@ -126,12 +130,17 @@ class BrowserMCPServer:
         # Get configuration sections
         storage_config = self.config.get("storage", {})
 
+        # Default to project-local data directory
+        default_data_dir = Path.cwd() / ".mcp-browser" / "data"
+
         # Register storage service with configuration
         self.container.register(
             "storage_service",
             lambda c: StorageService(
                 StorageConfig(
-                    base_path=Path(storage_config.get("base_path", DATA_DIR)),
+                    base_path=Path(
+                        storage_config.get("base_path", str(default_data_dir))
+                    ),
                     max_file_size_mb=storage_config.get("max_file_size_mb", 50),
                     retention_days=storage_config.get("retention_days", 7),
                 )
@@ -405,9 +414,10 @@ class BrowserMCPServer:
 
         # Create simple service instances without full initialization
         storage_config = self.config.get("storage", {})
+        default_data_dir = Path.cwd() / ".mcp-browser" / "data"
         storage = StorageService(
             StorageConfig(
-                base_path=Path(storage_config.get("base_path", DATA_DIR)),
+                base_path=Path(storage_config.get("base_path", str(default_data_dir))),
                 max_file_size_mb=storage_config.get("max_file_size_mb", 50),
                 retention_days=storage_config.get("retention_days", 7),
             )

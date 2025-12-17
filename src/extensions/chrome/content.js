@@ -597,23 +597,57 @@
             break;
 
           case 'submit':
+            // Find form - either from selector or auto-detect
+            let formToSubmit = null;
+            let submitButton = null;
+
             const formElement = domHelpers.getElement(actualRequest.params);
-            if (!formElement) {
-              sendResponse({ success: false, error: 'Form not found' });
+            if (formElement) {
+              // Element found - get its form
+              formToSubmit = formElement.tagName.toLowerCase() === 'form'
+                ? formElement
+                : formElement.closest('form');
+            } else {
+              // No element specified or not found - find first form on page
+              formToSubmit = document.querySelector('form');
+            }
+
+            if (!formToSubmit) {
+              sendResponse({ success: false, error: 'No form found on page' });
               break;
             }
 
-            const form = formElement.tagName.toLowerCase() === 'form'
-              ? formElement
-              : formElement.closest('form');
+            // Try to find and click a submit button for better form handling
+            // Priority: button[type="submit"] > input[type="submit"] > button (any)
+            submitButton = formToSubmit.querySelector('button[type="submit"], input[type="submit"]')
+              || formToSubmit.querySelector('button');
 
-            if (!form) {
-              sendResponse({ success: false, error: 'No form found for element' });
-              break;
+            if (submitButton) {
+              const buttonText = submitButton.textContent?.trim();
+              // CRITICAL: Send response FIRST, then click
+              // Form submission causes page navigation which destroys the content script
+              // context before sendResponse can complete. By sending first, we ensure
+              // the response reaches the background script before navigation.
+              sendResponse({ success: true, method: 'button_click', buttonText, willNavigate: true });
+              // Small delay to ensure response is fully sent before navigation
+              setTimeout(() => {
+                try {
+                  submitButton.click();
+                } catch (e) {
+                  // Page may have started navigating - that's OK
+                }
+              }, 50);
+            } else {
+              // Fallback to form.submit() - same pattern: respond first, then act
+              sendResponse({ success: true, method: 'form_submit', willNavigate: true });
+              setTimeout(() => {
+                try {
+                  formToSubmit.submit();
+                } catch (e) {
+                  // Page may have started navigating - that's OK
+                }
+              }, 50);
             }
-
-            form.submit();
-            sendResponse({ success: true });
             break;
 
           case 'get_element':

@@ -411,8 +411,8 @@ class WebSocketService:
                 await self.send_message(websocket, capabilities_response)
                 return
 
-            # Handle get_logs request
-            if message_type == "get_logs":
+            # Handle get_logs/query_logs request (both message types supported)
+            if message_type in ["get_logs", "query_logs"]:
                 # Try to get logs from registered handler
                 handler = self._message_handlers.get("query_logs")
                 logs = []
@@ -453,6 +453,9 @@ class WebSocketService:
                 "semantic_dom_extracted",
                 "screenshot_captured",
                 "dom_command_response",
+                "tab_info_response",
+                "evaluate_js_response",
+                "error",  # Extension error responses (e.g., no_registered_tab)
             ]
             if message_type in response_messages:
                 logger.info(f"Broadcasting response message: {message_type}")
@@ -480,11 +483,35 @@ class WebSocketService:
                 "extract_content",
                 "extract_semantic_dom",
                 "capture_screenshot",
+                "get_tab_info",
+                "evaluate_js",
             ]
+            # Handle server status query (returns server + extension connection status)
+            if message_type == "get_server_status":
+                # Check if active extension is connected (websockets ServerConnection uses .open property)
+                extension_connected = self._active_extension is not None and getattr(
+                    self._active_extension, "open", True
+                )
+                status_response = {
+                    "type": "server_status_response",
+                    "server_running": True,
+                    "extension_connected": extension_connected,
+                    "port": self._port,
+                    "project_id": self._project_id,
+                    "project_name": self._project_name,
+                    "active_connections": len(self._connections),
+                }
+                await self.send_message(websocket, status_response)
+                return
+
             if message_type in browser_commands:
                 logger.info(f"Broadcasting browser command: {message_type}")
                 # Check if there are other connections besides the sender
+                logger.info(f"Total connections: {len(self._connections)}")
                 other_connections = [c for c in self._connections if c != websocket]
+                logger.info(
+                    f"Other connections (excluding sender): {len(other_connections)}"
+                )
                 if not other_connections:
                     logger.warning(
                         f"No browser extension connected to receive command: {message_type}"
@@ -500,11 +527,12 @@ class WebSocketService:
                     )
                     return
                 # Broadcast to all other connections (browser extensions)
+                logger.info(f"Broadcasting to {len(other_connections)} connections")
                 for conn in other_connections:
                     try:
                         await conn.send(json.dumps(data))
-                        logger.debug(
-                            f"Sent {message_type} command to browser extension"
+                        logger.info(
+                            f"Sent {message_type} command to connection at {conn.remote_address}"
                         )
                     except Exception as e:
                         logger.error(f"Failed to send command to browser: {e}")
@@ -513,6 +541,9 @@ class WebSocketService:
             # Add connection info to data
             data["_websocket"] = websocket
             data["_remote_address"] = websocket.remote_address
+
+            # Debug: Log all incoming message types that aren't response/browser commands
+            logger.info(f"Processing message type: {message_type}")
 
             # Find and call appropriate handler
             handler = self._message_handlers.get(

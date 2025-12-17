@@ -310,7 +310,7 @@ class BrowserService:
         """Query console logs for a port.
 
         Args:
-            port: Port number
+            port: Port number (can be server port or client port)
             last_n: Number of recent messages to return
             level_filter: Optional filter by log levels
 
@@ -319,9 +319,61 @@ class BrowserService:
         """
         messages = []
 
+        # Debug: Log current state
+        logger.info(
+            f"query_logs called with port={port}, buffer_keys={list(self._message_buffer.keys())}, server_port_map={dict(self.browser_state.server_port_map)}"
+        )
+
+        # Translate server_port to client_port if needed
+        # The buffer is keyed by client_port (ephemeral), but queries often use server_port (8851)
+        lookup_port = port
+        if port not in self._message_buffer:
+            # Try to find client_port from server_port_map
+            client_port = self.browser_state.server_port_map.get(port)
+            if client_port and client_port in self._message_buffer:
+                lookup_port = client_port
+                logger.info(
+                    f"Translated server_port {port} to client_port {client_port}"
+                )
+
+        # IMPORTANT: If the translated buffer is empty, search ALL buffers
+        # This handles the case where server_port_map points to a CLI connection
+        # but console messages are stored in the extension's connection buffer
+        if lookup_port not in self._message_buffer or not self._message_buffer.get(
+            lookup_port
+        ):
+            logger.info(
+                f"Buffer for port {lookup_port} is empty, searching all buffers for console messages"
+            )
+            all_messages = []
+            for buf_port, buf in self._message_buffer.items():
+                if buf:
+                    logger.info(
+                        f"Found {len(buf)} messages in buffer for port {buf_port}"
+                    )
+                    all_messages.extend(list(buf))
+            if all_messages:
+                # Return combined messages from all buffers, sorted by timestamp
+                all_messages.sort(
+                    key=lambda m: m.timestamp if hasattr(m, "timestamp") else ""
+                )
+                if level_filter:
+                    all_messages = [
+                        m for m in all_messages if m.matches_filter(level_filter)
+                    ]
+                # Get from storage too if available
+                if self.storage_service:
+                    stored_messages = await self.storage_service.query_messages(
+                        port=port,
+                        last_n=max(0, last_n - len(all_messages)),
+                        level_filter=level_filter,
+                    )
+                    all_messages = stored_messages + all_messages
+                return all_messages[-last_n:] if last_n else all_messages
+
         # Get messages from buffer
-        if port in self._message_buffer:
-            buffer_messages = list(self._message_buffer[port])
+        if lookup_port in self._message_buffer:
+            buffer_messages = list(self._message_buffer[lookup_port])
             for msg in buffer_messages:
                 if msg.matches_filter(level_filter):
                     messages.append(msg)

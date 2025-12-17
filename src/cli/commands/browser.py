@@ -221,18 +221,33 @@ async def _navigate_command(url: str, wait: float, port: Optional[int]):
         result = await client.navigate(url, wait)
 
         if result["success"]:
-            console.print(
-                Panel(
-                    f"[green]✓ Successfully navigated to:[/green]\n{url}",
-                    title="Navigation Complete",
-                    border_style="green",
+            # Wait for page load then verify actual URL
+            await asyncio.sleep(1.5)
+            tab_info = await client.get_tab_info(timeout=3.0)
+
+            if tab_info.get("success"):
+                actual_url = tab_info.get("url", url)
+                title = tab_info.get("title", "")
+                console.print(
+                    Panel(
+                        f"[green]✓ Browser confirmed at:[/green]\n{actual_url}"
+                        + (f"\n[dim]Title: {title}[/dim]" if title else ""),
+                        title="Navigation Complete",
+                        border_style="green",
+                    )
                 )
-            )
+            else:
+                console.print(
+                    Panel(
+                        f"[green]✓ Navigation sent to:[/green]\n{url}\n"
+                        f"[dim](URL verification unavailable)[/dim]",
+                        title="Navigation Complete",
+                        border_style="green",
+                    )
+                )
+
             if wait > 0:
                 console.print(f"[dim]Waited {wait} seconds after navigation[/dim]")
-
-            # Fetch and display skeletal DOM
-            await asyncio.sleep(1.5)  # Give page time to load
             console.print("[dim]Fetching page structure...[/dim]")
             skeletal = await client.get_skeletal_dom()
             # Unwrap nested response for success check

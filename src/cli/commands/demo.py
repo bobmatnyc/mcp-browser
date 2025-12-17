@@ -276,15 +276,34 @@ async def _step_navigate(port: int) -> str:
             progress.update(task, completed=True)
 
         if result["success"]:
-            console.print(
-                Panel(
-                    f"[green]✓ Navigation successful![/green]\n\n"
-                    f"The browser should now be at:\n[cyan]{url}[/cyan]",
-                    title="Navigation Complete",
-                    border_style="green",
+            # Verify actual URL
+            await asyncio.sleep(1.0)  # Wait for page load
+            tab_info = await client.get_tab_info(timeout=3.0)
+            if tab_info.get("success"):
+                actual_url = tab_info.get("url", url)
+                title = tab_info.get("title", "")
+                console.print(
+                    Panel(
+                        f"[green]✓ Navigation successful![/green]\n\n"
+                        f"The browser is now at:\n[cyan]{actual_url}[/cyan]"
+                        + (f"\n[dim]Title: {title}[/dim]" if title else ""),
+                        title="Navigation Complete",
+                        border_style="green",
+                    )
                 )
-            )
-            return url
+                return actual_url
+            else:
+                # Fallback if verification fails
+                console.print(
+                    Panel(
+                        f"[green]✓ Navigation sent![/green]\n\n"
+                        f"Target URL:\n[cyan]{url}[/cyan]\n"
+                        f"[dim](URL verification unavailable)[/dim]",
+                        title="Navigation Complete",
+                        border_style="green",
+                    )
+                )
+                return url
         else:
             console.print(
                 Panel(
@@ -334,8 +353,11 @@ async def _step_console_logs(port: int):
             )
         )
 
-        # Wait for execution
-        await asyncio.sleep(1)
+        # Wait for execution AND buffer flush (content script buffers for 2.5 seconds)
+        console.print(
+            "[dim]Waiting for console log buffer to flush (3 seconds)...[/dim]"
+        )
+        await asyncio.sleep(3)
 
         console.print("[cyan]→ Querying captured logs...[/cyan]")
 
@@ -635,54 +657,189 @@ async def _step_dom_interaction(port: int) -> Optional[str]:
             await asyncio.sleep(2.0)
             console.print("[green]✓ Page loaded[/green]\n")
 
-            console.print("[cyan]→ Demonstrating form filling...[/cyan]")
+            console.print("[cyan]→ Demonstrating form filling (ALL fields)...[/cyan]")
 
-            # Try to fill a form field
-            request_id = f"demo_fill_{int(time.time() * 1000)}"
+            # Define all form fields to fill
+            form_fields = [
+                {
+                    "selector": 'input[name="custname"]',
+                    "value": "MCP Browser Demo User",
+                    "label": "Customer Name",
+                    "action": "fill",
+                },
+                {
+                    "selector": 'input[name="custtel"]',
+                    "value": "555-123-4567",
+                    "label": "Telephone",
+                    "action": "fill",
+                },
+                {
+                    "selector": 'input[name="custemail"]',
+                    "value": "demo@mcpbrowser.test",
+                    "label": "Email",
+                    "action": "fill",
+                },
+                {
+                    "selector": 'input[name="size"][value="medium"]',
+                    "value": None,
+                    "label": "Size (Medium)",
+                    "action": "click",
+                },
+                {
+                    "selector": 'input[name="topping"][value="bacon"]',
+                    "value": None,
+                    "label": "Topping: Bacon",
+                    "action": "click",
+                },
+                {
+                    "selector": 'input[name="topping"][value="cheese"]',
+                    "value": None,
+                    "label": "Topping: Extra Cheese",
+                    "action": "click",
+                },
+                {
+                    "selector": 'input[name="topping"][value="onion"]',
+                    "value": None,
+                    "label": "Topping: Onion",
+                    "action": "click",
+                },
+                {
+                    "selector": 'input[name="delivery"]',
+                    "value": "12:30",
+                    "label": "Delivery Time",
+                    "action": "fill",
+                },
+                {
+                    "selector": 'textarea[name="comments"]',
+                    "value": "Please ring the doorbell twice. Demo by MCP Browser!",
+                    "label": "Comments",
+                    "action": "fill",
+                },
+            ]
+
+            filled_fields = []
+            failed_fields = []
+
+            for field in form_fields:
+                request_id = f"demo_{field['action']}_{int(time.time() * 1000)}"
+
+                if field["action"] == "fill":
+                    await client.websocket.send(
+                        json.dumps(
+                            {
+                                "type": "fill_field",
+                                "requestId": request_id,
+                                "selector": field["selector"],
+                                "value": field["value"],
+                            }
+                        )
+                    )
+                else:  # click for radio/checkbox
+                    await client.websocket.send(
+                        json.dumps(
+                            {
+                                "type": "click",
+                                "requestId": request_id,
+                                "selector": field["selector"],
+                            }
+                        )
+                    )
+
+                # Wait for response
+                try:
+                    for _ in range(5):
+                        response = await asyncio.wait_for(
+                            client.websocket.recv(), timeout=2.0
+                        )
+                        data = json.loads(response)
+
+                        if data.get("type") in (
+                            "connection_ack",
+                            "server_info_response",
+                        ):
+                            continue
+
+                        if data.get("type") in (
+                            "fill_result",
+                            "dom_command_response",
+                            "click_result",
+                        ):
+                            success = data.get("success", False)
+                            if success:
+                                filled_fields.append(field["label"])
+                            else:
+                                failed_fields.append(
+                                    f"{field['label']}: {data.get('error', 'Unknown')}"
+                                )
+                            break
+                except asyncio.TimeoutError:
+                    failed_fields.append(f"{field['label']}: Timeout")
+
+                # Small delay between fields
+                await asyncio.sleep(0.3)
+
+            # Show results
+            if filled_fields:
+                fields_list = "\n".join([f"  ✓ {f}" for f in filled_fields])
+                console.print(
+                    Panel(
+                        f"[green]✓ Form fields filled successfully![/green]\n\n{fields_list}",
+                        title="Form Interaction",
+                        border_style="green",
+                    )
+                )
+
+            if failed_fields:
+                errors_list = "\n".join([f"  ✗ {f}" for f in failed_fields])
+                console.print(
+                    f"[yellow]⚠ Some fields could not be filled:[/yellow]\n{errors_list}"
+                )
+
+            # Submit the form
+            console.print("\n[cyan]→ Submitting form...[/cyan]")
+            request_id = f"demo_submit_{int(time.time() * 1000)}"
             await client.websocket.send(
                 json.dumps(
                     {
-                        "type": "fill_field",
+                        "type": "dom_command",
                         "requestId": request_id,
-                        "selector": 'input[name="custname"]',
-                        "value": "MCP Browser Demo User",
+                        "command": {
+                            "type": "submit",
+                            "params": {},  # No selector needed - will auto-detect form and submit button
+                        },
                     }
                 )
             )
 
-            # Wait for response
             try:
-                for _ in range(3):
+                for _ in range(5):
                     response = await asyncio.wait_for(
-                        client.websocket.recv(), timeout=2.0
+                        client.websocket.recv(), timeout=3.0
                     )
                     data = json.loads(response)
 
                     if data.get("type") in ("connection_ack", "server_info_response"):
                         continue
 
-                    # Handle both old (fill_result) and new (dom_command_response) formats
-                    if data.get("type") in ("fill_result", "dom_command_response"):
-                        success = data.get("success", False)
-                        if success:
-                            console.print(
-                                Panel(
-                                    "[green]✓ Form field filled successfully![/green]\n\n"
-                                    "Filled customer name field with 'MCP Browser Demo User'",
-                                    title="Form Interaction",
-                                    border_style="green",
-                                )
-                            )
+                    if data.get("type") == "dom_command_response":
+                        # Response is nested: data.response contains the actual result
+                        result = data.get("response", data)
+                        if result.get("success"):
+                            method = result.get("method", "submit")
+                            button_text = result.get("buttonText", "")
+                            msg = f"[green]✓ Form submitted using {method}!"
+                            if button_text:
+                                msg += f" (Button: '{button_text}')"
+                            msg += "[/green]"
+                            console.print(msg)
                         else:
-                            error = data.get("error", "Unknown error")
                             console.print(
-                                f"[yellow]⚠ Could not fill form: {error}[/yellow]\n"
-                                "[dim]Make sure you're on httpbin.org/forms/post[/dim]"
+                                f"[yellow]⚠ Submit failed: {result.get('error')}[/yellow]"
                             )
                         break
             except asyncio.TimeoutError:
                 console.print(
-                    "[yellow]⚠ Timeout waiting for form fill response[/yellow]"
+                    "[yellow]⚠ Submit timeout (form may have submitted)[/yellow]"
                 )
 
         else:

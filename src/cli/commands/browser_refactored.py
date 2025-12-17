@@ -134,11 +134,22 @@ class NavigateHandler(InteractiveCommandHandler):
         url = parts[1]
         result = await client.navigate(url, wait=0)
 
-        # Wait briefly for page to load, then fetch skeletal DOM
+        # Wait briefly for page to load, then verify URL and fetch skeletal DOM
         if result.get("success"):
             import asyncio
 
             await asyncio.sleep(1.5)  # Give page time to load
+
+            # Verify actual URL matches expected
+            tab_info = await client.get_tab_info(timeout=5.0)
+            if tab_info.get("success"):
+                result["verified_url"] = tab_info.get("url")
+                result["page_title"] = tab_info.get("title")
+                result["page_status"] = tab_info.get("status")
+            else:
+                result["verified_url"] = None
+                result["verification_error"] = tab_info.get("error")
+
             result["skeletal_dom"] = await client.get_skeletal_dom()
 
         return result
@@ -147,7 +158,19 @@ class NavigateHandler(InteractiveCommandHandler):
         parts = kwargs.get("parts", [])
         url = parts[1] if len(parts) > 1 else "unknown"
         if result["success"]:
-            console.print(f"[green]✓ Navigated to {url}[/green]")
+            verified_url = result.get("verified_url")
+            page_title = result.get("page_title")
+
+            if verified_url:
+                console.print(f"[green]✓ Browser confirmed at:[/green] {verified_url}")
+                if page_title:
+                    console.print(f"[dim]  Title: {page_title}[/dim]")
+            else:
+                console.print(f"[yellow]✓ Navigation sent to {url}[/yellow]")
+                if result.get("verification_error"):
+                    console.print(
+                        f"[dim]  (URL verification unavailable: {result.get('verification_error')})[/dim]"
+                    )
 
             # Display skeletal DOM if available
             skeletal_dom = result.get("skeletal_dom")

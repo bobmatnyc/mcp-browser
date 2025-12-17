@@ -38,14 +38,18 @@ const STATUS_COLORS = {
 /**
  * Set extension icon state based on connection status
  * Replaces badge-based status with colored icons
- * @param {string} state - Icon state: 'yellow' (inactive), 'green' (connected), or 'red' (error)
+ * @param {string} state - Icon state:
+ *   'outline' - Extension loaded, no server connection
+ *   'yellow' - Server connected, but current tab NOT connected (click Connect in popup)
+ *   'green' - Tab connected, can process commands from server
+ *   'red' - Error state
  * @param {string} titleText - Optional custom title text for the icon
  */
 function setIconState(state, titleText) {
-  const validStates = ['yellow', 'green', 'red'];
+  const validStates = ['outline', 'yellow', 'green', 'red'];
   if (!validStates.includes(state)) {
     console.error(`[MCP Browser] Invalid icon state: ${state}`);
-    state = 'yellow'; // Default to yellow on invalid state
+    state = 'outline'; // Default to outline on invalid state
   }
 
   const iconPath = {
@@ -62,6 +66,28 @@ function setIconState(state, titleText) {
   }
 
   console.log(`[MCP Browser] Icon state changed to: ${state}${titleText ? ` (${titleText})` : ''}`);
+
+  // STRICT BORDER RULE: Only show border on CONTROLLED tab when green
+  // Non-controlled tabs should show NO signals (borders, flashes) even if server connected
+  if (state === 'green' && controlledTabId !== null) {
+    // Show green border ONLY on the controlled tab
+    chrome.tabs.sendMessage(controlledTabId, { type: 'show_connection_border' }, () => {
+      if (chrome.runtime.lastError) { /* tab may not have content script */ }
+    });
+  } else {
+    // Hide green border on all tabs (yellow, red, or no controlled tab = not connected)
+    chrome.tabs.query({}, (tabs) => {
+      if (tabs) {
+        tabs.forEach(tab => {
+          if (tab.id) {
+            chrome.tabs.sendMessage(tab.id, { type: 'hide_connection_border' }, () => {
+              if (chrome.runtime.lastError) { /* ignore */ }
+            });
+          }
+        });
+      }
+    });
+  }
 }
 
 /**
@@ -369,6 +395,7 @@ class WebSocketClient {
     this.onMessage = null;
     this.onClose = null;
     this.onReady = null;
+    this.onRejected = null;
   }
 
   async connect() {
@@ -457,23 +484,19 @@ class WebSocketClient {
   }
 
   /**
-   * Show border feedback on all active tabs
+   * Show border feedback ONLY on the controlled tab
+   * Non-controlled tabs should show NO signals
    * @param {string} borderType - Border type: 'show_download_border'
    */
   _showBorderOnActiveTabs(borderType) {
-    chrome.tabs.query({ active: true }, (tabs) => {
-      if (!tabs || tabs.length === 0) return;
+    // STRICT: Only show borders on the CONTROLLED tab
+    if (controlledTabId === null) return;
 
-      tabs.forEach(tab => {
-        if (tab.id) {
-          chrome.tabs.sendMessage(tab.id, { type: borderType }, (response) => {
-            // Ignore errors (tab may not have content script)
-            if (chrome.runtime.lastError) {
-              // Silent fail - not all tabs have content script loaded
-            }
-          });
-        }
-      });
+    chrome.tabs.sendMessage(controlledTabId, { type: borderType }, (response) => {
+      // Ignore errors (tab may not have content script)
+      if (chrome.runtime.lastError) {
+        // Silent fail - tab may not have content script loaded
+      }
     });
   }
 
@@ -502,6 +525,31 @@ class WebSocketClient {
 
       if (data.type === 'pong') {
         this.lastPongTime = Date.now();
+        return;
+      }
+
+      // Handle server rejection (single-extension mode)
+      if (data.type === 'connection_rejected') {
+        console.warn(`[WebSocketClient] Connection rejected: ${data.reason} - ${data.message}`);
+
+        // Show notification to user
+        chrome.notifications.create({
+          type: 'basic',
+          iconUrl: 'icons/icon128-yellow.png',
+          title: 'MCP Browser: Connection Rejected',
+          message: data.message || 'Another extension is already connected. Disconnect it first.',
+          priority: 2
+        });
+
+        // Hide connection borders on all tabs
+        if (this.onRejected) {
+          this.onRejected(data);
+        }
+
+        // Close the connection (server will close too, but clean up)
+        if (this.ws) {
+          this.ws.close();
+        }
         return;
       }
 
@@ -921,6 +969,27 @@ class ConnectionManager {
         }
         // NOTE: Don't show border on connect - only show when commands are sent
         // This ensures the border appears only on the actual controlled tab
+      };
+
+      // Handle rejection (another extension is already connected)
+      client.onRejected = async (data) => {
+        console.log(`[ConnectionManager] Connection to port ${port} was rejected: ${data.reason}`);
+        // Hide any connection borders that may have been shown
+        this._hideConnectionBorderOnAllTabs();
+        // Remove client from registry
+        this.clients.delete(port);
+        // Reset primary port if this was it
+        if (this.primaryPort === port) {
+          this.primaryPort = null;
+          // Find another client to be primary
+          for (const [otherPort] of this.clients) {
+            this.primaryPort = otherPort;
+            break;
+          }
+        }
+        // Update icon to yellow (not connected)
+        this._updateGlobalStatus();
+        updateBadgeStatus();
       };
 
       // Connect
@@ -2251,6 +2320,11 @@ function updateBadgeStatus() {
 
 /**
  * Update icon for a specific tab
+ * Icon states represent connection hierarchy:
+ *   OUTLINE: Extension loaded, no server connection
+ *   YELLOW: Server connected, but tab not connected (need to click Connect)
+ *   GREEN: Tab connected - ONLY state that can process server commands
+ *   RED: Error state
  * @param {number} tabId - The tab ID to check connection status for
  */
 function updateBadgeForTab(tabId) {
@@ -2266,21 +2340,25 @@ function updateBadgeForTab(tabId) {
   // Tab is connected if it has an assigned port with an active WebSocket
   const isTabConnected = connection && connection.ws && connection.ws.readyState === WebSocket.OPEN;
 
-  console.log(`[MCP Browser] updateBadgeForTab: tabId=${tabId}, assignedPort=${assignedPort}, isConnected=${isTabConnected}`);
+  // Check if any server connections exist
+  const hasServerConnections = connectionManager.connections.size > 0;
+  const hasAvailableServers = connectionStatus.availableServers.length > 0;
+
+  console.log(`[MCP Browser] updateBadgeForTab: tabId=${tabId}, assignedPort=${assignedPort}, isTabConnected=${isTabConnected}, hasServers=${hasServerConnections || hasAvailableServers}`);
 
   if (isTabConnected) {
-    // GREEN: This tab is connected to a backend
+    // GREEN: This tab is connected to a backend - can process commands
     const projectName = connection.projectName || 'Unknown';
     setIconState('green', `MCP Browser: Connected to ${projectName}`);
-  } else if (connectionManager.connections.size > 0 || connectionStatus.availableServers.length > 0) {
-    // YELLOW: Backends available but this tab is not connected
-    setIconState('yellow', 'MCP Browser: Backends available (tab not connected)');
+  } else if (hasServerConnections || hasAvailableServers) {
+    // YELLOW: Server connected but this tab is not - need to click Connect
+    setIconState('yellow', 'MCP Browser: Server available (click Connect)');
   } else if (extensionState === 'scanning') {
-    // YELLOW: Scanning for servers
+    // YELLOW: Actively scanning for servers
     setIconState('yellow', 'MCP Browser: Scanning for servers...');
   } else {
-    // YELLOW: Idle, no backends
-    setIconState('yellow', 'MCP Browser: No backends available');
+    // OUTLINE: No servers, extension just loaded
+    setIconState('outline', 'MCP Browser: No servers found');
   }
 }
 
@@ -2288,9 +2366,14 @@ function updateBadgeForTab(tabId) {
 chrome.tabs.onActivated.addListener((activeInfo) => {
   updateBadgeForTab(activeInfo.tabId);
 
-  // NOTE: Tab switch border removed - border only shows when commands are sent
-  // When a browser command (navigate, click, fill, etc.) is sent to a specific tab,
-  // show_control_border will be sent to THAT tab only (see handleBrowserCommand)
+  // STRICT BORDER RULE: Only show border on the CONTROLLED tab (green icon state)
+  // Non-controlled tabs should show NO signals (even if server is connected)
+  if (controlledTabId !== null && activeInfo.tabId === controlledTabId) {
+    // This is the controlled tab becoming active - show border
+    chrome.tabs.sendMessage(activeInfo.tabId, { type: 'show_connection_border' }, () => {
+      if (chrome.runtime.lastError) { /* tab may not have content script */ }
+    });
+  }
 });
 
 // Listen for tab updates (URL changes) to update badge
@@ -2300,21 +2383,19 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-// Re-show border on the controlled tab after navigation completes
-// This ensures the border persists through form submissions and page loads
+// Re-show border after navigation completes on the CONTROLLED tab only
+// STRICT BORDER RULE: Only the controlled tab gets a border
 chrome.webNavigation.onCompleted.addListener((details) => {
   // Only handle main frame, not iframes
   if (details.frameId !== 0) return;
 
   const tabId = details.tabId;
 
-  // Only show border if this is the controlled tab
-  if (controlledTabId !== null && controlledTabId === tabId) {
-    console.log(`[MCP Browser] Navigation completed on controlled tab ${tabId}, re-showing border`);
-    chrome.tabs.sendMessage(tabId, { type: 'show_connection_border' }, (response) => {
-      if (chrome.runtime.lastError) {
-        console.debug(`[MCP Browser] Could not re-show border on tab ${tabId}:`, chrome.runtime.lastError.message);
-      }
+  // STRICT: Only show border if this is the CONTROLLED tab
+  // Non-controlled tabs should show NO signals
+  if (controlledTabId !== null && tabId === controlledTabId) {
+    chrome.tabs.sendMessage(tabId, { type: 'show_connection_border' }, () => {
+      if (chrome.runtime.lastError) { /* ignore */ }
     });
   }
 });
@@ -2838,23 +2919,25 @@ function handleServerMessage(data, connection = null) {
     }
   }
 
-  // No assigned tab found - use the active tab in last focused window and assign it
-  console.log(`[MCP Browser] No assigned tab found, using active tab in last focused window`);
-  chrome.tabs.query({ active: true, lastFocusedWindow: true }, async (tabs) => {
-    const activeTab = tabs[0];
-    if (!activeTab) {
-      console.warn('[MCP Browser] No active tab found for command:', data.type);
-      return;
-    }
+  // NO BOOTSTRAP - Strict tab connection required
+  // Only tabs that have been explicitly connected via the popup can receive commands
+  // This ensures the icon state (GREEN) matches command processing capability
 
-    // Assign this tab to the connection so future commands go here
-    if (port) {
-      console.log(`[MCP Browser] Assigning active tab ${activeTab.id} to port ${port}`);
-      connectionManager.assignTabToConnection(activeTab.id, port);
-    }
+  // STRICT MODE: Tab must be explicitly connected via popup to receive commands
+  // User must click extension icon and "Connect" button to register the current tab
+  // This ensures icon state (GREEN) accurately reflects command processing capability
+  console.warn(`[MCP Browser] No registered tab for this connection - commands blocked`);
+  console.warn(`[MCP Browser] User must click extension popup to register the active tab`);
 
-    await executeCommandOnTab(activeTab.id, data, connection);
-  });
+  // Send error back to CLI/server
+  if (connection && connection.ws && connection.ws.readyState === WebSocket.OPEN) {
+    connection.ws.send(JSON.stringify({
+      type: 'error',
+      error: 'no_registered_tab',
+      message: 'No tab registered for control. Click the MCP Browser extension icon to register the current tab.',
+      command: data.type
+    }));
+  }
 }
 
 /**
@@ -2928,14 +3011,48 @@ async function executeCommandOnTab(tabId, data, connection = null) {
       case 'navigate':
         // Navigate to a URL
         console.log(`[MCP Browser] Navigating to: ${data.url}`);
-        chrome.tabs.update(tabId, { url: data.url });
+        chrome.tabs.update(tabId, { url: data.url }, async () => {
+          // Auto-register this tab for the backend port so console logs get routed correctly
+          // This ensures that when we navigate via command, subsequent console logs from
+          // this tab will be sent to the same backend that sent the navigate command
+          if (connection && connection.port) {
+            connectionManager.tabRegistry.assignTab(tabId, connection.port);
+            console.log(`[MCP Browser] Auto-registered tab ${tabId} to port ${connection.port} after navigate`);
+            // Flush any unrouted messages for this tab
+            await connectionManager.flushUnroutedMessages(tabId);
+          }
+        });
+        break;
+
+      case 'get_tab_info':
+        // Return current tab info (URL, title, etc.) for verification
+        console.log(`[MCP Browser] Getting tab info for tab ${tabId}`);
+        chrome.tabs.get(tabId, (tab) => {
+          if (chrome.runtime.lastError) {
+            console.error('[MCP Browser] Failed to get tab info:', chrome.runtime.lastError);
+            return;
+          }
+          // Send tab info back to server
+          const tabInfo = {
+            type: 'tab_info_response',
+            tabId: tabId,
+            url: tab.url,
+            title: tab.title,
+            status: tab.status,
+            timestamp: new Date().toISOString()
+          };
+          if (connection && connection.ws && connection.ws.readyState === WebSocket.OPEN) {
+            connection.ws.send(JSON.stringify(tabInfo));
+            console.log(`[MCP Browser] Sent tab info: ${tab.url}`);
+          }
+        });
         break;
 
       case 'click':
         // Click an element
         console.log(`[MCP Browser] Clicking: ${data.selector}`);
         try {
-          await chrome.scripting.executeScript({
+          const clickResults = await chrome.scripting.executeScript({
             target: { tabId: tabId },
             func: (selector) => {
               const element = document.querySelector(selector);
@@ -2947,8 +3064,28 @@ async function executeCommandOnTab(tabId, data, connection = null) {
             },
             args: [data.selector]
           });
+          // Send response back to server
+          const clickResult = clickResults?.[0]?.result || { success: false, error: 'Script execution failed' };
+          if (connection && connection.ws && connection.ws.readyState === WebSocket.OPEN) {
+            connection.ws.send(JSON.stringify({
+              type: 'dom_command_response',
+              requestId: data.requestId,
+              success: clickResult.success,
+              error: clickResult.error,
+              selector: data.selector
+            }));
+            console.log(`[MCP Browser] Sent click response: ${clickResult.success}`);
+          }
         } catch (e) {
           console.error('[MCP Browser] Click failed:', e);
+          if (connection && connection.ws && connection.ws.readyState === WebSocket.OPEN) {
+            connection.ws.send(JSON.stringify({
+              type: 'dom_command_response',
+              requestId: data.requestId,
+              success: false,
+              error: e.message
+            }));
+          }
         }
         break;
 
@@ -2956,7 +3093,7 @@ async function executeCommandOnTab(tabId, data, connection = null) {
         // Fill a text field
         console.log(`[MCP Browser] Filling field: ${data.selector} with value`);
         try {
-          await chrome.scripting.executeScript({
+          const fillResults = await chrome.scripting.executeScript({
             target: { tabId: tabId },
             func: (selector, value) => {
               const element = document.querySelector(selector);
@@ -2972,8 +3109,29 @@ async function executeCommandOnTab(tabId, data, connection = null) {
             },
             args: [data.selector, data.value]
           });
+          // Send response back to server
+          const fillResult = fillResults?.[0]?.result || { success: false, error: 'Script execution failed' };
+          if (connection && connection.ws && connection.ws.readyState === WebSocket.OPEN) {
+            connection.ws.send(JSON.stringify({
+              type: 'dom_command_response',
+              requestId: data.requestId,
+              success: fillResult.success,
+              error: fillResult.error,
+              selector: data.selector
+            }));
+            console.log(`[MCP Browser] Sent fill_field response: ${fillResult.success}`);
+          }
         } catch (e) {
           console.error('[MCP Browser] Fill field failed:', e);
+          // Send error response
+          if (connection && connection.ws && connection.ws.readyState === WebSocket.OPEN) {
+            connection.ws.send(JSON.stringify({
+              type: 'dom_command_response',
+              requestId: data.requestId,
+              success: false,
+              error: e.message
+            }));
+          }
         }
         break;
 
@@ -2996,6 +3154,88 @@ async function executeCommandOnTab(tabId, data, connection = null) {
           });
         } catch (e) {
           console.error('[MCP Browser] Scroll failed:', e);
+        }
+        break;
+
+      case 'evaluate_js':
+        // Execute arbitrary JavaScript in the page's MAIN world
+        // This ensures console.log calls are captured by the content script's console interceptor
+        console.log(`[MCP Browser] Evaluating JS in MAIN world:`, data.code?.substring(0, 100));
+        try {
+          const evalResults = await chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            world: 'MAIN',  // Run in page's main world so console capture works
+            func: (code) => {
+              try {
+                // Capture console output during eval
+                const capturedLogs = [];
+                const originalConsole = {
+                  log: console.log,
+                  info: console.info,
+                  warn: console.warn,
+                  error: console.error
+                };
+
+                // Temporarily wrap console to capture output
+                ['log', 'info', 'warn', 'error'].forEach(method => {
+                  console[method] = function(...args) {
+                    capturedLogs.push({ level: method, message: args.map(a => String(a)).join(' ') });
+                    originalConsole[method].apply(console, args);
+                  };
+                });
+
+                // Execute the code
+                const result = eval(code);
+
+                // Restore original console
+                Object.assign(console, originalConsole);
+
+                return { success: true, result: String(result), capturedLogs };
+              } catch (e) {
+                return { success: false, error: e.message };
+              }
+            },
+            args: [data.code]
+          });
+          const evalResult = evalResults?.[0]?.result || { success: false, error: 'Script execution failed' };
+
+          // Send captured logs as a batch message
+          if (evalResult.capturedLogs && evalResult.capturedLogs.length > 0 && connection && connection.ws && connection.ws.readyState === WebSocket.OPEN) {
+            const batchMessage = {
+              type: 'batch',
+              messages: evalResult.capturedLogs.map(log => ({
+                level: log.level,
+                message: log.message,
+                timestamp: new Date().toISOString(),
+                url: `eval:${tabId}`
+              })),
+              url: `eval:${tabId}`,
+              timestamp: new Date().toISOString()
+            };
+            connection.ws.send(JSON.stringify(batchMessage));
+            console.log(`[MCP Browser] Sent ${evalResult.capturedLogs.length} captured console logs from eval`);
+          }
+
+          if (connection && connection.ws && connection.ws.readyState === WebSocket.OPEN) {
+            connection.ws.send(JSON.stringify({
+              type: 'evaluate_js_response',
+              requestId: data.requestId,
+              success: evalResult.success,
+              result: evalResult.result,
+              error: evalResult.error,
+              logsCaptures: evalResult.capturedLogs?.length || 0
+            }));
+          }
+        } catch (e) {
+          console.error('[MCP Browser] Evaluate JS failed:', e);
+          if (connection && connection.ws && connection.ws.readyState === WebSocket.OPEN) {
+            connection.ws.send(JSON.stringify({
+              type: 'evaluate_js_response',
+              requestId: data.requestId,
+              success: false,
+              error: e.message
+            }));
+          }
         }
         break;
 

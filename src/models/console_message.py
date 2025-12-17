@@ -75,11 +75,11 @@ class ConsoleMessage:
             metadata=data.get("metadata", {}),
         )
 
-    def to_jsonl(self) -> str:
-        """Convert to JSONL format for storage.
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization.
 
         Returns:
-            JSON string representation
+            Dictionary representation (None values excluded)
         """
         data = {
             "timestamp": self.timestamp.isoformat(),
@@ -94,8 +94,15 @@ class ConsoleMessage:
             "metadata": self.metadata,
         }
         # Remove None values
-        data = {k: v for k, v in data.items() if v is not None}
-        return json.dumps(data)
+        return {k: v for k, v in data.items() if v is not None}
+
+    def to_jsonl(self) -> str:
+        """Convert to JSONL format for storage.
+
+        Returns:
+            JSON string representation
+        """
+        return json.dumps(self.to_dict())
 
     @classmethod
     def from_jsonl(cls, line: str) -> "ConsoleMessage":

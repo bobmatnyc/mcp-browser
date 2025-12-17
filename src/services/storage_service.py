@@ -169,8 +169,14 @@ class StorageService:
         async with lock:
             file_path = self._get_log_file_path(port)
 
+            # If specific port file doesn't exist, search all port directories
+            # This handles the case where logs are stored by ephemeral client port
+            # but queries use the server port (e.g., query port=8851, logs at port=62738)
             if not file_path.exists():
-                return []
+                logger.info(f"No logs at port {port}, searching all port directories")
+                return await self._query_all_ports(
+                    last_n, level_filter, start_time, end_time
+                )
 
             messages = []
             async with aiofiles.open(file_path, "r") as f:
@@ -194,6 +200,75 @@ class StorageService:
 
             # Return last N messages
             return messages[-last_n:] if last_n else messages
+
+    async def _query_all_ports(
+        self,
+        last_n: int = 100,
+        level_filter: Optional[List[str]] = None,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+    ) -> List[ConsoleMessage]:
+        """Query messages from all port directories.
+
+        Fallback when specific port has no logs. Searches all port directories
+        and returns combined results sorted by timestamp.
+
+        Args:
+            last_n: Number of most recent messages to return
+            level_filter: Optional filter by log levels
+            start_time: Optional start time filter
+            end_time: Optional end time filter
+
+        Returns:
+            List of console messages from all ports
+        """
+        all_messages = []
+
+        # Find all port directories with console.jsonl files
+        if not self.config.base_path.exists():
+            return []
+
+        for port_dir in self.config.base_path.iterdir():
+            if not port_dir.is_dir():
+                continue
+
+            # Check if it's a numeric port directory
+            try:
+                int(port_dir.name)  # Validate it's a port number
+            except ValueError:
+                continue
+
+            log_file = port_dir / "console.jsonl"
+            if not log_file.exists():
+                continue
+
+            # Read messages from this port's log file
+            try:
+                async with aiofiles.open(log_file, "r") as f:
+                    async for line in f:
+                        try:
+                            msg = ConsoleMessage.from_jsonl(line.strip())
+
+                            # Apply filters
+                            if not msg.matches_filter(level_filter):
+                                continue
+
+                            if start_time and msg.timestamp < start_time:
+                                continue
+
+                            if end_time and msg.timestamp > end_time:
+                                continue
+
+                            all_messages.append(msg)
+                        except (json.JSONDecodeError, ValueError):
+                            continue  # Skip invalid lines silently
+            except Exception as e:
+                logger.warning(f"Failed to read log file {log_file}: {e}")
+
+        # Sort by timestamp and return last N
+        all_messages.sort(key=lambda m: m.timestamp)
+        logger.info(f"Found {len(all_messages)} total messages across all ports")
+        return all_messages[-last_n:] if last_n else all_messages
 
     async def _should_rotate(self, file_path: Path) -> bool:
         """Check if log file should be rotated.

@@ -4,12 +4,13 @@ import asyncio
 import os
 import signal
 import sys
+from pathlib import Path
 
 import click
 from rich.panel import Panel
 
 from ..._version import __version__
-from ..utils import DATA_DIR, console
+from ..utils import console
 from ..utils.daemon import (
     get_server_status,
     remove_project_server,
@@ -154,11 +155,13 @@ def start(ctx, port, background, daemon):
 
                 time.sleep(0.5)
 
+        # Show project-local data directory in banner
+        project_data_dir = Path(project_path) / ".mcp-browser" / "data"
         console.print(
             Panel.fit(
                 f"[bold green]Starting MCP Browser Server v{__version__}[/bold green]\n\n"
                 f"WebSocket: Ports {config.get('websocket', {}).get('port_range', [8851, 8899]) if config else [8851, 8899]}\n"
-                f"Data: {DATA_DIR}\n"
+                f"Data: {project_data_dir}\n"
                 f"Project: {project_path}",
                 title="Server Starting",
                 border_style="green",

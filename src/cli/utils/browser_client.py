@@ -138,6 +138,86 @@ class BrowserClient:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    async def get_server_status(self, timeout: float = 3.0) -> Dict[str, Any]:
+        """Get server status including extension connection.
+
+        Args:
+            timeout: Timeout in seconds
+
+        Returns:
+            Response with server_running and extension_connected
+        """
+        if not self._connected:
+            return {"success": False, "error": "Not connected to server"}
+
+        try:
+            message = {"type": "get_server_status"}
+            await self.websocket.send(json.dumps(message))
+
+            start = asyncio.get_event_loop().time()
+            while (asyncio.get_event_loop().time() - start) < timeout:
+                try:
+                    msg = await asyncio.wait_for(self.websocket.recv(), timeout=1.0)
+                    data = json.loads(msg)
+                    if data.get("type") == "server_status_response":
+                        return {
+                            "success": True,
+                            "server_running": data.get("server_running", False),
+                            "extension_connected": data.get(
+                                "extension_connected", False
+                            ),
+                            "port": data.get("port"),
+                            "project_name": data.get("project_name"),
+                        }
+                except asyncio.TimeoutError:
+                    continue
+
+            return {"success": False, "error": "Timeout"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def get_tab_info(self, timeout: float = 5.0) -> Dict[str, Any]:
+        """Get current tab info (URL, title, status).
+
+        Args:
+            timeout: Timeout in seconds
+
+        Returns:
+            Response dictionary with tab info
+        """
+        if not self._connected:
+            return {"success": False, "error": "Not connected to server"}
+
+        try:
+            # Send get_tab_info command
+            message = {"type": "get_tab_info", "timestamp": datetime.now().isoformat()}
+            await self.websocket.send(json.dumps(message))
+
+            # Wait for tab_info_response
+            start = asyncio.get_event_loop().time()
+            while (asyncio.get_event_loop().time() - start) < timeout:
+                try:
+                    msg = await asyncio.wait_for(self.websocket.recv(), timeout=1.0)
+                    data = json.loads(msg)
+                    if data.get("type") == "tab_info_response":
+                        return {
+                            "success": True,
+                            "url": data.get("url"),
+                            "title": data.get("title"),
+                            "status": data.get("status"),
+                        }
+                except asyncio.TimeoutError:
+                    continue
+                except Exception:
+                    break
+
+            return {
+                "success": False,
+                "error": f"Timeout waiting for tab info ({timeout}s)",
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     async def query_logs(self, limit: int = 50, level: str = "all") -> Dict[str, Any]:
         """Query console logs from browser.
 
