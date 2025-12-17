@@ -146,6 +146,24 @@ const navigatingTabs = new Set(); // Set of tabIds that should show border after
 // Track the currently controlled tab (receives commands from MCP)
 let controlledTabId = null;
 
+/**
+ * Check if a URL is restricted (cannot inject content scripts)
+ * @param {string} url - The URL to check
+ * @returns {boolean} True if the URL is restricted
+ */
+function isRestrictedUrl(url) {
+  if (!url) return true;
+  return url.startsWith('chrome://') ||
+         url.startsWith('chrome-extension://') ||
+         url.startsWith('about:') ||
+         url.startsWith('edge://') ||
+         url.startsWith('brave://') ||
+         url.startsWith('opera://') ||
+         url.startsWith('vivaldi://') ||
+         url === 'about:blank' ||
+         url === '';
+}
+
 // LEGACY: Single connection fallback (deprecated)
 let currentConnection = null;
 let messageQueue = [];
@@ -2364,21 +2382,38 @@ function updateBadgeForTab(tabId) {
 
 // Listen for tab activation to update badge per-tab
 chrome.tabs.onActivated.addListener((activeInfo) => {
-  updateBadgeForTab(activeInfo.tabId);
+  // Get tab info to check if it's a restricted URL
+  chrome.tabs.get(activeInfo.tabId, (tab) => {
+    if (chrome.runtime.lastError) return;
 
-  // STRICT BORDER RULE: Only show border on the CONTROLLED tab (green icon state)
-  // Non-controlled tabs should show NO signals (even if server is connected)
-  if (controlledTabId !== null && activeInfo.tabId === controlledTabId) {
-    // This is the controlled tab becoming active - show border
-    chrome.tabs.sendMessage(activeInfo.tabId, { type: 'show_connection_border' }, () => {
-      if (chrome.runtime.lastError) { /* tab may not have content script */ }
-    });
-  }
+    // Skip restricted URLs (chrome://, about:, etc.) - they can't have content scripts
+    if (isRestrictedUrl(tab.url)) {
+      // For restricted pages, show outline (disconnected) state
+      setIconState('outline', 'MCP Browser: Page not supported');
+      return;
+    }
+
+    updateBadgeForTab(activeInfo.tabId);
+
+    // STRICT BORDER RULE: Only show border on the CONTROLLED tab (green icon state)
+    // Non-controlled tabs should show NO signals (even if server is connected)
+    if (controlledTabId !== null && activeInfo.tabId === controlledTabId) {
+      // This is the controlled tab becoming active - show border
+      chrome.tabs.sendMessage(activeInfo.tabId, { type: 'show_connection_border' }, () => {
+        if (chrome.runtime.lastError) { /* tab may not have content script */ }
+      });
+    }
+  });
 });
 
 // Listen for tab updates (URL changes) to update badge
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tab.active) {
+    // Skip restricted URLs
+    if (isRestrictedUrl(tab.url)) {
+      setIconState('outline', 'MCP Browser: Page not supported');
+      return;
+    }
     updateBadgeForTab(tabId);
   }
 });
@@ -2391,13 +2426,21 @@ chrome.webNavigation.onCompleted.addListener((details) => {
 
   const tabId = details.tabId;
 
-  // STRICT: Only show border if this is the CONTROLLED tab
-  // Non-controlled tabs should show NO signals
-  if (controlledTabId !== null && tabId === controlledTabId) {
-    chrome.tabs.sendMessage(tabId, { type: 'show_connection_border' }, () => {
-      if (chrome.runtime.lastError) { /* ignore */ }
-    });
-  }
+  // Get tab to check URL
+  chrome.tabs.get(tabId, (tab) => {
+    if (chrome.runtime.lastError) return;
+
+    // Skip restricted URLs - they can't have content scripts
+    if (isRestrictedUrl(tab.url)) return;
+
+    // STRICT: Only show border if this is the CONTROLLED tab
+    // Non-controlled tabs should show NO signals
+    if (controlledTabId !== null && tabId === controlledTabId) {
+      chrome.tabs.sendMessage(tabId, { type: 'show_connection_border' }, () => {
+        if (chrome.runtime.lastError) { /* ignore */ }
+      });
+    }
+  });
 });
 
 /**
