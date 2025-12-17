@@ -60,34 +60,10 @@ class BrowserService:
         # Extract server port from connection_info (listening port for user-facing API)
         server_port = connection_info.get("server_port", client_port)
 
-        # SINGLE-CONNECTION MODE: Reject new connections if one is already active
-        # First connection wins - prevents thrashing when multiple extensions try to connect
-        existing_connections = await self.browser_state.get_active_connections()
-        for existing_port, existing_conn in existing_connections.items():
-            if existing_conn.is_active and existing_conn.websocket:
-                logger.info(
-                    f"Rejecting new connection from port {client_port} "
-                    f"(existing connection on port {existing_port} is active)"
-                )
-                try:
-                    # Send rejection message to the NEW connection and close it
-                    await websocket.send(
-                        json.dumps(
-                            {
-                                "type": "connection_rejected",
-                                "reason": "already_connected",
-                                "message": "Another browser is already connected. Disconnect it first.",
-                                "timestamp": datetime.now().isoformat(),
-                            }
-                        )
-                    )
-                    await websocket.close()
-                except Exception as e:
-                    logger.warning(
-                        f"Error rejecting new connection from port {client_port}: {e}"
-                    )
-                # Return early - don't register this connection
-                return
+        # SINGLE-EXTENSION MODE: Track extension connections separately from CLI
+        # Extension connections are identified later when they send connection_init
+        # For now, we allow all connections but track the first extension that registers
+        # Note: The actual extension-rejection happens in websocket_service when connection_init is received
 
         # Add connection to state with both ports
         await self.browser_state.add_connection(

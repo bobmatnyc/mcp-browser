@@ -40,6 +40,10 @@ class WebSocketService:
         self.message_buffer: deque = deque(maxlen=1000)  # Keep last 1000 messages
         self.current_sequence: int = 0
 
+        # Single-extension mode: track the active extension connection
+        # Only one browser extension can be registered at a time to prevent thrashing
+        self._active_extension: Optional[WebSocketServerProtocol] = None
+
         # Generate project identity
         self.project_identity = self._generate_project_identity()
         logger.info(
@@ -150,6 +154,33 @@ class WebSocketService:
             f"Connection init from extension v{extension_version}, lastSequence={last_sequence}"
         )
         logger.info(f"Client capabilities: {capabilities}")
+
+        # SINGLE-EXTENSION MODE: Reject if another extension is already registered
+        # This prevents thrashing when multiple browser profiles try to connect
+        if self._active_extension is not None and self._active_extension != websocket:
+            # Check if the existing extension is still connected
+            try:
+                if not self._active_extension.closed:
+                    logger.info(
+                        f"Rejecting extension v{extension_version} - another extension is already registered"
+                    )
+                    await self.send_message(
+                        websocket,
+                        {
+                            "type": "connection_rejected",
+                            "reason": "already_connected",
+                            "message": "Another browser extension is already connected. Disconnect it first.",
+                        },
+                    )
+                    await websocket.close()
+                    return
+            except Exception:
+                # Existing extension is dead, clear it
+                self._active_extension = None
+
+        # Register this extension as the active one
+        self._active_extension = websocket
+        logger.info(f"Registered extension v{extension_version} as active extension")
 
         # Find messages the client missed
         replay_messages = self._get_messages_after_sequence(last_sequence)
@@ -306,6 +337,11 @@ class WebSocketService:
             logger.error(f"Error handling connection: {e}")
         finally:
             self._connections.discard(websocket)
+
+            # Clear active extension if this was it
+            if self._active_extension == websocket:
+                logger.info("Active extension disconnected")
+                self._active_extension = None
 
             # Notify disconnection handler
             if "disconnect" in self._connection_handlers:
