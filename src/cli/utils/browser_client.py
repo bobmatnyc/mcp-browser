@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import os
 import uuid
 from datetime import datetime
 from typing import Any, Dict, Optional
@@ -10,7 +11,7 @@ from typing import Any, Dict, Optional
 import websockets
 from rich.console import Console
 
-from .daemon import PORT_RANGE_END, PORT_RANGE_START, read_service_info
+from .daemon import PORT_RANGE_START, get_project_server
 
 console = Console()
 logger = logging.getLogger(__name__)
@@ -513,37 +514,28 @@ class BrowserClient:
         return await self._send_and_wait(message, timeout)
 
 
-async def find_active_port(
-    start_port: int = PORT_RANGE_START, end_port: int = PORT_RANGE_END
-) -> Optional[int]:
-    """Find the active WebSocket server port.
+async def find_active_port() -> Optional[int]:
+    """Find the active WebSocket server port for current project.
 
-    First checks service registry, then scans port range.
-
-    Args:
-        start_port: Starting port to scan
-        end_port: Ending port to scan
+    Looks up the current project in the service registry.
+    Returns None if no server is registered for this project.
 
     Returns:
-        Active port number or None if not found
+        Active port number or None if no server for this project
     """
-    # Check service registry first
-    info = read_service_info()
-    if info and info.get("port"):
-        port = info["port"]
-        try:
-            uri = f"ws://localhost:{port}"
-            async with websockets.connect(uri, open_timeout=0.5):
-                return port
-        except Exception:
-            pass
+    # Look up server for current project
+    current_project = os.getcwd()
+    project_server = get_project_server(current_project)
 
-    # Fallback to port scanning
-    for port in range(start_port, end_port + 1):
+    if project_server and project_server.get("port"):
+        port = project_server["port"]
         try:
             uri = f"ws://localhost:{port}"
             async with websockets.connect(uri, open_timeout=0.5):
                 return port
         except Exception:
-            continue
+            # Server registered but not responding
+            return None
+
+    # No server registered for this project
     return None
