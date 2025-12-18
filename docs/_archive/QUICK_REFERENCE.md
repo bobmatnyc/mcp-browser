@@ -61,7 +61,7 @@ mcp-browser start           # Start server
 4. Or manually:
    - Open chrome://extensions
    - Enable "Developer mode"
-   - Load unpacked: `.mcp-browser/extension`
+   - Load unpacked: `mcp-browser-extensions/chrome`
 
 ## Claude Desktop Configuration
 

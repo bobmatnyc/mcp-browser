@@ -93,7 +93,7 @@
             <strong>Instructions:</strong>
             <ol>
                 <li>Make sure the MCP Browser server is running (<code>python -m src.cli.main start</code>)</li>
-                <li>Install the extension from <code>.mcp-browser/extension/</code> in Chrome</li>
+                <li>Install the extension from <code>mcp-browser-extensions/chrome/</code> in Chrome</li>
                 <li>Click the extension icon in toolbar and check connection status</li>
                 <li>Use the test buttons below to verify console capture</li>
             </ol>
@@ -156,7 +156,7 @@
             } else {
                 extStatus.textContent = 'Not Detected';
                 extStatus.className = 'status disconnected';
-                diagnostics.innerHTML = 'Extension not detected. Please install from .mcp-browser/extension/';
+                diagnostics.innerHTML = 'Extension not detected. Please install from mcp-browser-extensions/chrome/';
             }
 
             diagnostics.style.display = 'block';

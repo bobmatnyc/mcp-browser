@@ -91,17 +91,18 @@ websocket_service.start()  # Port 8851-8899
 ## 🔴 CRITICAL: Security Rules
 
 ### Extension Installation Security
-**CRITICAL**: Extension installs to `~/.mcp-browser/extension/` NOT the source directory:
+**CRITICAL**: Extension loads from project-local `mcp-browser-extensions/` directory, NOT the source directory:
 
 ```bash
-# ✅ CORRECT: Extension deployed to home directory
-~/.mcp-browser/extension/
+# ✅ CORRECT: Extension deployed to project directory
+./mcp-browser-extensions/chrome/    # For local/project install
+~/mcp-browser-extensions/chrome/    # For global install (via CLI --global)
 
-# ❌ WRONG: Never install from project directory
+# ❌ WRONG: Never install from source directory
 /Users/masa/Projects/mcp-browser/src/extensions/chrome/
 ```
 
-**Rationale**: Prevents source code modifications from affecting running extensions.
+**Rationale**: Separates source from deployed extensions. The `make ext-deploy` command copies from `src/extensions/` to `mcp-browser-extensions/`.
 
 ### Secrets and Configuration
 1. **NEVER commit** `.env.local` - Contains user-specific settings
@@ -398,8 +399,8 @@ function captureMessage(level, args) {
 ```bash
 # 1. Edit source: src/extensions/chrome/*
 # 2. Deploy to mcp-browser-extensions/: make ext-deploy
-# 3. Extension auto-installs to ~/.mcp-browser/extension/
-# 4. Reload extension in browser
+# 3. Load unpacked extension in Chrome from mcp-browser-extensions/chrome/
+# 4. Reload extension in browser after changes
 ```
 
 ### Safari Extension
@@ -749,8 +750,11 @@ mcp-browser/
 ├── config/settings.json     # Auto-generated configuration
 ├── logs/mcp-browser.log     # Server logs
 ├── data/[port]/             # JSONL log storage
-├── run/mcp-browser.pid      # Process tracking
-└── extension/               # Installed extension
+└── run/mcp-browser.pid      # Process tracking
+
+# Extension location (separate from runtime data):
+./mcp-browser-extensions/    # Project-local extensions (recommended)
+~/mcp-browser-extensions/    # Global extensions (via --global flag)
 ```
 
 ---

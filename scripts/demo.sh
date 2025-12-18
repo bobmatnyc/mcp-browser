@@ -44,8 +44,8 @@ echo ""
 # Step 4: Initialize extension
 echo -e "${GREEN}Step 4: Initialize project extension${NC}"
 echo "This would run: mcp-browser init"
-echo "It creates: .mcp-browser/extension/ in your project"
-mkdir -p .mcp-browser/extension
+echo "It creates: mcp-browser-extensions/ in your project"
+mkdir -p mcp-browser-extensions/chrome
 echo "✓ Extension directory created"
 echo ""
 
@@ -95,7 +95,7 @@ echo -e "${BLUE}           Demo Setup Complete!                ${NC}"
 echo -e "${BLUE}================================================${NC}"
 echo ""
 echo "Project directory: $TEST_PROJECT"
-echo "Extension path: $TEST_PROJECT/.mcp-browser/extension/"
+echo "Extension path: $TEST_PROJECT/mcp-browser-extensions/chrome/"
 echo ""
 echo "Next steps:"
 echo "1. Install via pipx: pipx install ."
