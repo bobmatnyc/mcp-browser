@@ -495,6 +495,7 @@ class WebSocketService:
                 "dom_command",
                 "extract_content",
                 "extract_semantic_dom",
+                "extract_ascii_layout",
                 "capture_screenshot",
                 "get_tab_info",
                 "evaluate_js",
