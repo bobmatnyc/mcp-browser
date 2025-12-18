@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.59] - 2025-12-18
+
+### Added
+- ASCII layout extraction for `browser_extract` tool - generates token-efficient box diagrams showing page element positions
+- New extract type: `ascii` with configurable `ascii_width` parameter
+- Visual hierarchy understanding without screenshots (~100x smaller than images)
+
 ## [2.2.58] - 2025-12-18
 
 ### Fixed
