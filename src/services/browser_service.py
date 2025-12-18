@@ -580,7 +580,9 @@ class BrowserService:
         Returns:
             Dict with success status and layout data containing viewport and elements
         """
-        connection = await self._get_connection_with_fallback(port, require_extension=True)
+        connection = await self._get_connection_with_fallback(
+            port, require_extension=True
+        )
 
         if not connection or not connection.websocket:
             return {"success": False, "error": "No active browser connection"}

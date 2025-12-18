@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "MCP Browser",
-  "version": "2.2.59.1",
+  "version": "2.2.60",
   "description": "Browser control and console log capture for AI coding assistants. Connects one tab to one MCP server.",
   "permissions": [
     "activeTab",

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.60] - 2025-12-18
+
+### Added
+- ASCII layout extraction CLI command: `mcp-browser browser extract ascii`
+- Extension build versioning scheme (major.minor.patch.build)
+
 ## [2.2.59] - 2025-12-18
 
 ### Added

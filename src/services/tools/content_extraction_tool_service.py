@@ -448,13 +448,11 @@ class ContentExtractionToolService:
         height = min(height, 60)  # Cap at 60 rows
 
         # Create canvas
-        canvas = [[' ' for _ in range(width)] for _ in range(height)]
+        canvas = [[" " for _ in range(width)] for _ in range(height)]
 
         # Sort elements by area (largest first for background)
         sorted_elements = sorted(
-            elements,
-            key=lambda e: e.get("width", 0) * e.get("height", 0),
-            reverse=True
+            elements, key=lambda e: e.get("width", 0) * e.get("height", 0), reverse=True
         )
 
         # Draw elements
@@ -520,24 +518,24 @@ class ContentExtractionToolService:
             return
 
         # Draw corners
-        canvas[y1][x1] = '┌'
-        canvas[y1][x2] = '┐'
-        canvas[y2][x1] = '└'
-        canvas[y2][x2] = '┘'
+        canvas[y1][x1] = "┌"
+        canvas[y1][x2] = "┐"
+        canvas[y2][x1] = "└"
+        canvas[y2][x2] = "┘"
 
         # Draw horizontal lines
         for x in range(x1 + 1, x2):
-            if canvas[y1][x] == ' ':
-                canvas[y1][x] = '─'
-            if canvas[y2][x] == ' ':
-                canvas[y2][x] = '─'
+            if canvas[y1][x] == " ":
+                canvas[y1][x] = "─"
+            if canvas[y2][x] == " ":
+                canvas[y2][x] = "─"
 
         # Draw vertical lines
         for y in range(y1 + 1, y2):
-            if canvas[y][x1] == ' ':
-                canvas[y][x1] = '│'
-            if canvas[y][x2] == ' ':
-                canvas[y][x2] = '│'
+            if canvas[y][x1] == " ":
+                canvas[y][x1] = "│"
+            if canvas[y][x2] == " ":
+                canvas[y][x2] = "│"
 
         # Add type label
         label = f"[{el_type}]"

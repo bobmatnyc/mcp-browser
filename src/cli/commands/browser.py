@@ -736,6 +736,7 @@ async def _extract_ascii_command(port: Optional[int], width: int, json_output: b
 
         if json_output:
             import json as json_module
+
             print(json_module.dumps(result, indent=2))
             return
 
