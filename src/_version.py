@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 # Semantic version - MAJOR.MINOR.PATCH
-__version__ = "2.2.55"
+__version__ = "2.2.56"
 
 # Version components for programmatic access
 VERSION_INFO = tuple(map(int, __version__.split(".")))
