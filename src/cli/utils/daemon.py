@@ -185,15 +185,17 @@ def find_available_port() -> Optional[int]:
 
 
 def cleanup_stale_servers() -> int:
-    """Kill all stale mcp-browser processes and clear registry.
+    """Kill stale mcp-browser processes for THIS project only.
 
     Scans ports 8851-8899 for any listening processes, checks if they are
-    mcp-browser servers, and kills them to ensure clean startup.
+    mcp-browser servers for the CURRENT project, and kills only those.
+    Servers for OTHER projects are left untouched.
 
     Returns:
         Number of processes killed
     """
     killed = 0
+    current_project = os.path.normpath(os.getcwd())
 
     # Find all processes listening on our port range
     for port in range(PORT_RANGE_START, PORT_RANGE_END + 1):
@@ -220,7 +222,24 @@ def cleanup_stale_servers() -> int:
                         is_mcp_browser = "mcp-browser" in cmd or "mcp_browser" in cmd
                         is_module_server = "src.cli.main" in cmd and "start" in cmd
                         if is_mcp_browser or is_module_server:
-                            # Kill the process
+                            # Check if this process belongs to THIS project
+                            cwd_result = subprocess.run(
+                                ["lsof", "-a", "-p", str(pid), "-d", "cwd", "-Fn"],
+                                capture_output=True,
+                                text=True,
+                                timeout=2,
+                            )
+                            process_cwd = None
+                            for line in cwd_result.stdout.split("\n"):
+                                if line.startswith("n/"):
+                                    process_cwd = line[1:]  # Remove 'n' prefix
+                                    break
+
+                            # Skip if this process belongs to a different project
+                            if process_cwd and os.path.normpath(process_cwd) != current_project:
+                                continue
+
+                            # Kill the process (belongs to this project or unknown cwd)
                             os.kill(pid, 15)  # SIGTERM
                             time.sleep(0.3)
                             if is_process_running(pid):
@@ -233,10 +252,28 @@ def cleanup_stale_servers() -> int:
             # Skip if lsof fails or returns invalid data
             pass
 
-    # Clear the registry after cleanup
-    save_server_registry({"servers": []})
+    # Only clear registry entries for THIS project
+    _cleanup_registry_for_project(current_project)
 
     return killed
+
+
+def _cleanup_registry_for_project(project_path: str) -> None:
+    """Remove registry entries for a specific project.
+
+    Args:
+        project_path: The project path whose entries should be removed
+    """
+    registry = read_service_registry()
+    normalized_path = os.path.normpath(project_path)
+
+    # Keep only servers for OTHER projects
+    registry["servers"] = [
+        s for s in registry.get("servers", [])
+        if os.path.normpath(s.get("project_path", "")) != normalized_path
+    ]
+
+    save_server_registry(registry)
 
 
 def cleanup_unregistered_servers() -> int:
