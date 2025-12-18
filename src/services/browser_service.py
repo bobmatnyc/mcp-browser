@@ -562,6 +562,55 @@ class BrowserService:
             if success:
                 logger.info(f"Received semantic DOM for request {request_id}")
 
+    async def extract_ascii_layout(
+        self,
+        port: int,
+        tab_id: Optional[int] = None,
+        options: Optional[Dict[str, Any]] = None,
+        timeout: float = 10.0,
+    ) -> Dict[str, Any]:
+        """Extract element positions for ASCII layout visualization.
+
+        Args:
+            port: WebSocket port
+            tab_id: Optional specific tab ID
+            options: Optional dict with max_text setting
+            timeout: Request timeout
+
+        Returns:
+            Dict with success status and layout data containing viewport and elements
+        """
+        connection = await self._get_connection_with_fallback(port, require_extension=True)
+
+        if not connection or not connection.websocket:
+            return {"success": False, "error": "No active browser connection"}
+
+        try:
+            result = await self._async_rr_service.send_request(
+                websocket=connection.websocket,
+                message_type="extract_ascii_layout",
+                payload={"options": options or {}},
+                timeout=timeout,
+                tab_id=tab_id,
+            )
+
+            if result is None:
+                return {"success": False, "error": f"Timeout after {timeout}s"}
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to extract ASCII layout: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def handle_ascii_layout_extracted(self, data: Dict[str, Any]) -> None:
+        """Handle ascii_layout_extracted response from extension."""
+        request_id = data.get("requestId")
+        response = data.get("response", {})
+
+        if request_id:
+            await self._async_rr_service.handle_response(request_id, response)
+
     async def capture_screenshot_via_extension(
         self, port: int, timeout: float = 10.0
     ) -> Dict[str, Any]:

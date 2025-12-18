@@ -3638,6 +3638,99 @@ async function executeCommandOnTab(tabId, data, connection = null) {
         }
         break;
 
+      case 'extract_ascii_layout':
+        console.log(`[MCP Browser] Extracting ASCII layout for request ${data.requestId}`);
+        try {
+          const options = data.options || {};
+          const layoutResults = await chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            func: (opts) => {
+              const viewport = {
+                width: window.innerWidth,
+                height: window.innerHeight
+              };
+
+              const elements = [];
+              const maxText = opts.max_text || 30;
+
+              // Capture key layout elements with their positions
+              const selectors = [
+                { selector: 'header, [role="banner"]', type: 'HEADER' },
+                { selector: 'nav, [role="navigation"]', type: 'NAV' },
+                { selector: 'main, [role="main"]', type: 'MAIN' },
+                { selector: 'aside, [role="complementary"]', type: 'ASIDE' },
+                { selector: 'footer, [role="contentinfo"]', type: 'FOOTER' },
+                { selector: 'form', type: 'FORM' },
+                { selector: 'input:not([type="hidden"])', type: 'input' },
+                { selector: 'button, [role="button"]', type: 'button' },
+                { selector: 'a[href]', type: 'link' },
+                { selector: 'h1, h2, h3', type: 'heading' },
+                { selector: 'img', type: 'img' },
+                { selector: 'table', type: 'table' },
+              ];
+
+              selectors.forEach(({ selector, type }) => {
+                document.querySelectorAll(selector).forEach(el => {
+                  const rect = el.getBoundingClientRect();
+                  // Only include visible elements in viewport
+                  if (rect.width > 0 && rect.height > 0 &&
+                      rect.bottom > 0 && rect.top < viewport.height &&
+                      rect.right > 0 && rect.left < viewport.width) {
+                    elements.push({
+                      type: type,
+                      x: Math.round(rect.left),
+                      y: Math.round(rect.top),
+                      width: Math.round(rect.width),
+                      height: Math.round(rect.height),
+                      text: el.textContent?.trim().substring(0, maxText) || '',
+                      tag: el.tagName.toLowerCase(),
+                      id: el.id || null,
+                      name: el.name || null,
+                    });
+                  }
+                });
+              });
+
+              return {
+                success: true,
+                layout: {
+                  viewport,
+                  url: window.location.href,
+                  title: document.title,
+                  elements
+                }
+              };
+            },
+            args: [options]
+          });
+
+          const extractionResult = layoutResults[0]?.result || { success: false, error: 'No result from script' };
+
+          const response = {
+            type: 'ascii_layout_extracted',
+            requestId: data.requestId,
+            response: extractionResult
+          };
+
+          if (connection && connection.ws && connection.ws.readyState === WebSocket.OPEN) {
+            connection.ws.send(JSON.stringify(response));
+            console.log(`[MCP Browser] Sent ascii_layout_extracted response for request ${data.requestId}`);
+          } else {
+            console.error(`[MCP Browser] No active connection to send ASCII layout for request ${data.requestId}`);
+          }
+        } catch (e) {
+          console.error('[MCP Browser] ASCII layout extraction failed:', e);
+          const errorResponse = {
+            type: 'ascii_layout_extracted',
+            requestId: data.requestId,
+            response: { success: false, error: e.message }
+          };
+          if (connection && connection.ws && connection.ws.readyState === WebSocket.OPEN) {
+            connection.ws.send(JSON.stringify(errorResponse));
+          }
+        }
+        break;
+
       case 'capture_screenshot':
         // Capture screenshot using chrome.tabs.captureVisibleTab
         console.log(`[MCP Browser] Capturing screenshot for request ${data.requestId}`);

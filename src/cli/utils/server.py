@@ -276,6 +276,9 @@ class BrowserMCPServer:
             "semantic_dom_extracted", browser.handle_semantic_dom_extracted
         )
         websocket.register_message_handler(
+            "ascii_layout_extracted", browser.handle_ascii_layout_extracted
+        )
+        websocket.register_message_handler(
             "screenshot_captured", browser.handle_screenshot_captured
         )
 

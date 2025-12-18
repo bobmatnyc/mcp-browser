@@ -273,17 +273,17 @@ class MCPService:
                         "required": ["action"],
                     },
                 ),
-                # Tool 5: browser_extract - content, semantic_dom
+                # Tool 5: browser_extract - content, semantic_dom, ascii
                 Tool(
                     name="browser_extract",
-                    description="Extract page content: readable article content or semantic DOM structure",
+                    description="Extract page content: readable article content, semantic DOM structure, or ASCII layout visualization",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "extract": {
                                 "type": "string",
-                                "enum": ["content", "semantic_dom"],
-                                "description": "Type of extraction: content (readable article) or semantic_dom (structure)",
+                                "enum": ["content", "semantic_dom", "ascii"],
+                                "description": "Type of extraction: content (readable article), semantic_dom (structure), or ascii (layout visualization)",
                             },
                             "port": {
                                 "type": "integer",
@@ -313,6 +313,12 @@ class MCPService:
                             "max_text_length": {
                                 "type": "integer",
                                 "description": "[semantic_dom] Max characters per text field (default: 100)",
+                            },
+                            # ascii params
+                            "ascii_width": {
+                                "type": "integer",
+                                "description": "[ascii] ASCII canvas width in characters (default: 80)",
+                                "default": 80,
                             },
                         },
                         "required": ["extract"],
@@ -522,7 +528,7 @@ class MCPService:
     ) -> List[TextContent]:
         """Handle browser_extract tool - consolidated extraction.
 
-        Extractions: content (readable article), semantic_dom (structure)
+        Extractions: content (readable article), semantic_dom (structure), ascii (layout)
         """
         extract = arguments.get("extract")
 
@@ -530,11 +536,13 @@ class MCPService:
             return await self._extract_content(arguments)
         elif extract == "semantic_dom":
             return await self._extract_semantic_dom(arguments)
+        elif extract == "ascii":
+            return await self._extract_ascii(arguments)
         else:
             return [
                 TextContent(
                     type="text",
-                    text=f"Unknown extract type: {extract}. Valid: content, semantic_dom",
+                    text=f"Unknown extract type: {extract}. Valid: content, semantic_dom, ascii",
                 )
             ]
 
@@ -572,6 +580,24 @@ class MCPService:
             include_links=arguments.get("include_links", True),
             include_forms=arguments.get("include_forms", True),
             max_text_length=arguments.get("max_text_length", 100),
+        )
+
+        return [TextContent(type="text", text=result["formatted_text"])]
+
+    async def _extract_ascii(self, arguments: Dict[str, Any]) -> List[TextContent]:
+        """Handle ASCII layout extraction."""
+        port, port_warning = self.port_resolver.resolve_port(arguments.get("port"))
+        if port is None:
+            return [TextContent(type="text", text=port_warning or "No port available")]
+
+        tab_id = arguments.get("tab_id")
+        ascii_width = arguments.get("ascii_width", 80)
+
+        # Delegate to content extraction tool service
+        result = await self.content_extraction_tool_service.handle_extract_ascii(
+            port=port,
+            tab_id=tab_id,
+            width=ascii_width,
         )
 
         return [TextContent(type="text", text=result["formatted_text"])]

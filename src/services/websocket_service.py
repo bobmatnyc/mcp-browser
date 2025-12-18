@@ -463,6 +463,7 @@ class WebSocketService:
                 "dom_response",
                 "page_content",
                 "semantic_dom_extracted",
+                "ascii_layout_extracted",
                 "screenshot_captured",
                 "dom_command_response",
                 "tab_info_response",
