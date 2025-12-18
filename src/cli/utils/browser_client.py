@@ -405,6 +405,22 @@ class BrowserClient:
         }
         return await self._send_and_wait(message, timeout)
 
+    async def extract_ascii_layout(
+        self,
+        max_text: int = 30,
+        timeout: float = 10.0,
+    ) -> Dict[str, Any]:
+        """Extract element positions for ASCII layout visualization."""
+        message = {
+            "type": "extract_ascii_layout",
+            "requestId": str(uuid.uuid4()),
+            "options": {
+                "max_text": max_text,
+            },
+            "timestamp": datetime.now().isoformat(),
+        }
+        return await self._send_and_wait(message, timeout)
+
     async def extract_element(
         self, selector: str, timeout: float = 10.0
     ) -> Dict[str, Any]:

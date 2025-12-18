@@ -606,6 +606,7 @@ def extract():
     Extraction strategies:
       content   - Readable article content (Readability.js)
       semantic  - Page structure (headings, landmarks, links, forms)
+      ascii     - ASCII box diagram of element positions
       selector  - Specific element by CSS selector
 
     \b
@@ -691,6 +692,167 @@ async def _extract_content_command(port: Optional[int], json_output: bool):
             sys.exit(1)
     finally:
         await client.disconnect()
+
+
+@extract.command(name="ascii")
+@click.option("--port", default=None, type=int, help="WebSocket port")
+@click.option("--width", default=80, type=int, help="ASCII canvas width")
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON")
+@requires_server
+def extract_ascii(port: int, width: int, json_output: bool):
+    """Extract ASCII layout visualization of page elements.
+
+    Shows element positions as ASCII box diagram - token-efficient
+    alternative to screenshots (~100x smaller).
+
+    \b
+    Examples:
+      mcp-browser browser extract ascii
+      mcp-browser browser extract ascii --width 100
+      mcp-browser browser extract ascii --json
+    """
+    asyncio.run(_extract_ascii_command(port, width, json_output))
+
+
+async def _extract_ascii_command(port: Optional[int], width: int, json_output: bool):
+    """Execute ASCII layout extraction."""
+    if port is None:
+        console.print("[cyan]🔍 Searching for active server...[/cyan]")
+        port = await find_active_port()
+        if port is None:
+            console.print(
+                "[red]✗ No active server found. Start with: mcp-browser start[/red]"
+            )
+            sys.exit(1)
+        console.print(f"[green]✓ Found server on port {port}[/green]\n")
+
+    client = BrowserClient(port=port)
+    if not await client.connect():
+        sys.exit(1)
+
+    try:
+        console.print("[cyan]→ Extracting ASCII layout...[/cyan]")
+        result = await client.extract_ascii_layout(timeout=15.0)
+
+        if json_output:
+            import json as json_module
+            print(json_module.dumps(result, indent=2))
+            return
+
+        if result.get("success") or result.get("response", {}).get("success"):
+            response = result.get("response", result)
+            layout = response.get("layout", {})
+
+            # Format ASCII output
+            formatted = _format_ascii_layout(layout, width)
+            console.print(formatted)
+        else:
+            error = result.get("error") or result.get("response", {}).get(
+                "error", "Unknown error"
+            )
+            console.print(
+                Panel(
+                    f"[red]✗ ASCII extraction failed:[/red]\n{error}",
+                    title="Extract Error",
+                    border_style="red",
+                )
+            )
+            sys.exit(1)
+    finally:
+        await client.disconnect()
+
+
+def _format_ascii_layout(layout: Dict[str, Any], width: int = 80) -> str:
+    """Convert element positions to ASCII box diagram."""
+    viewport = layout.get("viewport", {"width": 1200, "height": 800})
+    elements = layout.get("elements", [])
+    url = layout.get("url", "")
+    title = layout.get("title", "")
+
+    if not elements:
+        return f"# ASCII Layout: {title}\nURL: {url}\n\n(No visible elements found)"
+
+    vp_width = max(viewport.get("width", 1200), 1)
+    vp_height = max(viewport.get("height", 800), 1)
+    scale_x = (width - 2) / vp_width
+    scale_y = ((width // 2) - 2) / vp_height
+
+    height = max(int(vp_height * scale_y) + 2, 10)
+    height = min(height, 60)
+
+    canvas = [[" " for _ in range(width)] for _ in range(height)]
+
+    sorted_elements = sorted(
+        elements, key=lambda e: e.get("width", 0) * e.get("height", 0), reverse=True
+    )
+
+    for el in sorted_elements:
+        x1 = int(el.get("x", 0) * scale_x)
+        y1 = int(el.get("y", 0) * scale_y)
+        el_width = int(el.get("width", 0) * scale_x)
+        el_height = int(el.get("height", 0) * scale_y)
+
+        x2 = min(x1 + el_width, width - 1)
+        y2 = min(y1 + el_height, height - 1)
+
+        if x2 > x1 + 2 and y2 > y1 + 1 and x1 >= 0 and y1 >= 0:
+            _draw_ascii_box(canvas, x1, y1, x2, y2, el.get("type", "?"))
+
+    lines = [
+        f"# ASCII Layout: {title}",
+        f"URL: {url}",
+        f"Viewport: {vp_width}x{vp_height}",
+        "",
+    ]
+    lines.extend("".join(row).rstrip() for row in canvas)
+
+    element_types = set(el.get("type", "?") for el in elements)
+    lines.append("")
+    lines.append("## Elements Found:")
+    for el_type in sorted(element_types):
+        count = sum(1 for el in elements if el.get("type") == el_type)
+        lines.append(f"  [{el_type}]: {count}")
+
+    return "\n".join(lines)
+
+
+def _draw_ascii_box(
+    canvas: list, x1: int, y1: int, x2: int, y2: int, el_type: str
+) -> None:
+    """Draw a box on the ASCII canvas."""
+    height = len(canvas)
+    width = len(canvas[0]) if canvas else 0
+
+    x1 = max(0, min(x1, width - 1))
+    y1 = max(0, min(y1, height - 1))
+    x2 = max(0, min(x2, width - 1))
+    y2 = max(0, min(y2, height - 1))
+
+    if x2 <= x1 or y2 <= y1:
+        return
+
+    canvas[y1][x1] = "┌"
+    canvas[y1][x2] = "┐"
+    canvas[y2][x1] = "└"
+    canvas[y2][x2] = "┘"
+
+    for x in range(x1 + 1, x2):
+        if canvas[y1][x] == " ":
+            canvas[y1][x] = "─"
+        if canvas[y2][x] == " ":
+            canvas[y2][x] = "─"
+
+    for y in range(y1 + 1, y2):
+        if canvas[y][x1] == " ":
+            canvas[y][x1] = "│"
+        if canvas[y][x2] == " ":
+            canvas[y][x2] = "│"
+
+    label = f"[{el_type}]"
+    if len(label) < x2 - x1 - 1 and y1 + 1 < y2:
+        for i, c in enumerate(label):
+            if x1 + 1 + i < x2:
+                canvas[y1 + 1][x1 + 1 + i] = c
 
 
 @extract.command(name="semantic")
