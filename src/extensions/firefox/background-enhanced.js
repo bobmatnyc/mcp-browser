@@ -165,6 +165,8 @@ function isRestrictedUrl(url) {
 }
 
 // LEGACY: Single connection fallback (deprecated)
+// DEPRECATED: Legacy single connection - kept for backward compatibility only
+// Use connectionManager.primaryPort and connectionManager.clients instead
 let currentConnection = null;
 let messageQueue = [];
 let connectionReady = false;
@@ -2102,9 +2104,16 @@ function checkSequenceGap(incomingSequence) {
 
 /**
  * Request recovery of missed messages
+ * MIGRATED: Now uses ConnectionManager's primary connection
  */
 function requestGapRecovery(fromSequence, toSequence) {
-  if (!currentConnection || currentConnection.readyState !== WebSocket.OPEN) {
+  const primaryPort = connectionManager.primaryPort;
+  if (!primaryPort) {
+    return;
+  }
+
+  const client = connectionManager.clients.get(primaryPort);
+  if (!client || !client.ws || client.ws.readyState !== WebSocket.OPEN) {
     return;
   }
 
@@ -2112,7 +2121,7 @@ function requestGapRecovery(fromSequence, toSequence) {
   console.log(`[MCP Browser] Requesting gap recovery: sequences ${fromSequence} to ${toSequence}`);
 
   try {
-    currentConnection.send(JSON.stringify({
+    client.ws.send(JSON.stringify({
       type: 'gap_recovery',
       fromSequence: fromSequence,
       toSequence: toSequence
@@ -2217,15 +2226,23 @@ function stopHeartbeat() {
 
 /**
  * Send heartbeat and check for pong timeout
+ * MIGRATED: Now uses ConnectionManager's primary connection
  */
 function sendHeartbeat() {
-  if (currentConnection && currentConnection.readyState === WebSocket.OPEN) {
+  const primaryPort = connectionManager.primaryPort;
+  if (!primaryPort) {
+    stopHeartbeat();
+    return;
+  }
+
+  const client = connectionManager.clients.get(primaryPort);
+  if (client && client.ws && client.ws.readyState === WebSocket.OPEN) {
     // Check if we received pong recently
     const timeSinceLastPong = Date.now() - lastPongTime;
     if (timeSinceLastPong > HEARTBEAT_INTERVAL + PONG_TIMEOUT) {
       console.warn(`[MCP Browser] Heartbeat timeout - no pong for ${timeSinceLastPong}ms, reconnecting`);
       // Close connection and trigger reconnect
-      currentConnection.close();
+      client.ws.close();
       stopHeartbeat();
 
       // Calculate delay with backoff
@@ -2238,7 +2255,7 @@ function sendHeartbeat() {
 
     // Send heartbeat with timestamp
     try {
-      currentConnection.send(JSON.stringify({
+      client.ws.send(JSON.stringify({
         type: 'heartbeat',
         timestamp: Date.now()
       }));
@@ -2643,6 +2660,9 @@ async function probePort(port) {
 }
 
 /**
+ * DEPRECATED: Legacy connection function - kept for backward compatibility only
+ * Use connectionManager.connectToBackend() instead
+ *
  * Connect to a specific server
  * @param {number} port - Port to connect to
  * @param {Object} serverInfo - Optional server info
@@ -2923,14 +2943,18 @@ function setupWebSocketHandlers(ws) {
 
 /**
  * Try to connect to a specific port
+ * MIGRATED: Now uses ConnectionManager instead of legacy connectToServer
  */
 async function tryConnectToPort(port) {
   const serverInfo = await probePort(port);
   if (serverInfo) {
-    const connected = await connectToServer(port);
-    if (connected) {
-      console.log(`[MCP Browser] Connected to port ${port}`);
+    try {
+      await connectionManager.connectToBackend(port, serverInfo);
+      console.log(`[MCP Browser] Connected to port ${port} via ConnectionManager`);
       return true;
+    } catch (error) {
+      console.error(`[MCP Browser] Failed to connect to port ${port}:`, error);
+      return false;
     }
   }
   return false;
@@ -3736,33 +3760,45 @@ async function executeCommandOnTab(tabId, data, connection = null) {
 
 /**
  * Send message to server
+ * MIGRATED: Now uses ConnectionManager's primary connection instead of legacy currentConnection
  * @param {Object} message - Message to send
  * @returns {Promise<boolean>} Success status
  */
 async function sendToServer(message) {
-  if (currentConnection && currentConnection.readyState === WebSocket.OPEN && connectionReady) {
-    // Connection is open AND handshake is complete
-    currentConnection.send(JSON.stringify(message));
-    connectionStatus.messageCount++;
-    return true;
-  } else {
-    // Queue message if not connected or handshake not complete
-    messageQueue.push(message);
-    // Enforce max queue size
-    if (messageQueue.length > MAX_QUEUE_SIZE) {
-      messageQueue.shift();
+  // Use ConnectionManager's primary connection
+  const primaryPort = connectionManager.primaryPort;
+  if (primaryPort) {
+    const client = connectionManager.clients.get(primaryPort);
+    if (client && client.ws && client.ws.readyState === WebSocket.OPEN && client.connectionReady) {
+      client.ws.send(JSON.stringify(message));
+      connectionStatus.messageCount++;
+      return true;
     }
-    // Persist queue to storage
-    await saveMessageQueue();
-    return false;
   }
+
+  // Queue message if not connected or handshake not complete
+  messageQueue.push(message);
+  // Enforce max queue size
+  if (messageQueue.length > MAX_QUEUE_SIZE) {
+    messageQueue.shift();
+  }
+  // Persist queue to storage
+  await saveMessageQueue();
+  return false;
 }
 
 /**
  * Flush queued messages
+ * MIGRATED: Now uses ConnectionManager's primary connection
  */
 async function flushMessageQueue() {
-  if (!currentConnection || currentConnection.readyState !== WebSocket.OPEN) {
+  const primaryPort = connectionManager.primaryPort;
+  if (!primaryPort) {
+    return;
+  }
+
+  const client = connectionManager.clients.get(primaryPort);
+  if (!client || !client.ws || client.ws.readyState !== WebSocket.OPEN) {
     return;
   }
 
@@ -3771,7 +3807,7 @@ async function flushMessageQueue() {
   while (messageQueue.length > 0) {
     const message = messageQueue.shift();
     try {
-      currentConnection.send(JSON.stringify(message));
+      client.ws.send(JSON.stringify(message));
       connectionStatus.messageCount++;
     } catch (e) {
       console.error('[MCP Browser] Failed to send queued message:', e);

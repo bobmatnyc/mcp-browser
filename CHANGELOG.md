@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.58] - 2025-12-18
+
+### Fixed
+- **Multi-Backend Connection**: Fixed extension failing to work with 2+ running backends
+  - Root cause: Dual connection systems competing (legacy `currentConnection` vs new `ConnectionManager`)
+  - `autoConnect()` used legacy system, popup used new system - causing message routing failures
+  - Migrated ALL connection code to use `ConnectionManager` exclusively:
+    - `tryConnectToPort()` now uses `connectionManager.connectToBackend()` instead of legacy `connectToServer()`
+    - `sendToServer()` uses `connectionManager.primaryPort` and `connectionManager.clients.get()`
+    - `sendHeartbeat()` uses ConnectionManager instead of global `currentConnection`
+    - `flushMessageQueue()` uses ConnectionManager for proper connection routing
+    - `requestGapRecovery()` uses ConnectionManager for sending gap recovery requests
+  - Extension now properly supports connecting to multiple backends simultaneously
+  - Legacy `currentConnection` variable marked deprecated (kept for backward compatibility)
+
 ## [2.2.57] - 2025-12-18
 
 ### Fixed
