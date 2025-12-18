@@ -3989,6 +3989,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         connectionManager.assignTabToConnection(tabId, port);
         console.log(`[MCP Browser] Tab ${tabId} assigned to port ${port}`);
 
+        // Set this tab as the controlled tab and show green border
+        controlledTabId = tabId;
+        console.log(`[MCP Browser] Tab ${tabId} set as controlled tab via popup`);
+
+        // Show green connection border on this tab
+        chrome.tabs.sendMessage(tabId, { type: 'show_connection_border' }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.debug(`[MCP Browser] Could not show border on tab ${tabId}:`, chrome.runtime.lastError.message);
+          }
+        });
+
         // Get tab URL for domain caching
         try {
           const tab = await chrome.tabs.get(tabId);
