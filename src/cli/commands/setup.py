@@ -261,16 +261,14 @@ def init_configuration(force: bool = False) -> bool:
 
 
 def install_extension(force: bool = False) -> bool:
-    """Install all browser extensions to project and global directories.
+    """Install all browser extensions to project directory.
 
     Copies the unpacked extensions to:
-      1. ./mcp-browser-extensions/{browser}/ (project-local)
-      2. ~/.mcp-browser/extension/ (global - for existing Chrome installs)
+      ./mcp-browser-extensions/{browser}/ (project-local)
 
-    Installs:
-      - Chrome extension (both locations)
-      - Firefox extension (project-local only)
-      - Safari extension (project-local only)
+    Installs: Chrome, Firefox, Safari extensions.
+
+    Users should load the extension from this project-local path in their browser.
 
     Args:
         force: Force reinstallation even if already installed
