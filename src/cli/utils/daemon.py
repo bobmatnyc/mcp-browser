@@ -293,13 +293,13 @@ def cleanup_unregistered_servers() -> int:
 
 
 def cleanup_project_servers(project_path: str) -> int:
-    """Kill ALL mcp-browser servers running for this project.
+    """Kill mcp-browser servers running for THIS project only.
 
-    Scans all ports in range (8851-8899) and kills ANY mcp-browser process
-    found on those ports, regardless of cwd. This ensures a clean slate
-    before starting a new server, preventing duplicate servers.
+    Scans all ports in range (8851-8899) and kills mcp-browser processes
+    whose working directory matches the specified project path.
+    Servers for OTHER projects are left untouched.
 
-    Also removes entries from registry.
+    Also removes entries from registry for this project.
 
     Args:
         project_path: Absolute path to the project directory
@@ -364,8 +364,23 @@ def cleanup_project_servers(project_path: str) -> int:
                     if "mcp-browser" not in cmd and "mcp_browser" not in cmd:
                         continue
 
-                    # CRITICAL FIX: Kill ALL mcp-browser processes on port range
-                    # regardless of cwd. This prevents duplicate servers.
+                    # Only kill if process cwd matches THIS project
+                    cwd_result = subprocess.run(
+                        ["lsof", "-a", "-p", str(pid), "-d", "cwd", "-Fn"],
+                        capture_output=True,
+                        text=True,
+                        timeout=2,
+                    )
+                    process_cwd = None
+                    for line in cwd_result.stdout.split("\n"):
+                        if line.startswith("n/"):
+                            process_cwd = line[1:]  # Remove 'n' prefix
+                            break
+
+                    # Skip if this process belongs to a different project
+                    if process_cwd and os.path.normpath(process_cwd) != normalized_path:
+                        continue
+
                     try:
                         os.kill(pid, 15)  # SIGTERM
                         time.sleep(0.3)
