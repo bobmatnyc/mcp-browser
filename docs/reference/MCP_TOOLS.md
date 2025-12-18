@@ -102,20 +102,57 @@ Example:
 
 ### `browser_extract`
 
-Extracts readable content or a semantic DOM summary.
+Extracts readable content, a semantic DOM summary, or an ASCII box diagram.
 
 Required:
-- `extract`: one of `content | semantic_dom`
+- `extract`: one of `content | semantic_dom | ascii`
 
 Common fields:
 - `port` (optional)
 - `tab_id` (optional)
-- `include_headings` / `include_landmarks` / `include_links` / `include_forms` (semantic DOM options)
-- `max_text_length` (semantic DOM option)
 
-Example:
+#### Extract Types
+
+| Type | Description |
+|------|-------------|
+| `content` | Readable text content from page |
+| `semantic_dom` | Semantic DOM summary with structure |
+| `ascii` | ASCII box diagram showing element positions |
+
+#### semantic_dom Options
+
+- `include_headings` / `include_landmarks` / `include_links` / `include_forms` (boolean)
+- `max_text_length` (integer)
+
+#### ascii Options
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `ascii_width` | integer | 80 | Output width in characters |
+| `max_text_length` | integer | 20 | Max text length per element label |
+
+**Output includes:**
+- Viewport dimensions
+- Box diagram of visible page elements
+- Element type legend with counts
+- Page URL and title
+
+**Best for:**
+- Quick visual hierarchy understanding
+- Token-efficient layout visualization (~100x smaller than screenshots)
+- Understanding element spatial relationships
+- Layout debugging without images
+
+#### Examples
+
+**Example - Semantic DOM:**
 ```json
 {"extract":"semantic_dom","include_headings":true,"include_links":true,"max_text_length":120}
+```
+
+**Example - ASCII Layout:**
+```json
+{"extract":"ascii","ascii_width":100,"max_text_length":20,"port":8851}
 ```
 
 ## Migration from legacy tool names
