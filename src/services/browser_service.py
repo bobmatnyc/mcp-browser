@@ -185,6 +185,26 @@ class BrowserService:
 
         logger.debug(f"Processed batch of {len(messages)} messages from port {port}")
 
+    async def handle_extension_init(self, data: Dict[str, Any]) -> None:
+        """Handle extension initialization - mark connection as browser extension.
+
+        This is called when a connection sends connection_init message,
+        indicating it's a browser extension (not CLI or other client).
+        Extension connections can respond to DOM commands, screenshots, etc.
+
+        Args:
+            data: Connection init data including remote address
+        """
+        remote_address = data.get("_remote_address")
+        port = remote_address[1] if isinstance(remote_address, tuple) else None
+
+        if port:
+            await self.browser_state.mark_as_extension(port)
+            logger.info(
+                f"Extension initialized on port {port}, "
+                f"version={data.get('extensionVersion', 'unknown')}"
+            )
+
     async def handle_dom_response(self, data: Dict[str, Any]) -> None:
         """Handle DOM operation response from browser.
 
@@ -200,7 +220,7 @@ class BrowserService:
             )
 
     async def _get_connection_with_fallback(
-        self, port: Optional[int]
+        self, port: Optional[int], require_extension: bool = False
     ) -> Optional[Any]:  # Returns BrowserConnection
         """Get connection by port, with fallback to any active connection.
 
@@ -209,21 +229,44 @@ class BrowserService:
 
         Args:
             port: Port number (supports both server port and client port, or None)
+            require_extension: If True, only return extension connections (for DOM/screenshot ops)
 
         Returns:
             BrowserConnection if found, None otherwise
         """
+        # For operations requiring extension response (DOM, screenshot, extract),
+        # we must get the extension connection specifically
+        if require_extension:
+            extension_conn = await self.browser_state.get_extension_connection()
+            if extension_conn:
+                return extension_conn
+            logger.warning(
+                "No extension connection available for operation requiring extension"
+            )
+            return None
+
         if port is None:
-            # No port specified, return any active connection
+            # No port specified, prefer extension connection, fallback to any
+            extension_conn = await self.browser_state.get_extension_connection()
+            if extension_conn:
+                return extension_conn
             return await self.browser_state.get_any_active_connection()
 
         # BrowserState.get_connection now automatically handles server→client port mapping
         connection = await self.browser_state.get_connection(port)
 
         if connection and connection.is_active:
+            # If we found the connection but it's not an extension, prefer extension
+            if not connection.is_extension:
+                extension_conn = await self.browser_state.get_extension_connection()
+                if extension_conn:
+                    return extension_conn
             return connection
 
-        # Fallback to any active connection if specific port not found
+        # Fallback: prefer extension, then any active
+        extension_conn = await self.browser_state.get_extension_connection()
+        if extension_conn:
+            return extension_conn
         return await self.browser_state.get_any_active_connection()
 
     async def send_dom_command(
@@ -239,7 +282,10 @@ class BrowserService:
         Returns:
             True if command was sent successfully
         """
-        connection = await self._get_connection_with_fallback(port)
+        # DOM commands require extension connection (need response)
+        connection = await self._get_connection_with_fallback(
+            port, require_extension=True
+        )
 
         if not connection or not connection.websocket:
             logger.warning(f"No active browser connection for port {port}")
@@ -403,7 +449,10 @@ class BrowserService:
         Returns:
             Dict containing extracted content or error information
         """
-        connection = await self._get_connection_with_fallback(port)
+        # Content extraction requires extension connection (need response)
+        connection = await self._get_connection_with_fallback(
+            port, require_extension=True
+        )
 
         if not connection or not connection.websocket:
             logger.warning(f"No active browser connection for port {port}")
@@ -452,7 +501,10 @@ class BrowserService:
         Returns:
             Dict containing semantic DOM structure or error information
         """
-        connection = await self._get_connection_with_fallback(port)
+        # Semantic DOM extraction requires extension connection (need response)
+        connection = await self._get_connection_with_fallback(
+            port, require_extension=True
+        )
 
         if not connection or not connection.websocket:
             return {"success": False, "error": "No active browser connection"}
@@ -522,7 +574,10 @@ class BrowserService:
         Returns:
             Dict with success, data (base64), and mimeType or error
         """
-        connection = await self._get_connection_with_fallback(port)
+        # Screenshot capture requires extension connection (need response)
+        connection = await self._get_connection_with_fallback(
+            port, require_extension=True
+        )
 
         if not connection or not connection.websocket:
             return {"success": False, "error": "No active browser connection"}

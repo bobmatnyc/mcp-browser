@@ -71,6 +71,9 @@ async def test_screenshot_with_server_port():
         port=client_port, server_port=server_port, websocket=mock_ws
     )
 
+    # Mark as extension (screenshot requires extension connection)
+    await browser_service.browser_state.mark_as_extension(client_port)
+
     # Try to capture screenshot using server port
 
     # Start the async operation (don't wait for response since it's mocked)
@@ -149,3 +152,70 @@ async def test_multiple_connections_fallback():
         assert result is not None
         assert result.is_active
         assert result.port == 57804  # Should get second active connection
+
+
+@pytest.mark.asyncio
+async def test_extension_connection_tracking():
+    """Test that extension connections are properly tracked and preferred.
+
+    This test validates the fix for connection instability where DOM/screenshot
+    operations would fail because they were sent to CLI connections instead of
+    the browser extension connection.
+    """
+    browser_service = BrowserService()
+
+    # Create mock websockets for CLI and extension
+    mock_cli_ws = AsyncMock()
+    mock_cli_ws.send = AsyncMock()
+
+    mock_ext_ws = AsyncMock()
+    mock_ext_ws.send = AsyncMock()
+
+    # Add CLI connection (not extension)
+    await browser_service.browser_state.add_connection(
+        port=57801, server_port=8851, websocket=mock_cli_ws
+    )
+
+    # Add extension connection
+    await browser_service.browser_state.add_connection(
+        port=57802, server_port=8851, websocket=mock_ext_ws
+    )
+    # Mark as extension (simulates connection_init being received)
+    await browser_service.browser_state.mark_as_extension(57802)
+
+    # Verify extension connection is properly marked
+    ext_conn = await browser_service.browser_state.get_extension_connection()
+    assert ext_conn is not None, "Extension connection should be found"
+    assert ext_conn.port == 57802, "Should return extension connection"
+    assert ext_conn.is_extension is True, "Connection should be marked as extension"
+
+    # Operations requiring extension should use extension connection
+    result = await browser_service._get_connection_with_fallback(8851, require_extension=True)
+    assert result is not None, "Should find extension when require_extension=True"
+    assert result.port == 57802, "Should return extension connection, not CLI"
+    assert result.is_extension is True
+
+    # Regular operations should prefer extension
+    result = await browser_service._get_connection_with_fallback(8851)
+    assert result is not None
+    assert result.port == 57802, "Should prefer extension connection"
+
+
+@pytest.mark.asyncio
+async def test_no_extension_returns_none():
+    """Test that require_extension=True returns None when no extension is connected."""
+    browser_service = BrowserService()
+
+    # Add only a CLI connection (not extension)
+    mock_cli_ws = AsyncMock()
+    await browser_service.browser_state.add_connection(
+        port=57801, server_port=8851, websocket=mock_cli_ws
+    )
+
+    # Operations requiring extension should return None
+    result = await browser_service._get_connection_with_fallback(8851, require_extension=True)
+    assert result is None, "Should return None when no extension is connected"
+
+    # Regular operations should still find CLI connection
+    result = await browser_service._get_connection_with_fallback(8851, require_extension=False)
+    assert result is not None, "Should find CLI connection for non-extension ops"

@@ -22,6 +22,9 @@ class BrowserConnection:
     user_agent: Optional[str] = None
     websocket: Any = None  # WebSocket connection object
     is_active: bool = True
+    is_extension: bool = (
+        False  # True if this is a browser extension (sent connection_init)
+    )
 
     def update_activity(self) -> None:
         """Update last activity timestamp."""
@@ -167,6 +170,42 @@ class BrowserState:
                 if conn.is_active:
                     return conn
             return None
+
+    async def get_extension_connection(self) -> Optional[BrowserConnection]:
+        """Get the active browser extension connection.
+
+        Extension connections are identified by sending connection_init message.
+        These are the only connections that can respond to DOM commands,
+        extract content, capture screenshots, etc.
+
+        Returns:
+            Active extension connection, or None if no extension is connected
+        """
+        async with self._lock:
+            for port, conn in self.connections.items():
+                if conn.is_active and conn.is_extension:
+                    logger.debug(f"Found extension connection on port {port}")
+                    return conn
+            logger.warning("No extension connection found")
+            return None
+
+    async def mark_as_extension(self, port: int) -> bool:
+        """Mark a connection as a browser extension.
+
+        Called when a connection sends connection_init message.
+
+        Args:
+            port: Client port number
+
+        Returns:
+            True if connection was found and marked, False otherwise
+        """
+        async with self._lock:
+            if port in self.connections:
+                self.connections[port].is_extension = True
+                logger.info(f"Marked connection on port {port} as extension")
+                return True
+            return False
 
     async def get_active_connections(self) -> Dict[int, BrowserConnection]:
         """Get all active connections.

@@ -279,6 +279,12 @@ class BrowserMCPServer:
             "screenshot_captured", browser.handle_screenshot_captured
         )
 
+        # Register connection_init handler to mark extension connections
+        # This allows BrowserService to distinguish extension from CLI connections
+        websocket.register_message_handler(
+            "connection_init", browser.handle_extension_init
+        )
+
         # Register query_logs handler for get_logs message type
         # The websocket service will call this with extracted parameters
         websocket.register_message_handler("query_logs", browser.query_logs)

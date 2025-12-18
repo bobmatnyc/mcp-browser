@@ -182,6 +182,18 @@ class WebSocketService:
         self._active_extension = websocket
         logger.info(f"Registered extension v{extension_version} as active extension")
 
+        # Call registered handler to mark this connection as extension in BrowserState
+        # This allows BrowserService to route DOM/screenshot operations correctly
+        handler = self._message_handlers.get("connection_init")
+        if handler:
+            # Add websocket info for handler
+            message["_websocket"] = websocket
+            message["_remote_address"] = websocket.remote_address
+            try:
+                await handler(message)
+            except Exception as e:
+                logger.error(f"Error in connection_init handler: {e}")
+
         # Find messages the client missed
         replay_messages = self._get_messages_after_sequence(last_sequence)
 

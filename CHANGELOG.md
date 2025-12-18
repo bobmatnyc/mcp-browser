@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.53] - 2025-12-18
+
+### Fixed
+- **Connection Stability**: Fixed intermittent "No active browser connection" errors for DOM operations
+  - Root cause: BrowserService couldn't distinguish browser extension connections from CLI connections
+  - DOM commands, screenshots, and content extraction were sometimes routed to CLI connections which can't respond
+  - Added `is_extension` tracking to `BrowserConnection` to identify browser extension connections
+  - DOM operations (`extract_content`, `capture_screenshot`, `send_dom_command`) now use `require_extension=True`
+  - Extension connections are marked when they send `connection_init` handshake
+  - This ensures DOM/screenshot operations are always sent to the correct connection
+
 ## [2.2.52] - 2025-12-17
 
 
