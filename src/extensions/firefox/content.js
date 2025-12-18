@@ -5,6 +5,24 @@
 (function() {
   'use strict';
 
+  // Global error handler for extension context invalidation
+  // This catches any uncaught errors from async callbacks
+  if (typeof chrome !== 'undefined' && chrome.runtime) {
+    // Check context validity before doing anything
+    try {
+      if (!chrome.runtime.id) {
+        console.debug('[MCP Browser] Extension context not available');
+        return; // Exit early
+      }
+    } catch (e) {
+      console.debug('[MCP Browser] Extension context invalidated on load');
+      return; // Exit early
+    }
+  } else {
+    console.debug('[MCP Browser] Chrome runtime not available');
+    return; // Exit early
+  }
+
   // Mark that the extension is installed (for detection)
   // Note: This won't be accessible from page context due to isolation
   window.__MCP_BROWSER_EXTENSION__ = {
@@ -33,6 +51,25 @@
   const BUFFER_INTERVAL = 2500; // 2.5 seconds
   const MAX_BUFFER_SIZE = 100;
 
+  // Event listener tracking for cleanup - memory leak prevention
+  const trackedListeners = [];
+
+  function addTrackedListener(target, event, handler, options) {
+    target.addEventListener(event, handler, options);
+    trackedListeners.push({ target, event, handler, options });
+  }
+
+  function removeAllTrackedListeners() {
+    trackedListeners.forEach(({ target, event, handler, options }) => {
+      try {
+        target.removeEventListener(event, handler, options);
+      } catch (e) {
+        // Ignore errors for removed elements
+      }
+    });
+    trackedListeners.length = 0;
+  }
+
   // Store original console methods
   const originalConsole = {
     log: console.log,
@@ -42,14 +79,71 @@
     debug: console.debug
   };
 
+  // Check if extension context is still valid
+  function isContextValid() {
+    try {
+      // Check if chrome and chrome.runtime exist first
+      if (typeof chrome === 'undefined' || !chrome) {
+        cleanupOnContextInvalidation();
+        return false;
+      }
+      if (typeof chrome.runtime === 'undefined' || !chrome.runtime) {
+        cleanupOnContextInvalidation();
+        return false;
+      }
+      // Then check for id
+      const isValid = !!chrome.runtime.id;
+      if (!isValid) {
+        cleanupOnContextInvalidation();
+      }
+      return isValid;
+    } catch (e) {
+      cleanupOnContextInvalidation();
+      return false;
+    }
+  }
+
+  // Clean up resources when extension context is invalidated - memory leak prevention
+  function cleanupOnContextInvalidation() {
+    // Clear message buffer to prevent memory leak
+    messageBuffer.length = 0;
+
+    // Remove all tracked event listeners
+    removeAllTrackedListeners();
+
+    // Clear buffer timer
+    if (bufferTimer) {
+      clearTimeout(bufferTimer);
+      bufferTimer = null;
+    }
+  }
+
   // Send message to background script
   function sendToBackground(messages) {
-    browser.runtime.sendMessage({
-      type: 'console_messages',
-      messages: messages,
-      url: window.location.href,
-      timestamp: new Date().toISOString()
-    });
+    // Check if extension context is still valid
+    if (!isContextValid()) {
+      // Extension was reloaded/updated - stop trying to send messages
+      console.debug('[MCP Browser] Extension context invalidated, stopping message capture');
+      return;
+    }
+
+    try {
+      chrome.runtime.sendMessage({
+        type: 'console_messages',
+        messages: messages,
+        url: window.location.href,
+        timestamp: new Date().toISOString()
+      }, (response) => {
+        // Handle potential errors silently
+        if (chrome.runtime.lastError) {
+          // Context invalidated - this is expected during extension reload
+          console.debug('[MCP Browser] Message send failed:', chrome.runtime.lastError.message);
+        }
+      });
+    } catch (e) {
+      // Extension context invalidated
+      console.debug('[MCP Browser] Extension context error:', e.message);
+    }
   }
 
   // Flush message buffer
@@ -127,7 +221,7 @@
   captureConsoleMethod('debug', 'debug');
 
   // Capture unhandled errors
-  window.addEventListener('error', function(event) {
+  addTrackedListener(window, 'error', function(event) {
     const message = {
       level: 'error',
       timestamp: new Date().toISOString(),
@@ -144,7 +238,7 @@
   });
 
   // Capture unhandled promise rejections
-  window.addEventListener('unhandledrejection', function(event) {
+  addTrackedListener(window, 'unhandledrejection', function(event) {
     const message = {
       level: 'error',
       timestamp: new Date().toISOString(),
@@ -157,9 +251,16 @@
     scheduleFlush();
   });
 
-  // Flush buffer before page unload
-  window.addEventListener('beforeunload', function() {
+  // Flush buffer before page unload and clean up resources
+  addTrackedListener(window, 'beforeunload', function() {
     flushBuffer();
+    // Clear flush timer - memory leak prevention
+    if (bufferTimer) {
+      clearTimeout(bufferTimer);
+      bufferTimer = null;
+    }
+    // Remove all tracked listeners
+    removeAllTrackedListeners();
   });
 
   // DOM interaction helper functions
@@ -248,18 +349,199 @@
     }
   };
 
+  // ============================================
+  // MCP BROWSER CONTROL BORDER
+  // ============================================
+
+  /**
+   * Show visual green border when tab is being controlled by MCP Browser
+   * Enhanced with thicker border, longer persistence, and smooth fade-out animation
+   */
+  function showControlBorder() {
+    // Remove any existing border first to reset animation
+    const existingBorder = document.getElementById('mcp-browser-control-border');
+    if (existingBorder) {
+      existingBorder.remove();
+    }
+
+    // Create new border with enhanced styling
+    const border = document.createElement('div');
+    border.id = 'mcp-browser-control-border';
+    border.style.cssText = `
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      border: 8px solid #4CAF50;
+      box-shadow: inset 0 0 20px rgba(76, 175, 80, 0.7);
+      pointer-events: none;
+      z-index: 2147483647;
+      box-sizing: border-box;
+      opacity: 1;
+      transition: opacity 1500ms ease-out;
+    `;
+    document.body.appendChild(border);
+    console.log('[MCP Browser] Control border shown (enhanced)');
+
+    // Auto-hide after 3 seconds with smooth fade
+    setTimeout(() => {
+      if (border && border.parentNode) {
+        border.style.opacity = '0';
+        // Remove from DOM after fade completes
+        setTimeout(() => {
+          if (border && border.parentNode) {
+            border.remove();
+            console.log('[MCP Browser] Control border faded out');
+          }
+        }, 1500); // Match transition duration
+      }
+    }, 3000); // 3 second persist before fade starts
+  }
+
+  /**
+   * Hide visual border when tab is no longer controlled
+   */
+  function hideControlBorder() {
+    const border = document.getElementById('mcp-browser-control-border');
+    if (border) {
+      // Fade out smoothly if still visible
+      border.style.opacity = '0';
+      setTimeout(() => {
+        if (border && border.parentNode) {
+          border.remove();
+          console.log('[MCP Browser] Control border hidden');
+        }
+      }, 1500); // Match transition duration
+    }
+  }
+
+  /**
+   * Show persistent green border when WebSocket connection is ACTIVE
+   * Border stays visible the entire time connection is established
+   */
+  function showConnectionBorder() {
+    // Remove any existing connection border first
+    const existingBorder = document.getElementById('mcp-browser-connection-border');
+    if (existingBorder) {
+      return; // Already showing, don't recreate
+    }
+
+    // Create persistent green border for active connection
+    const border = document.createElement('div');
+    border.id = 'mcp-browser-connection-border';
+    border.style.cssText = `
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      border: 8px solid #22c55e;
+      box-shadow: inset 0 0 20px rgba(34, 197, 94, 0.7);
+      pointer-events: none;
+      z-index: 2147483646;
+      box-sizing: border-box;
+      opacity: 1;
+    `;
+    document.body.appendChild(border);
+    console.log('[MCP Browser] Connection border shown (persistent)');
+  }
+
+  /**
+   * Hide persistent green border when WebSocket connection is CLOSED
+   */
+  function hideConnectionBorder() {
+    const border = document.getElementById('mcp-browser-connection-border');
+    if (border && border.parentNode) {
+      border.remove();
+      console.log('[MCP Browser] Connection border hidden');
+    }
+  }
+
+  /**
+   * Show blue border flash when receiving message FROM server (download)
+   * Quick flash animation (~500ms) to indicate incoming message activity
+   */
+  function showDownloadBorder() {
+    // Remove any existing download border first to reset animation
+    const existingBorder = document.getElementById('mcp-browser-download-border');
+    if (existingBorder) {
+      existingBorder.remove();
+    }
+
+    // Create blue border for download activity
+    const border = document.createElement('div');
+    border.id = 'mcp-browser-download-border';
+    border.style.cssText = `
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      border: 8px solid #3b82f6;
+      box-shadow: inset 0 0 20px rgba(59, 130, 246, 0.7);
+      pointer-events: none;
+      z-index: 2147483647;
+      box-sizing: border-box;
+      opacity: 1;
+      transition: opacity 300ms ease-out;
+    `;
+    document.body.appendChild(border);
+    console.log('[MCP Browser] Download border shown');
+
+    // Quick flash - fade out after 200ms, remove after transition completes
+    setTimeout(() => {
+      if (border && border.parentNode) {
+        border.style.opacity = '0';
+        setTimeout(() => {
+          if (border && border.parentNode) {
+            border.remove();
+          }
+        }, 300); // Match transition duration
+      }
+    }, 200); // Brief visibility before fade starts
+  }
+
   // Listen for commands from background
-  browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // Wrap in try-catch to handle extension context invalidation
+  try {
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     (async () => {
       try {
-        switch (request.type) {
+        // Handle dom_command wrapper - extract the actual command
+        let actualRequest = request;
+        if (actualRequest.type === 'dom_command' && actualRequest.command) {
+          actualRequest = actualRequest.command;
+          // Merge params from nested command structure
+          if (actualRequest.params) {
+            actualRequest = { ...actualRequest, ...actualRequest.params };
+          }
+        }
+
+        switch (actualRequest.type) {
+          case 'show_control_border':
+            showControlBorder();
+            sendResponse({ success: true });
+            break;
+
+          case 'hide_control_border':
+            hideControlBorder();
+            sendResponse({ success: true });
+            break;
+
+          case 'show_connection_border':
+            showConnectionBorder();
+            sendResponse({ success: true });
+            break;
+
+          case 'hide_connection_border':
+            hideConnectionBorder();
+            sendResponse({ success: true });
+            break;
+
+          case 'show_download_border':
+            showDownloadBorder();
+            sendResponse({ success: true });
+            break;
+
           case 'navigate':
-            window.location.href = request.url;
+            window.location.href = actualRequest.url;
             sendResponse({ success: true });
             break;
 
           case 'click':
-            const clickElement = domHelpers.getElement(request.params);
+            const clickElement = domHelpers.getElement(actualRequest.params);
             if (!clickElement) {
               sendResponse({ success: false, error: 'Element not found' });
               break;
@@ -276,7 +558,7 @@
             break;
 
           case 'fill':
-            const fillElement = domHelpers.getElement(request.params);
+            const fillElement = domHelpers.getElement(actualRequest.params);
             if (!fillElement) {
               sendResponse({ success: false, error: 'Element not found' });
               break;
@@ -291,20 +573,27 @@
             await new Promise(resolve => setTimeout(resolve, 300));
 
             if (fillElement.tagName.toLowerCase() === 'select') {
-              fillElement.value = request.params.value;
+              fillElement.value = actualRequest.params.value;
               domHelpers.triggerEvent(fillElement, 'change');
             } else {
               fillElement.focus();
               fillElement.value = '';
 
-              // Simulate typing for better compatibility
-              for (const char of request.params.value) {
-                fillElement.value += char;
-                domHelpers.triggerEvent(fillElement, 'input');
-                await new Promise(resolve => setTimeout(resolve, 20));
+              // Set value directly (char-by-char typing causes issues with autocomplete sites like Google)
+              fillElement.value = actualRequest.params.value;
+
+              // Trigger events using native input setter to work with React/Vue
+              const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+              const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+
+              const setter = fillElement.tagName.toLowerCase() === 'textarea' ? nativeTextAreaValueSetter : nativeInputValueSetter;
+              if (setter) {
+                setter.call(fillElement, actualRequest.params.value);
               }
 
-              domHelpers.triggerEvent(fillElement, 'change');
+              // Trigger input and change events
+              fillElement.dispatchEvent(new Event('input', { bubbles: true }));
+              fillElement.dispatchEvent(new Event('change', { bubbles: true }));
               fillElement.blur();
             }
 
@@ -315,27 +604,61 @@
             break;
 
           case 'submit':
-            const formElement = domHelpers.getElement(request.params);
-            if (!formElement) {
-              sendResponse({ success: false, error: 'Form not found' });
+            // Find form - either from selector or auto-detect
+            let formToSubmit = null;
+            let submitButton = null;
+
+            const formElement = domHelpers.getElement(actualRequest.params);
+            if (formElement) {
+              // Element found - get its form
+              formToSubmit = formElement.tagName.toLowerCase() === 'form'
+                ? formElement
+                : formElement.closest('form');
+            } else {
+              // No element specified or not found - find first form on page
+              formToSubmit = document.querySelector('form');
+            }
+
+            if (!formToSubmit) {
+              sendResponse({ success: false, error: 'No form found on page' });
               break;
             }
 
-            const form = formElement.tagName.toLowerCase() === 'form'
-              ? formElement
-              : formElement.closest('form');
+            // Try to find and click a submit button for better form handling
+            // Priority: button[type="submit"] > input[type="submit"] > button (any)
+            submitButton = formToSubmit.querySelector('button[type="submit"], input[type="submit"]')
+              || formToSubmit.querySelector('button');
 
-            if (!form) {
-              sendResponse({ success: false, error: 'No form found for element' });
-              break;
+            if (submitButton) {
+              const buttonText = submitButton.textContent?.trim();
+              // CRITICAL: Send response FIRST, then click
+              // Form submission causes page navigation which destroys the content script
+              // context before sendResponse can complete. By sending first, we ensure
+              // the response reaches the background script before navigation.
+              sendResponse({ success: true, method: 'button_click', buttonText, willNavigate: true });
+              // Small delay to ensure response is fully sent before navigation
+              setTimeout(() => {
+                try {
+                  submitButton.click();
+                } catch (e) {
+                  // Page may have started navigating - that's OK
+                }
+              }, 50);
+            } else {
+              // Fallback to form.submit() - same pattern: respond first, then act
+              sendResponse({ success: true, method: 'form_submit', willNavigate: true });
+              setTimeout(() => {
+                try {
+                  formToSubmit.submit();
+                } catch (e) {
+                  // Page may have started navigating - that's OK
+                }
+              }, 50);
             }
-
-            form.submit();
-            sendResponse({ success: true });
             break;
 
           case 'get_element':
-            const queryElement = domHelpers.getElement(request.params);
+            const queryElement = domHelpers.getElement(actualRequest.params);
             const elementInfo = domHelpers.getElementInfo(queryElement);
 
             sendResponse({
@@ -346,7 +669,7 @@
             break;
 
           case 'get_elements':
-            const { selector, limit = 10 } = request.params;
+            const { selector, limit = 10 } = actualRequest.params;
             const elements = Array.from(document.querySelectorAll(selector))
               .slice(0, limit)
               .map(el => domHelpers.getElementInfo(el));
@@ -361,8 +684,8 @@
           case 'wait_for_element':
             try {
               const element = await domHelpers.waitForElement(
-                request.params.selector,
-                request.params.timeout || 5000
+                actualRequest.params.selector,
+                actualRequest.params.timeout || 5000
               );
 
               sendResponse({
@@ -378,15 +701,15 @@
             break;
 
           case 'select_option':
-            const selectElement = domHelpers.getElement(request.params);
+            const selectElement = domHelpers.getElement(actualRequest.params);
             if (!selectElement || selectElement.tagName.toLowerCase() !== 'select') {
               sendResponse({ success: false, error: 'Select element not found' });
               break;
             }
 
-            const optionValue = request.params.optionValue;
-            const optionText = request.params.optionText;
-            const optionIndex = request.params.optionIndex;
+            const optionValue = actualRequest.params.optionValue;
+            const optionText = actualRequest.params.optionText;
+            const optionIndex = actualRequest.params.optionIndex;
 
             let option;
             if (optionValue !== undefined) {
@@ -415,14 +738,14 @@
             break;
 
           case 'check_checkbox':
-            const checkElement = domHelpers.getElement(request.params);
+            const checkElement = domHelpers.getElement(actualRequest.params);
             if (!checkElement || checkElement.type !== 'checkbox') {
               sendResponse({ success: false, error: 'Checkbox not found' });
               break;
             }
 
-            const shouldCheck = request.params.checked !== undefined
-              ? request.params.checked
+            const shouldCheck = actualRequest.params.checked !== undefined
+              ? actualRequest.params.checked
               : !checkElement.checked;
 
             if (checkElement.checked !== shouldCheck) {
@@ -436,11 +759,11 @@
             break;
 
           case 'scroll_to':
-            const scrollElement = request.params.selector
-              ? domHelpers.getElement(request.params)
+            const scrollElement = actualRequest.params.selector
+              ? domHelpers.getElement(actualRequest.params)
               : null;
 
-            if (request.params.selector && !scrollElement) {
+            if (actualRequest.params.selector && !scrollElement) {
               sendResponse({ success: false, error: 'Element not found' });
               break;
             }
@@ -448,17 +771,71 @@
             if (scrollElement) {
               scrollElement.scrollIntoView({
                 behavior: 'smooth',
-                block: request.params.block || 'center'
+                block: actualRequest.params.block || 'center'
               });
             } else {
               window.scrollTo({
-                top: request.params.top || 0,
-                left: request.params.left || 0,
+                top: actualRequest.params.top || 0,
+                left: actualRequest.params.left || 0,
                 behavior: 'smooth'
               });
             }
 
             sendResponse({ success: true });
+            break;
+
+          case 'get_skeletal_dom':
+            try {
+              // Extract skeletal DOM - key interactive elements only
+              const skeletalDOM = {
+                url: window.location.href,
+                title: document.title,
+                links: Array.from(document.querySelectorAll('a[href]'))
+                  .slice(0, 10)
+                  .map(a => ({
+                    text: a.textContent?.trim().substring(0, 50) || '(no text)',
+                    href: a.href,
+                    isVisible: a.offsetParent !== null
+                  }))
+                  .filter(link => link.isVisible),
+                buttons: Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"]'))
+                  .slice(0, 5)
+                  .map(btn => ({
+                    text: btn.textContent?.trim() || btn.value || '(no text)',
+                    type: btn.tagName.toLowerCase(),
+                    name: btn.name || null,
+                    isVisible: btn.offsetParent !== null
+                  }))
+                  .filter(btn => btn.isVisible),
+                inputs: Array.from(document.querySelectorAll('input:not([type="button"]):not([type="submit"]), textarea'))
+                  .slice(0, 5)
+                  .map(input => ({
+                    type: input.type || 'text',
+                    name: input.name || null,
+                    id: input.id || null,
+                    placeholder: input.placeholder || null,
+                    isVisible: input.offsetParent !== null
+                  }))
+                  .filter(input => input.isVisible),
+                headings: Array.from(document.querySelectorAll('h1, h2, h3'))
+                  .slice(0, 5)
+                  .map(h => ({
+                    level: h.tagName.toLowerCase(),
+                    text: h.textContent?.trim().substring(0, 100) || '(no text)'
+                  }))
+              };
+
+              sendResponse({
+                success: true,
+                skeletal_dom: skeletalDOM
+              });
+            } catch (error) {
+              console.error('[mcp-browser] Skeletal DOM extraction error:', error);
+              sendResponse({
+                success: false,
+                error: error.message || 'Failed to extract skeletal DOM'
+              });
+            }
             break;
 
           case 'extractContent':
@@ -592,73 +969,100 @@
 
     // Return true to indicate async response
     return true;
-  })
+  });
+  } catch (e) {
+    // Extension context invalidated - ignore
+    console.debug('[MCP Browser] Could not add message listener - context invalidated');
+  }
 
   // Initial console message to confirm injection
   console.log('[mcp-browser] Console capture initialized');
 
+  // Safe helper to get extension version
+  function safeGetVersion() {
+    try {
+      return chrome.runtime.getManifest ? chrome.runtime.getManifest().version : '1.0.0';
+    } catch (e) {
+      return '1.0.0';
+    }
+  }
+
+  // Safe helper to get extension id
+  function safeGetId() {
+    try {
+      return chrome.runtime.id || 'unknown';
+    } catch (e) {
+      return 'unknown';
+    }
+  }
+
   // Extension detection helpers
   (function setupDetection() {
-    // Inject detection marker
-    const marker = document.createElement('div');
-    marker.setAttribute('data-mcp-browser-extension', 'true');
-    marker.dataset.version = browser.runtime.getManifest ? browser.runtime.getManifest().version : '1.0.0';
-    marker.style.display = 'none';
-    marker.id = 'mcp-browser-extension-marker';
-    document.documentElement.appendChild(marker);
+    try {
+      // Inject detection marker
+      const marker = document.createElement('div');
+      marker.setAttribute('data-mcp-browser-extension', 'true');
+      marker.dataset.version = safeGetVersion();
+      marker.style.display = 'none';
+      marker.id = 'mcp-browser-extension-marker';
+      document.documentElement.appendChild(marker);
 
-    // Add class to HTML element
-    document.documentElement.classList.add('mcp-browser-extension-active');
+      // Add class to HTML element
+      document.documentElement.classList.add('mcp-browser-extension-active');
 
-    // Expose global flag
-    window.__MCP_BROWSER_EXTENSION__ = {
-      installed: true,
-      version: browser.runtime.getManifest ? browser.runtime.getManifest().version : '1.0.0',
-      timestamp: Date.now()
-    };
+      // Expose global flag
+      window.__MCP_BROWSER_EXTENSION__ = {
+        installed: true,
+        version: safeGetVersion(),
+        timestamp: Date.now()
+      };
 
-    // Listen for detection pings
-    window.addEventListener('message', function(event) {
-      if (event.data && event.data.type === 'MCP_BROWSER_PING') {
-        // Respond with pong
-        window.postMessage({
-          type: 'MCP_BROWSER_PONG',
-          status: 'connected',
-          version: browser.runtime.getManifest ? browser.runtime.getManifest().version : '1.0.0',
-          id: browser.runtime.id,
-          info: 'MCP Browser Extension Active'
-        }, '*');
-      }
+      // Listen for detection pings
+      addTrackedListener(window, 'message', function(event) {
+        if (event.data && event.data.type === 'MCP_BROWSER_PING') {
+          // Respond with pong
+          window.postMessage({
+            type: 'MCP_BROWSER_PONG',
+            status: 'connected',
+            version: safeGetVersion(),
+            id: safeGetId(),
+            info: 'MCP Browser Extension Active'
+          }, '*');
+        }
 
-      // Handle test requests
-      if (event.data && event.data.type === 'MCP_BROWSER_TEST') {
-        window.postMessage({
-          type: 'MCP_BROWSER_TEST_RESPONSE',
-          success: true,
-          timestamp: Date.now()
-        }, '*');
-      }
-    });
-
-    // Dispatch ready event
-    const readyEvent = new CustomEvent('mcp-browser-extension-ready', {
-      detail: {
-        version: browser.runtime.getManifest ? browser.runtime.getManifest().version : '1.0.0',
-        id: browser.runtime.id
-      }
-    });
-    document.dispatchEvent(readyEvent);
-
-    // Listen for test pings via custom events
-    document.addEventListener('mcp-browser-test-ping', function(event) {
-      const responseEvent = new CustomEvent('mcp-browser-test-pong', {
-        detail: {
-          timestamp: event.detail.timestamp,
-          version: browser.runtime.getManifest ? browser.runtime.getManifest().version : '1.0.0'
+        // Handle test requests
+        if (event.data && event.data.type === 'MCP_BROWSER_TEST') {
+          window.postMessage({
+            type: 'MCP_BROWSER_TEST_RESPONSE',
+            success: true,
+            timestamp: Date.now()
+          }, '*');
         }
       });
-      document.dispatchEvent(responseEvent);
-    });
+
+      // Dispatch ready event
+      const readyEvent = new CustomEvent('mcp-browser-extension-ready', {
+        detail: {
+          version: safeGetVersion(),
+          id: safeGetId()
+        }
+      });
+      document.dispatchEvent(readyEvent);
+
+      // Listen for test pings via custom events
+      addTrackedListener(document, 'mcp-browser-test-ping', function(event) {
+        const responseEvent = new CustomEvent('mcp-browser-test-pong', {
+          detail: {
+            timestamp: event.detail.timestamp,
+            version: safeGetVersion()
+          }
+        });
+        document.dispatchEvent(responseEvent);
+      });
+    } catch (e) {
+      // Extension context invalidated - ignore
+      console.debug('[MCP Browser] Detection setup failed - context invalidated');
+    }
   })();
 
   // ============================================
@@ -674,7 +1078,7 @@
    */
   function connectKeepalivePort() {
     try {
-      keepalivePort = browser.runtime.connect({ name: 'keepalive' });
+      keepalivePort = chrome.runtime.connect({ name: 'keepalive' });
       keepaliveReconnectAttempts = 0;
 
       console.log('[MCP Browser Content] Keepalive port connected');
@@ -700,6 +1104,11 @@
         }
       });
     } catch (e) {
+      // Check if context was invalidated - stop retrying
+      if (e.message && e.message.includes('Extension context invalidated')) {
+        console.debug('[MCP Browser Content] Extension context invalidated - stopping keepalive');
+        return;
+      }
       console.error('[MCP Browser Content] Failed to connect keepalive port:', e);
     }
   }

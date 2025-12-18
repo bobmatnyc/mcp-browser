@@ -251,9 +251,16 @@
     scheduleFlush();
   });
 
-  // Flush buffer before page unload
+  // Flush buffer before page unload and clean up resources
   addTrackedListener(window, 'beforeunload', function() {
     flushBuffer();
+    // Clear flush timer - memory leak prevention
+    if (bufferTimer) {
+      clearTimeout(bufferTimer);
+      bufferTimer = null;
+    }
+    // Remove all tracked listeners
+    removeAllTrackedListeners();
   });
 
   // DOM interaction helper functions

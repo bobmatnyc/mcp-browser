@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.57] - 2025-12-18
+
+### Fixed
+- **Memory Leaks**: Fixed 5 critical memory leaks in Chrome/Firefox extension that could cause browser crashes
+  - **Tab cleanup**: Enhanced `chrome.tabs.onRemoved` to clean ALL tab-related Maps (activePorts, pendingTabs, navigatingTabs, unroutedMessages)
+  - **Message age-out**: Added periodic cleanup to remove messages older than 5 minutes from unroutedMessages buffer
+  - **Gap recovery timeout**: Added 30-second timeout for sequence gap recovery to prevent unbounded buffer growth
+  - **Interval cleanup**: Clear heartbeat intervals and gap recovery timeouts before replacing connections
+  - **Content script cleanup**: Enhanced beforeunload handler to clear timers and remove tracked event listeners
+- **Multi-project support**: Fixed `cleanup_stale_servers()` to only kill servers for the current project
+  - Previously killed ALL mcp-browser processes regardless of which project they belonged to
+  - Now checks process working directory before killing, leaving other projects' servers untouched
+
+## [2.2.56] - 2025-12-18
+
+### Fixed
+- **Multi-project support**: Fixed `cleanup_stale_servers()` to respect project boundaries
+  - Only kills mcp-browser servers for the current project
+  - Servers for other projects are left running
+
 ## [2.2.55] - 2025-12-18
 
 

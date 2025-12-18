@@ -473,6 +473,12 @@ class WebSocketClient {
     this.intentionallyClosed = true;
     this._stopHeartbeat();
 
+    // Clear gap recovery timeout - memory leak prevention
+    if (this.gapRecoveryTimeout) {
+      clearTimeout(this.gapRecoveryTimeout);
+      this.gapRecoveryTimeout = null;
+    }
+
     if (this.ws) {
       try {
         this.ws.close();
@@ -647,6 +653,13 @@ class WebSocketClient {
 
   async _handleGapRecovery(data) {
     this.pendingGapRecovery = false;
+
+    // Clear gap recovery timeout - memory leak prevention
+    if (this.gapRecoveryTimeout) {
+      clearTimeout(this.gapRecoveryTimeout);
+      this.gapRecoveryTimeout = null;
+    }
+
     if (data.messages && Array.isArray(data.messages)) {
       for (const msg of data.messages) {
         if (msg.sequence !== undefined && msg.sequence > this.lastSequence) {
@@ -850,6 +863,36 @@ class MessageRouter {
   constructor(tabRegistry) {
     this.tabRegistry = tabRegistry;
     this.unroutedMessages = [];
+
+    // Periodic cleanup of old messages - memory leak prevention
+    this._cleanupInterval = setInterval(() => this._cleanOldMessages(), 60000); // Every 60 seconds
+  }
+
+  /**
+   * Clean messages older than 5 minutes - memory leak prevention
+   * @private
+   */
+  _cleanOldMessages() {
+    const now = Date.now();
+    const MAX_AGE = 5 * 60 * 1000; // 5 minutes
+    const oldCount = this.unroutedMessages.length;
+    this.unroutedMessages = this.unroutedMessages.filter(
+      m => (now - m.timestamp) < MAX_AGE
+    );
+    const removedCount = oldCount - this.unroutedMessages.length;
+    if (removedCount > 0) {
+      console.log(`[MessageRouter] Cleaned ${removedCount} old messages (older than 5 minutes)`);
+    }
+  }
+
+  /**
+   * Clean up resources when shutting down
+   */
+  destroy() {
+    if (this._cleanupInterval) {
+      clearInterval(this._cleanupInterval);
+      this._cleanupInterval = null;
+    }
   }
 
   async routeMessage(tabId, message, sendFn) {
@@ -1577,6 +1620,12 @@ class ConnectionManager {
           console.log(`[ConnectionManager] Gap recovery response received for port ${port}`);
           connection.pendingGapRecovery = false;
 
+          // Clear gap recovery timeout - memory leak prevention
+          if (connection.gapRecoveryTimeout) {
+            clearTimeout(connection.gapRecoveryTimeout);
+            connection.gapRecoveryTimeout = null;
+          }
+
           if (data.messages && Array.isArray(data.messages)) {
             for (const msg of data.messages) {
               if (msg.sequence !== undefined && msg.sequence > connection.lastSequence) {
@@ -1818,6 +1867,14 @@ class ConnectionManager {
     connection.pendingGapRecovery = true;
     console.log(`[ConnectionManager] Requesting gap recovery for port ${connection.port}: sequences ${fromSequence} to ${toSequence}`);
 
+    // Set 30-second timeout for gap recovery - memory leak prevention
+    connection.gapRecoveryTimeout = setTimeout(() => {
+      console.warn(`[ConnectionManager] Gap recovery timeout for port ${connection.port}, clearing buffer`);
+      connection.pendingGapRecovery = false;
+      connection.outOfOrderBuffer = [];
+      connection.gapRecoveryTimeout = null;
+    }, 30000);
+
     try {
       connection.ws.send(JSON.stringify({
         type: 'gap_recovery',
@@ -1827,6 +1884,10 @@ class ConnectionManager {
     } catch (e) {
       console.error(`[ConnectionManager] Failed to request gap recovery for port ${connection.port}:`, e);
       connection.pendingGapRecovery = false;
+      if (connection.gapRecoveryTimeout) {
+        clearTimeout(connection.gapRecoveryTimeout);
+        connection.gapRecoveryTimeout = null;
+      }
     }
   }
 
@@ -3730,20 +3791,32 @@ async function flushMessageQueue() {
  * Clean up ports when tabs are closed
  */
 chrome.tabs.onRemoved.addListener((tabId) => {
+  console.log(`[MCP Browser] Cleaned up tab ${tabId}`);
+
+  // Clean ALL tab-related Maps - comprehensive cleanup
   if (activePorts.has(tabId)) {
-    console.log(`[MCP Browser] Tab ${tabId} closed, removing port`);
     activePorts.delete(tabId);
   }
 
-  // Remove tab from ConnectionManager
+  // Remove tab from ConnectionManager registry
   connectionManager.removeTab(tabId);
 
-  // Remove unrouted messages for closed tab - memory leak fix
-  connectionManager.unroutedMessages = connectionManager.unroutedMessages.filter(item => item.tabId !== tabId);
-
   // Remove from pending tabs
-  if (connectionManager.pendingTabs.has(tabId)) {
-    connectionManager.pendingTabs.delete(tabId);
+  if (connectionManager.tabRegistry) {
+    connectionManager.tabRegistry.removePendingTab(tabId);
+  }
+
+  // Clean navigating tabs Set
+  navigatingTabs.delete(tabId);
+
+  // Remove unrouted messages for closed tab - memory leak fix
+  if (connectionManager.messageRouter) {
+    connectionManager.messageRouter.unroutedMessages =
+      connectionManager.messageRouter.unroutedMessages.filter(m => m.tabId !== tabId);
+  }
+
+  // Update badge to reflect cleanup
+  if (connectionManager._updatePendingBadge) {
     connectionManager._updatePendingBadge();
   }
 });
