@@ -236,7 +236,10 @@ def cleanup_stale_servers() -> int:
                                     break
 
                             # Skip if this process belongs to a different project
-                            if process_cwd and os.path.normpath(process_cwd) != current_project:
+                            if (
+                                process_cwd
+                                and os.path.normpath(process_cwd) != current_project
+                            ):
                                 continue
 
                             # Kill the process (belongs to this project or unknown cwd)
@@ -269,7 +272,8 @@ def _cleanup_registry_for_project(project_path: str) -> None:
 
     # Keep only servers for OTHER projects
     registry["servers"] = [
-        s for s in registry.get("servers", [])
+        s
+        for s in registry.get("servers", [])
         if os.path.normpath(s.get("project_path", "")) != normalized_path
     ]
 
