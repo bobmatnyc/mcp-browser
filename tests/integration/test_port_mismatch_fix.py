@@ -190,7 +190,9 @@ async def test_extension_connection_tracking():
     assert ext_conn.is_extension is True, "Connection should be marked as extension"
 
     # Operations requiring extension should use extension connection
-    result = await browser_service._get_connection_with_fallback(8851, require_extension=True)
+    result = await browser_service._get_connection_with_fallback(
+        8851, require_extension=True
+    )
     assert result is not None, "Should find extension when require_extension=True"
     assert result.port == 57802, "Should return extension connection, not CLI"
     assert result.is_extension is True
@@ -213,9 +215,13 @@ async def test_no_extension_returns_none():
     )
 
     # Operations requiring extension should return None
-    result = await browser_service._get_connection_with_fallback(8851, require_extension=True)
+    result = await browser_service._get_connection_with_fallback(
+        8851, require_extension=True
+    )
     assert result is None, "Should return None when no extension is connected"
 
     # Regular operations should still find CLI connection
-    result = await browser_service._get_connection_with_fallback(8851, require_extension=False)
+    result = await browser_service._get_connection_with_fallback(
+        8851, require_extension=False
+    )
     assert result is not None, "Should find CLI connection for non-extension ops"
