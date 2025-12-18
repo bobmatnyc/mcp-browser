@@ -196,13 +196,6 @@ $RECYCLE.BIN/
 *.swp
 *.temp
 *~
-.claude-mpm/*.log
-.claude-mpm/cache/
-.claude-mpm/logs/
-.claude-mpm/sessions/
-.claude-mpm/tmp/
-.claude/cache/
-.claude/sessions/
 .conda/
 .env.*
 .kuzu-memory/
@@ -233,7 +226,9 @@ docs/research/
 # Added by Claude MPM /mpm-init
 .claude.json
 .claude/
+.claude-mpm/
+.mcp-browser/
+.kuzu-memory-backups/
 uv.lock
 mcp-browser-extensions/
-.claude-mpm/correlations/
 chunk-graph.json
