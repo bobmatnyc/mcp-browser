@@ -812,7 +812,8 @@ def _format_ascii_layout(layout: Dict[str, Any], width: int = 80) -> str:
     lines.append("## Elements Found:")
     for el_type in sorted(element_types):
         count = sum(1 for el in elements if el.get("type") == el_type)
-        lines.append(f"  [{el_type}]: {count}")
+        # Escape brackets for Rich console (otherwise [type] is interpreted as markup)
+        lines.append(f"  \\[{el_type}]: {count}")
 
     return "\n".join(lines)
 
