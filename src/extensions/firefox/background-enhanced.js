@@ -67,27 +67,29 @@ function setIconState(state, titleText) {
 
   console.log(`[MCP Browser] Icon state changed to: ${state}${titleText ? ` (${titleText})` : ''}`);
 
-  // STRICT BORDER RULE: Only show border on CONTROLLED tab when green
-  // Non-controlled tabs should show NO signals (borders, flashes) even if server connected
-  if (state === 'green' && controlledTabId !== null) {
-    // Show green border ONLY on the controlled tab
-    chrome.tabs.sendMessage(controlledTabId, { type: 'show_connection_border' }, () => {
-      if (chrome.runtime.lastError) { /* tab may not have content script */ }
-    });
-  } else {
-    // Hide green border on all tabs (yellow, red, or no controlled tab = not connected)
-    chrome.tabs.query({}, (tabs) => {
-      if (tabs) {
-        tabs.forEach(tab => {
-          if (tab.id) {
+  // MULTI-TAB BORDER: Show green border on ALL connected tabs, not just one
+  // Get all tabs that are connected to any backend
+  const connectedTabIds = new Set(connectionManager.tabConnections.keys());
+
+  chrome.tabs.query({}, (tabs) => {
+    if (tabs) {
+      tabs.forEach(tab => {
+        if (tab.id) {
+          if (connectedTabIds.has(tab.id)) {
+            // This tab is connected to a backend - show green border
+            chrome.tabs.sendMessage(tab.id, { type: 'show_connection_border' }, () => {
+              if (chrome.runtime.lastError) { /* tab may not have content script */ }
+            });
+          } else {
+            // This tab is not connected - hide border
             chrome.tabs.sendMessage(tab.id, { type: 'hide_connection_border' }, () => {
               if (chrome.runtime.lastError) { /* ignore */ }
             });
           }
-        });
-      }
-    });
-  }
+        }
+      });
+    }
+  });
 }
 
 /**
