@@ -4187,23 +4187,53 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
     return true; // Keep channel open for async response
   } else if (request.type === 'get_detailed_status') {
-    // Get detailed technical status for debugging
-    const connections = connectionManager.getActiveConnections();
-    const firstConnection = connections.length > 0 ? connections[0] : null;
+    // Get detailed technical status for debugging - use current tab's connection
+    (async () => {
+      try {
+        // Get the active tab to find its connection
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tabId = activeTab?.id;
 
-    const detailedStatus = {
-      port: firstConnection?.port || connectionStatus.port || null,
-      connectionState: firstConnection ? (firstConnection.ready ? 'connected' : 'connecting') : 'disconnected',
-      retryCount: firstConnection?.reconnectAttempts || reconnectAttempts || 0,
-      projectName: firstConnection?.projectName || connectionStatus.projectName || null,
-      serverPid: firstConnection?.serverPid || null,
-      messageCount: connectionStatus.messageCount || 0,
-      lastError: connectionStatus.lastError || null,
-      totalConnections: connections.length,
-      extensionState: extensionState
-    };
+        const connections = connectionManager.getActiveConnections();
 
-    sendResponse(detailedStatus);
+        // Find connection for the active tab, or fall back to first connection
+        let tabConnection = null;
+        if (tabId) {
+          tabConnection = connections.find(conn => {
+            // Check if this connection is assigned to the active tab
+            const assignedTabs = connectionManager.getTabsForPort(conn.port);
+            return assignedTabs && assignedTabs.has(tabId);
+          });
+        }
+
+        // Use tab's connection if found, otherwise first connection for backward compat
+        const connection = tabConnection || (connections.length > 0 ? connections[0] : null);
+
+        const detailedStatus = {
+          port: connection?.port || connectionStatus.port || null,
+          connectionState: connection ? (connection.ready ? 'connected' : 'connecting') : 'disconnected',
+          retryCount: connection?.reconnectAttempts || reconnectAttempts || 0,
+          projectName: connection?.projectName || connectionStatus.projectName || null,
+          serverPid: connection?.serverPid || null,
+          messageCount: connectionStatus.messageCount || 0,
+          lastError: connectionStatus.lastError || null,
+          totalConnections: connections.length,
+          extensionState: extensionState,
+          activeTabId: tabId || null,
+          isTabSpecific: !!tabConnection
+        };
+
+        sendResponse(detailedStatus);
+      } catch (error) {
+        console.error('[MCP Browser] Error getting detailed status:', error);
+        sendResponse({
+          port: null,
+          connectionState: 'error',
+          lastError: error.message
+        });
+      }
+    })();
+    return true; // Keep channel open for async response
   }
 });
 
