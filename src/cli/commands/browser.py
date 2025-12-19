@@ -763,8 +763,8 @@ async def _extract_ascii_command(port: Optional[int], width: int, json_output: b
         await client.disconnect()
 
 
-def _format_ascii_layout(layout: Dict[str, Any], width: int = 80) -> str:
-    """Convert element positions to ASCII box diagram."""
+def _format_ascii_layout(layout: Dict[str, Any], width: int = 120) -> str:
+    """Convert element positions to ASCII box diagram with improved horizontal layout."""
     viewport = layout.get("viewport", {"width": 1200, "height": 800})
     elements = layout.get("elements", [])
     url = layout.get("url", "")
@@ -775,53 +775,120 @@ def _format_ascii_layout(layout: Dict[str, Any], width: int = 80) -> str:
 
     vp_width = max(viewport.get("width", 1200), 1)
     vp_height = max(viewport.get("height", 800), 1)
-    scale_x = (width - 2) / vp_width
-    scale_y = ((width // 2) - 2) / vp_height
 
-    height = max(int(vp_height * scale_y) + 2, 10)
-    height = min(height, 60)
+    # Prioritize major landmark elements first
+    priority_types = {
+        "HEADER",
+        "NAV",
+        "MAIN",
+        "ASIDE",
+        "FOOTER",
+        "FORM",
+        "SECTION",
+        "ARTICLE",
+    }
+    major_elements = [
+        e for e in elements if e.get("type", "").upper() in priority_types
+    ]
+
+    # If no major landmarks, fall back to largest elements
+    if not major_elements:
+        sorted_by_size = sorted(
+            elements, key=lambda e: e.get("width", 0) * e.get("height", 0), reverse=True
+        )
+        major_elements = sorted_by_size[:15]  # Top 15 largest
+    else:
+        # Add largest non-landmark elements to fill in the layout
+        other_elements = [
+            e for e in elements if e.get("type", "").upper() not in priority_types
+        ]
+        sorted_others = sorted(
+            other_elements,
+            key=lambda e: e.get("width", 0) * e.get("height", 0),
+            reverse=True,
+        )
+        major_elements.extend(sorted_others[:10])  # Add top 10 others
+
+    # Use larger canvas with better scaling
+    scale_x = (width - 2) / vp_width
+    # Calculate height to maintain aspect ratio, but cap it
+    height = min(60, max(30, int(vp_height * scale_x * 0.5)))
+    scale_y = (height - 2) / vp_height
 
     canvas = [[" " for _ in range(width)] for _ in range(height)]
 
-    sorted_elements = sorted(
-        elements, key=lambda e: e.get("width", 0) * e.get("height", 0), reverse=True
-    )
-
-    for el in sorted_elements:
+    # Draw elements with minimum sizes for readability
+    drawn_count = 0
+    for el in major_elements:
         x1 = int(el.get("x", 0) * scale_x)
         y1 = int(el.get("y", 0) * scale_y)
-        el_width = int(el.get("width", 0) * scale_x)
-        el_height = int(el.get("height", 0) * scale_y)
+        # Ensure minimum box size for visibility
+        el_width = max(int(el.get("width", 0) * scale_x), 8)
+        el_height = max(int(el.get("height", 0) * scale_y), 3)
 
         x2 = min(x1 + el_width, width - 1)
         y2 = min(y1 + el_height, height - 1)
 
-        if x2 > x1 + 2 and y2 > y1 + 1 and x1 >= 0 and y1 >= 0:
-            _draw_ascii_box(canvas, x1, y1, x2, y2, el.get("type", "?"))
+        # Skip if box is too small or out of bounds
+        if (
+            x2 > x1 + 4
+            and y2 > y1 + 2
+            and x1 >= 0
+            and y1 >= 0
+            and x2 < width
+            and y2 < height
+        ):
+            # Get label: prefer text content, fall back to type
+            text = el.get("text", "").strip()[:30]
+            el_type = el.get("type", "?")
+            if text:
+                label = f"{el_type}: {text}"
+            else:
+                label = el_type
+
+            _draw_ascii_box(canvas, x1, y1, x2, y2, label)
+            drawn_count += 1
 
     lines = [
         f"# ASCII Layout: {title}",
         f"URL: {url}",
-        f"Viewport: {vp_width}x{vp_height}",
+        f"Viewport: {vp_width}x{vp_height} (scaled to {width}x{height})",
+        f"Showing: {drawn_count} major elements",
         "",
     ]
     lines.extend("".join(row).rstrip() for row in canvas)
 
-    element_types = set(el.get("type", "?") for el in elements)
+    # Show summary of major elements with positions and text
     lines.append("")
-    lines.append("## Elements Found:")
-    for el_type in sorted(element_types):
-        count = sum(1 for el in elements if el.get("type") == el_type)
-        # Escape brackets for Rich console (otherwise [type] is interpreted as markup)
+    lines.append("## Major Elements:")
+    displayed_elements = major_elements[:20]  # Show top 20
+    for el in displayed_elements:
+        el_type = el.get("type", "?")
+        text = el.get("text", "").strip()[:40] or "(no text)"
+        x, y = el.get("x", 0), el.get("y", 0)
+        w, h = el.get("width", 0), el.get("height", 0)
+        # Escape brackets for Rich console
+        lines.append(f"  \\[{el_type}] at ({x},{y}) {w}x{h}: {text}")
+
+    # Element type summary
+    element_types = {}
+    for el in elements:
+        el_type = el.get("type", "?")
+        element_types[el_type] = element_types.get(el_type, 0) + 1
+
+    lines.append("")
+    lines.append("## All Element Types:")
+    for el_type in sorted(element_types.keys()):
+        count = element_types[el_type]
         lines.append(f"  \\[{el_type}]: {count}")
 
     return "\n".join(lines)
 
 
 def _draw_ascii_box(
-    canvas: list, x1: int, y1: int, x2: int, y2: int, el_type: str
+    canvas: list, x1: int, y1: int, x2: int, y2: int, label: str
 ) -> None:
-    """Draw a box on the ASCII canvas."""
+    """Draw a box on the ASCII canvas with a label."""
     height = len(canvas)
     width = len(canvas[0]) if canvas else 0
 
@@ -833,28 +900,42 @@ def _draw_ascii_box(
     if x2 <= x1 or y2 <= y1:
         return
 
+    # Draw corners
     canvas[y1][x1] = "┌"
     canvas[y1][x2] = "┐"
     canvas[y2][x1] = "└"
     canvas[y2][x2] = "┘"
 
+    # Draw top and bottom edges
     for x in range(x1 + 1, x2):
         if canvas[y1][x] == " ":
             canvas[y1][x] = "─"
         if canvas[y2][x] == " ":
             canvas[y2][x] = "─"
 
+    # Draw left and right edges
     for y in range(y1 + 1, y2):
         if canvas[y][x1] == " ":
             canvas[y][x1] = "│"
         if canvas[y][x2] == " ":
             canvas[y][x2] = "│"
 
-    label = f"[{el_type}]"
-    if len(label) < x2 - x1 - 1 and y1 + 1 < y2:
-        for i, c in enumerate(label):
-            if x1 + 1 + i < x2:
-                canvas[y1 + 1][x1 + 1 + i] = c
+    # Add label if there's room (need at least 3 chars wide and 3 tall for label)
+    box_width = x2 - x1
+    box_height = y2 - y1
+    if box_width >= 5 and box_height >= 3:
+        # Truncate label to fit inside box
+        max_label_len = box_width - 2  # Leave 1 char padding on each side
+        display_label = label[:max_label_len]
+
+        # Center the label in the first line inside the box
+        label_y = y1 + 1
+        label_x_start = x1 + 1
+
+        # Write label characters
+        for i, c in enumerate(display_label):
+            if label_x_start + i < x2:
+                canvas[label_y][label_x_start + i] = c
 
 
 @extract.command(name="semantic")
