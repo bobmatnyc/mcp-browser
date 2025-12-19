@@ -80,10 +80,10 @@ TESTS_DIR := tests
 # Check if command exists in PATH
 command-exists = $(shell command -v $(1) 2>/dev/null)
 
-# Get Python binary
-# Priority: 1) .venv/bin/python (if exists), 2) python3, 3) python
-VENV_PYTHON := $(wildcard .venv/bin/python)
-PYTHON := $(or $(VENV_PYTHON),$(call command-exists,python3),$(call command-exists,python))
+# Python execution via uv (preferred) or fallback to direct python
+# Usage: Use $(UV_RUN) for running Python scripts
+UV_RUN := uv run python
+PYTHON := uv run python
 
 # Get current version (if VERSION file exists)
 ifneq (,$(wildcard $(VERSION_FILE)))
@@ -105,7 +105,7 @@ env-info: ## Display current environment configuration
 	@echo "$(BLUE)Environment Configuration$(NC)"
 	@echo "$(BLUE)════════════════════════════════════════$(NC)"
 	@echo "Environment: $(ENV)"
-	@echo "Python: $$($(PYTHON) --version 2>&1)"
+	@echo "Python: $$(uv run python --version 2>&1)"
 	@echo "Shell: $(DETECTED_SHELL)"
 	@echo "Version: $(or $(VERSION),unknown)"
 	@echo "Build: $(or $(BUILD_NUMBER),unknown)"

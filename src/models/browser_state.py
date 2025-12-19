@@ -184,10 +184,65 @@ class BrowserState:
         async with self._lock:
             for port, conn in self.connections.items():
                 if conn.is_active and conn.is_extension:
-                    logger.debug(f"Found extension connection on port {port}")
-                    return conn
-            logger.warning("No extension connection found")
+                    # Verify WebSocket is still open
+                    if conn.websocket and not getattr(conn.websocket, "closed", True):
+                        logger.debug(f"Found extension connection on port {port}")
+                        return conn
+                    else:
+                        # WebSocket closed but not cleaned up yet
+                        logger.warning(
+                            f"Extension connection on port {port} has closed WebSocket, skipping"
+                        )
+                        conn.is_active = False  # Mark as inactive
+
+            # Log diagnostic info
+            total = len(self.connections)
+            extensions = sum(1 for c in self.connections.values() if c.is_extension)
+            active = sum(1 for c in self.connections.values() if c.is_active)
+            logger.warning(
+                f"No extension connection found. "
+                f"(Total: {total}, Extensions: {extensions}, Active: {active})"
+            )
             return None
+
+    async def verify_extension_health(self) -> Dict[str, Any]:
+        """Verify extension connection health and return diagnostic info.
+
+        Returns:
+            Dict with connection health status and diagnostic information
+        """
+        async with self._lock:
+            total_connections = len(self.connections)
+            extension_connections = []
+            non_extension_connections = []
+
+            for port, conn in self.connections.items():
+                ws_open = conn.websocket and not getattr(conn.websocket, "closed", True)
+                conn_info = {
+                    "port": port,
+                    "server_port": conn.server_port,
+                    "is_active": conn.is_active,
+                    "is_extension": conn.is_extension,
+                    "websocket_open": ws_open,
+                    "idle_time": conn.idle_time,
+                    "message_count": conn.message_count,
+                }
+                if conn.is_extension:
+                    extension_connections.append(conn_info)
+                else:
+                    non_extension_connections.append(conn_info)
+
+            has_healthy_extension = any(
+                c["is_active"] and c["websocket_open"] for c in extension_connections
+            )
+
+            return {
+                "healthy": has_healthy_extension,
+                "total_connections": total_connections,
+                "extension_connections": extension_connections,
+                "non_extension_connections": non_extension_connections,
+                "server_port_map": dict(self.server_port_map),
+            }
 
     async def mark_as_extension(self, port: int) -> bool:
         """Mark a connection as a browser extension.

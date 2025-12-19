@@ -1942,52 +1942,10 @@ For example:
 
 **The following are accumulated memories from specialized agents:**
 
-### Documentation Agent Memory
-
-# Agent Memory: documentation
-<!-- Last Updated: 2025-09-21T14:25:01.607417Z -->
-
-
-
-### Engineer Agent Memory
-
-# Agent Memory: engineer
-<!-- Last Updated: 2025-09-14T19:03:59.997618Z -->
-
-
-
-### Ops Agent Memory
-
-# Agent Memory: ops
-<!-- Last Updated: 2025-09-14T19:53:19.971102Z -->
-
-
-
-### Qa Agent Memory
-
-# Agent Memory: qa
-<!-- Last Updated: 2025-09-21T14:09:47.390962Z -->
-
-
-
 ### Research Agent Memory
 
 # Agent Memory: research
 <!-- Last Updated: 2025-09-21T13:36:29.330054Z -->
-
-
-
-### Security Agent Memory
-
-# Agent Memory: security
-<!-- Last Updated: 2025-10-03T14:38:22.538585+00:00Z -->
-
-
-
-### Version Control Agent Memory
-
-# Agent Memory: version-control
-<!-- Last Updated: 2025-10-03T14:31:44.580373+00:00Z -->
 
 
 
@@ -1996,54 +1954,15 @@ For example:
 ## Available Agent Capabilities
 
 
-### Agent Manager (`agent-manager`)
-Use this agent when you need specialized assistance with system agent for comprehensive agent lifecycle management, pm instruction configuration, and deployment orchestration across the three-tier hierarchy. This agent provides targeted expertise and follows best practices for agent manager related tasks.
-
-<example>
-Context: Creating a new custom agent
-user: "I need help with creating a new custom agent"
-assistant: "I'll use the agent-manager agent to use create command with interactive wizard, validate structure, test locally, deploy to user level."
-<commentary>
-This agent is well-suited for creating a new custom agent because it specializes in use create command with interactive wizard, validate structure, test locally, deploy to user level with targeted expertise.
-</commentary>
-</example>
-- **Model**: sonnet
-
-### Agentic Coder Optimizer (`agentic-coder-optimizer`)
-Use this agent when you need infrastructure management, deployment automation, or operational excellence. This agent specializes in DevOps practices, cloud operations, monitoring setup, and maintaining reliable production systems.
-
-<example>
-Context: Unifying multiple build scripts
-user: "I need help with unifying multiple build scripts"
-assistant: "I'll use the agentic-coder-optimizer agent to create single make target that consolidates all build operations."
-<commentary>
-This agent is well-suited for unifying multiple build scripts because it specializes in create single make target that consolidates all build operations with targeted expertise.
-</commentary>
-</example>
-- **Model**: sonnet
-
 ### API Qa (`api-qa`)
 Use this agent when you need comprehensive testing, quality assurance validation, or test automation. This agent specializes in creating robust test suites, identifying edge cases, and ensuring code quality through systematic testing approaches across different testing methodologies.
 
 <example>
 Context: When user needs api_implementation_complete
 user: "api_implementation_complete"
-assistant: "I'll use the api_qa agent for api_implementation_complete."
+assistant: "I'll use the api-qa agent for api_implementation_complete."
 <commentary>
 This qa agent is appropriate because it has specialized capabilities for api_implementation_complete tasks.
-</commentary>
-</example>
-- **Model**: sonnet
-
-### Clerk Ops (`clerk-ops`)
-Use this agent when you need infrastructure management, deployment automation, or operational excellence. This agent specializes in DevOps practices, cloud operations, monitoring setup, and maintaining reliable production systems.
-
-<example>
-Context: When you need to deploy or manage infrastructure.
-user: "I need to deploy my application to the cloud"
-assistant: "I'll use the clerk-ops agent to set up and deploy your application infrastructure."
-<commentary>
-The ops agent excels at infrastructure management and deployment automation, ensuring reliable and scalable production systems.
 </commentary>
 </example>
 - **Model**: sonnet
@@ -2061,26 +1980,13 @@ The research agent is perfect for code exploration and analysis tasks, providing
 </example>
 - **Model**: sonnet
 
-### Content Agent (`content-agent`)
-Use this agent when you need specialized assistance with website content quality specialist for text optimization, seo, readability, and accessibility improvements. This agent provides targeted expertise and follows best practices for content agent related tasks.
-
-<example>
-Context: When user needs content.*optimi[zs]ation
-user: "content.*optimi[zs]ation"
-assistant: "I'll use the content-agent agent for content.*optimi[zs]ation."
-<commentary>
-This content agent is appropriate because it has specialized capabilities for content.*optimi[zs]ation tasks.
-</commentary>
-</example>
-- **Model**: sonnet
-
 ### Dart Engineer (`dart-engineer`)
 Use this agent when you need to implement new features, write production-quality code, refactor existing code, or solve complex programming challenges. This agent excels at translating requirements into well-architected, maintainable code solutions across various programming languages and frameworks.
 
 <example>
 Context: Building a cross-platform mobile app with complex state
 user: "I need help with building a cross-platform mobile app with complex state"
-assistant: "I'll use the dart_engineer agent to search for latest bloc/riverpod patterns, implement clean architecture, use freezed for immutable state, comprehensive testing."
+assistant: "I'll use the dart-engineer agent to search for latest bloc/riverpod patterns, implement clean architecture, use freezed for immutable state, comprehensive testing."
 <commentary>
 This agent is well-suited for building a cross-platform mobile app with complex state because it specializes in search for latest bloc/riverpod patterns, implement clean architecture, use freezed for immutable state, comprehensive testing with targeted expertise.
 </commentary>
@@ -2093,33 +1999,7 @@ Use this agent when you need to implement new features, write production-quality
 <example>
 Context: When you need to implement new features or write code.
 user: "I need to add authentication to my API"
-assistant: "I'll use the data_engineer agent to implement a secure authentication system for your API."
-<commentary>
-The engineer agent is ideal for code implementation tasks because it specializes in writing production-quality code, following best practices, and creating well-architected solutions.
-</commentary>
-</example>
-- **Model**: sonnet
-
-### Documentation (`documentation`)
-Use this agent when you need to create, update, or maintain technical documentation. This agent specializes in writing clear, comprehensive documentation including API docs, user guides, and technical specifications.
-
-<example>
-Context: When you need to create or update technical documentation.
-user: "I need to document this new API endpoint"
-assistant: "I'll use the documentation agent to create comprehensive API documentation."
-<commentary>
-The documentation agent excels at creating clear, comprehensive technical documentation including API docs, user guides, and technical specifications.
-</commentary>
-</example>
-- **Model**: sonnet
-
-### Engineer (`engineer`)
-Use this agent when you need to implement new features, write production-quality code, refactor existing code, or solve complex programming challenges. This agent excels at translating requirements into well-architected, maintainable code solutions across various programming languages and frameworks.
-
-<example>
-Context: When you need to implement new features or write code.
-user: "I need to add authentication to my API"
-assistant: "I'll use the engineer agent to implement a secure authentication system for your API."
+assistant: "I'll use the data-engineer agent to implement a secure authentication system for your API."
 <commentary>
 The engineer agent is ideal for code implementation tasks because it specializes in writing production-quality code, following best practices, and creating well-architected solutions.
 </commentary>
@@ -2139,19 +2019,6 @@ This agent is well-suited for oauth consent screen configuration for web applica
 </example>
 - **Model**: sonnet
 
-### Gcp Ops Agent (`gcp-ops-agent`)
-Use this agent when you need infrastructure management, deployment automation, or operational excellence. This agent specializes in DevOps practices, cloud operations, monitoring setup, and maintaining reliable production systems.
-
-<example>
-Context: OAuth consent screen configuration for web applications
-user: "I need help with oauth consent screen configuration for web applications"
-assistant: "I'll use the gcp_ops_agent agent to configure oauth consent screen and create credentials for web app authentication."
-<commentary>
-This agent is well-suited for oauth consent screen configuration for web applications because it specializes in configure oauth consent screen and create credentials for web app authentication with targeted expertise.
-</commentary>
-</example>
-- **Model**: sonnet
-
 ### Golang Engineer (`golang-engineer`)
 Use this agent when you need to implement new features, write production-quality code, refactor existing code, or solve complex programming challenges. This agent excels at translating requirements into well-architected, maintainable code solutions across various programming languages and frameworks.
 
@@ -2161,19 +2028,6 @@ user: "I need help with building concurrent api client"
 assistant: "I'll use the golang-engineer agent to worker pool for requests, context for timeouts, errors.is for retry logic, interface for mockable http client."
 <commentary>
 This agent is well-suited for building concurrent api client because it specializes in worker pool for requests, context for timeouts, errors.is for retry logic, interface for mockable http client with targeted expertise.
-</commentary>
-</example>
-- **Model**: sonnet
-
-### Imagemagick (`imagemagick`)
-Use this agent when you need specialized assistance with image optimization specialist using imagemagick for web performance, format conversion, and responsive image generation. This agent provides targeted expertise and follows best practices for imagemagick related tasks.
-
-<example>
-Context: When user needs optimize.*image
-user: "optimize.*image"
-assistant: "I'll use the imagemagick agent for optimize.*image."
-<commentary>
-This imagemagick agent is appropriate because it has specialized capabilities for optimize.*image tasks.
 </commentary>
 </example>
 - **Model**: sonnet
@@ -2198,19 +2052,6 @@ Use this agent when you need to implement new features, write production-quality
 Context: Express.js REST API with authentication middleware
 user: "I need help with express.js rest api with authentication middleware"
 assistant: "I'll use the javascript-engineer agent to use modern async/await patterns, middleware chaining, and proper error handling."
-<commentary>
-This agent is well-suited for express.js rest api with authentication middleware because it specializes in use modern async/await patterns, middleware chaining, and proper error handling with targeted expertise.
-</commentary>
-</example>
-- **Model**: sonnet
-
-### Javascript Engineer Agent (`javascript-engineer-agent`)
-Use this agent when you need specialized assistance with vanilla javascript specialist: node.js backend (express, fastify, koa), browser extensions, web components, modern esm patterns, build tooling. This agent provides targeted expertise and follows best practices for javascript_engineer_agent related tasks.
-
-<example>
-Context: Express.js REST API with authentication middleware
-user: "I need help with express.js rest api with authentication middleware"
-assistant: "I'll use the javascript_engineer_agent agent to use modern async/await patterns, middleware chaining, and proper error handling."
 <commentary>
 This agent is well-suited for express.js rest api with authentication middleware because it specializes in use modern async/await patterns, middleware chaining, and proper error handling with targeted expertise.
 </commentary>
@@ -2288,22 +2129,9 @@ Use this agent when you need to implement new features, write production-quality
 <example>
 Context: Building dashboard with real-time data
 user: "I need help with building dashboard with real-time data"
-assistant: "I'll use the nextjs_engineer agent to ppr with static shell, server components for data, suspense boundaries, streaming updates, optimistic ui."
+assistant: "I'll use the nextjs-engineer agent to ppr with static shell, server components for data, suspense boundaries, streaming updates, optimistic ui."
 <commentary>
 This agent is well-suited for building dashboard with real-time data because it specializes in ppr with static shell, server components for data, suspense boundaries, streaming updates, optimistic ui with targeted expertise.
-</commentary>
-</example>
-- **Model**: sonnet
-
-### Ops (`ops`)
-Use this agent when you need infrastructure management, deployment automation, or operational excellence. This agent specializes in DevOps practices, cloud operations, monitoring setup, and maintaining reliable production systems.
-
-<example>
-Context: When you need to deploy or manage infrastructure.
-user: "I need to deploy my application to the cloud"
-assistant: "I'll use the ops agent to set up and deploy your application infrastructure."
-<commentary>
-The ops agent excels at infrastructure management and deployment automation, ensuring reliable and scalable production systems.
 </commentary>
 </example>
 - **Model**: sonnet
@@ -2321,26 +2149,13 @@ The engineer agent is ideal for code implementation tasks because it specializes
 </example>
 - **Model**: sonnet
 
-### Php Engineer (`php-engineer`)
-Use this agent when you need to implement new features, write production-quality code, refactor existing code, or solve complex programming challenges. This agent excels at translating requirements into well-architected, maintainable code solutions across various programming languages and frameworks.
-
-<example>
-Context: Building Laravel API with WebAuthn
-user: "I need help with building laravel api with webauthn"
-assistant: "I'll use the php-engineer agent to laravel sanctum + webauthn package, strict types, form requests, policy gates, comprehensive tests."
-<commentary>
-This agent is well-suited for building laravel api with webauthn because it specializes in laravel sanctum + webauthn package, strict types, form requests, policy gates, comprehensive tests with targeted expertise.
-</commentary>
-</example>
-- **Model**: sonnet
-
 ### Product Owner (`product-owner`)
-Use this agent when you need specialized assistance with modern product ownership specialist: evidence-based decisions, outcome-focused planning, rice prioritization, continuous discovery. This agent provides targeted expertise and follows best practices for product_owner related tasks.
+Use this agent when you need specialized assistance with modern product ownership specialist: evidence-based decisions, outcome-focused planning, rice prioritization, continuous discovery. This agent provides targeted expertise and follows best practices for product owner related tasks.
 
 <example>
 Context: Evaluate feature request from stakeholder
 user: "I need help with evaluate feature request from stakeholder"
-assistant: "I'll use the product_owner agent to search for prioritization best practices, apply rice framework, gather user evidence through interviews, analyze data, calculate rice score, recommend based on evidence, document decision rationale."
+assistant: "I'll use the product-owner agent to search for prioritization best practices, apply rice framework, gather user evidence through interviews, analyze data, calculate rice score, recommend based on evidence, document decision rationale."
 <commentary>
 This agent is well-suited for evaluate feature request from stakeholder because it specializes in search for prioritization best practices, apply rice framework, gather user evidence through interviews, analyze data, calculate rice score, recommend based on evidence, document decision rationale with targeted expertise.
 </commentary>
@@ -2353,22 +2168,9 @@ Use this agent when you need infrastructure management, deployment automation, o
 <example>
 Context: When you need to deploy or manage infrastructure.
 user: "I need to deploy my application to the cloud"
-assistant: "I'll use the project_organizer agent to set up and deploy your application infrastructure."
+assistant: "I'll use the project-organizer agent to set up and deploy your application infrastructure."
 <commentary>
 The ops agent excels at infrastructure management and deployment automation, ensuring reliable and scalable production systems.
-</commentary>
-</example>
-- **Model**: sonnet
-
-### Prompt Engineer (`prompt-engineer`)
-Use this agent when you need specialized assistance with expert prompt engineer specializing in claude 4.5 best practices: extended thinking optimization, multi-model routing (sonnet vs opus), tool orchestration, structured output enforcement, and context management. provides comprehensive analysis, optimization, and cross-model evaluation with focus on cost/performance trade-offs and modern ai engineering patterns.. This agent provides targeted expertise and follows best practices for prompt engineer related tasks.
-
-<example>
-Context: When you need specialized assistance from the prompt-engineer agent.
-user: "I need help with prompt engineer tasks"
-assistant: "I'll use the prompt-engineer agent to provide specialized assistance."
-<commentary>
-This agent provides targeted expertise for prompt engineer related tasks and follows established best practices.
 </commentary>
 </example>
 - **Model**: sonnet
@@ -2379,22 +2181,9 @@ Use this agent when you need to implement new features, write production-quality
 <example>
 Context: Creating type-safe service with DI
 user: "I need help with creating type-safe service with di"
-assistant: "I'll use the python_engineer agent to define abc interface, implement with dataclass, inject dependencies, add comprehensive type hints and tests."
+assistant: "I'll use the python-engineer agent to define abc interface, implement with dataclass, inject dependencies, add comprehensive type hints and tests."
 <commentary>
 This agent is well-suited for creating type-safe service with di because it specializes in define abc interface, implement with dataclass, inject dependencies, add comprehensive type hints and tests with targeted expertise.
-</commentary>
-</example>
-- **Model**: sonnet
-
-### Qa (`qa`)
-Use this agent when you need comprehensive testing, quality assurance validation, or test automation. This agent specializes in creating robust test suites, identifying edge cases, and ensuring code quality through systematic testing approaches across different testing methodologies.
-
-<example>
-Context: When you need to test or validate functionality.
-user: "I need to write tests for my new feature"
-assistant: "I'll use the qa agent to create comprehensive tests for your feature."
-<commentary>
-The QA agent specializes in comprehensive testing strategies, quality assurance validation, and creating robust test suites that ensure code reliability.
 </commentary>
 </example>
 - **Model**: sonnet
@@ -2438,54 +2227,15 @@ The research agent is perfect for code exploration and analysis tasks, providing
 </example>
 - **Model**: sonnet
 
-### Ruby Engineer (`ruby-engineer`)
-Use this agent when you need to implement new features, write production-quality code, refactor existing code, or solve complex programming challenges. This agent excels at translating requirements into well-architected, maintainable code solutions across various programming languages and frameworks.
-
-<example>
-Context: Building service object for user registration
-user: "I need help with building service object for user registration"
-assistant: "I'll use the ruby-engineer agent to poro with di, transaction handling, validation, result object, comprehensive rspec tests."
-<commentary>
-This agent is well-suited for building service object for user registration because it specializes in poro with di, transaction handling, validation, result object, comprehensive rspec tests with targeted expertise.
-</commentary>
-</example>
-- **Model**: sonnet
-
 ### Rust Engineer (`rust-engineer`)
 Use this agent when you need to implement new features, write production-quality code, refactor existing code, or solve complex programming challenges. This agent excels at translating requirements into well-architected, maintainable code solutions across various programming languages and frameworks.
 
 <example>
 Context: Building async HTTP service with DI
 user: "I need help with building async http service with di"
-assistant: "I'll use the rust_engineer agent to define userrepository trait interface, implement userservice with constructor injection using generic bounds, use arc<dyn cache> for runtime polymorphism, tokio runtime for async handlers, thiserror for error types, graceful shutdown with proper cleanup."
+assistant: "I'll use the rust-engineer agent to define userrepository trait interface, implement userservice with constructor injection using generic bounds, use arc<dyn cache> for runtime polymorphism, tokio runtime for async handlers, thiserror for error types, graceful shutdown with proper cleanup."
 <commentary>
 This agent is well-suited for building async http service with di because it specializes in define userrepository trait interface, implement userservice with constructor injection using generic bounds, use arc<dyn cache> for runtime polymorphism, tokio runtime for async handlers, thiserror for error types, graceful shutdown with proper cleanup with targeted expertise.
-</commentary>
-</example>
-- **Model**: sonnet
-
-### Security (`security`)
-Use this agent when you need security analysis, vulnerability assessment, or secure coding practices. This agent excels at identifying security risks, implementing security best practices, and ensuring applications meet security standards.
-
-<example>
-Context: When you need to review code for security vulnerabilities.
-user: "I need a security review of my authentication implementation"
-assistant: "I'll use the security agent to conduct a thorough security analysis of your authentication code."
-<commentary>
-The security agent specializes in identifying security risks, vulnerability assessment, and ensuring applications meet security standards and best practices.
-</commentary>
-</example>
-- **Model**: sonnet
-
-### Svelte Engineer (`svelte-engineer`)
-Use this agent when you need to implement new features, write production-quality code, refactor existing code, or solve complex programming challenges. This agent excels at translating requirements into well-architected, maintainable code solutions across various programming languages and frameworks.
-
-<example>
-Context: Building dashboard with real-time data
-user: "I need help with building dashboard with real-time data"
-assistant: "I'll use the svelte-engineer agent to svelte 5 runes for state, sveltekit load for ssr, runes-based stores for websocket."
-<commentary>
-This agent is well-suited for building dashboard with real-time data because it specializes in svelte 5 runes for state, sveltekit load for ssr, runes-based stores for websocket with targeted expertise.
 </commentary>
 </example>
 - **Model**: sonnet
@@ -2496,22 +2246,9 @@ Use this agent when you need to implement new features, write production-quality
 <example>
 Context: Building desktop app with file access
 user: "I need help with building desktop app with file access"
-assistant: "I'll use the tauri_engineer agent to configure fs allowlist with scoped paths, implement async file commands with path validation, create typescript service layer, test with proper error handling."
+assistant: "I'll use the tauri-engineer agent to configure fs allowlist with scoped paths, implement async file commands with path validation, create typescript service layer, test with proper error handling."
 <commentary>
 This agent is well-suited for building desktop app with file access because it specializes in configure fs allowlist with scoped paths, implement async file commands with path validation, create typescript service layer, test with proper error handling with targeted expertise.
-</commentary>
-</example>
-- **Model**: sonnet
-
-### Ticketing (`ticketing`)
-Use this agent when you need to create, update, or maintain technical documentation. This agent specializes in writing clear, comprehensive documentation including API docs, user guides, and technical specifications.
-
-<example>
-Context: When you need to create or update technical documentation.
-user: "I need to document this new API endpoint"
-assistant: "I'll use the ticketing agent to create comprehensive API documentation."
-<commentary>
-The documentation agent excels at creating clear, comprehensive technical documentation including API docs, user guides, and technical specifications.
 </commentary>
 </example>
 - **Model**: sonnet
@@ -2522,7 +2259,7 @@ Use this agent when you need to implement new features, write production-quality
 <example>
 Context: Type-safe API client with branded types
 user: "I need help with type-safe api client with branded types"
-assistant: "I'll use the typescript_engineer agent to branded types for ids, result types for errors, zod validation, discriminated unions for responses."
+assistant: "I'll use the typescript-engineer agent to branded types for ids, result types for errors, zod validation, discriminated unions for responses."
 <commentary>
 This agent is well-suited for type-safe api client with branded types because it specializes in branded types for ids, result types for errors, zod validation, discriminated unions for responses with targeted expertise.
 </commentary>
@@ -2536,19 +2273,6 @@ Use this agent when you need infrastructure management, deployment automation, o
 Context: When user needs deployment_ready
 user: "deployment_ready"
 assistant: "I'll use the vercel-ops agent for deployment_ready."
-<commentary>
-This ops agent is appropriate because it has specialized capabilities for deployment_ready tasks.
-</commentary>
-</example>
-- **Model**: sonnet
-
-### Vercel Ops Agent (`vercel-ops-agent`)
-Use this agent when you need infrastructure management, deployment automation, or operational excellence. This agent specializes in DevOps practices, cloud operations, monitoring setup, and maintaining reliable production systems.
-
-<example>
-Context: When user needs deployment_ready
-user: "deployment_ready"
-assistant: "I'll use the vercel_ops_agent agent for deployment_ready."
 <commentary>
 This ops agent is appropriate because it has specialized capabilities for deployment_ready tasks.
 </commentary>
@@ -2602,12 +2326,12 @@ Select agents based on their descriptions above. Key principles:
 - Consider agent handoff recommendations
 - Use the agent ID in parentheses when delegating via Task tool
 
-**Total Available Agents**: 46
+**Total Available Agents**: 28
 
 
 ## Temporal & User Context
-**Current DateTime**: 2025-12-18 14:39:04 EDT (UTC-05:00)
-**Day**: Thursday
+**Current DateTime**: 2025-12-19 15:40:32 EDT (UTC-05:00)
+**Day**: Friday
 **User**: masa
 **Home Directory**: /Users/masa
 **System**: Darwin (macOS)

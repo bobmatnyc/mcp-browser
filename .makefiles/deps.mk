@@ -1,18 +1,17 @@
 # ============================================================================
 # deps.mk - Dependency Management
 # ============================================================================
-# Provides: pip-based dependency management and installation
+# Provides: uv-based dependency management and installation
 # Include in main Makefile with: -include .makefiles/deps.mk
 #
-# Adapted for mcp-browser (pip-based, no Poetry)
-# Dependencies: common.mk (for colors, PYTHON)
-# Last updated: 2025-12-11
+# Uses uv for all Python operations (faster, modern tooling)
+# Dependencies: common.mk (for colors)
+# Last updated: 2025-12-19
 # ============================================================================
 #
-# Workflow for updating dependencies:
-#   1. make install            - Install dependencies from pyproject.toml
-#   2. make install-dev        - Install with dev dependencies
-#   3. make test               - Test with installed deps
+# Workflow for dependencies:
+#   1. make install            - Sync dependencies with uv
+#   2. make test               - Test with installed deps
 #
 # For CI/CD integration:
 #   make install-prod          - Install production dependencies only
@@ -28,14 +27,14 @@
 # ============================================================================
 
 install: ## Install project with all dependencies and Playwright browsers
-	@echo "$(YELLOW)📦 Installing Python dependencies...$(NC)"
-	@$(PYTHON) -m pip install -e ".[dev]"
-	@echo "$(GREEN)✓ Python dependencies installed$(NC)"
+	@echo "$(YELLOW)📦 Syncing dependencies with uv...$(NC)"
+	@uv sync --all-extras
+	@echo "$(GREEN)✓ Dependencies synced$(NC)"
 	@$(MAKE) playwright-install
 
 install-prod: ## Install production dependencies only (no dev deps)
 	@echo "$(YELLOW)📦 Installing production dependencies...$(NC)"
-	@$(PYTHON) -m pip install -e .
+	@uv sync --no-dev
 	@echo "$(GREEN)✓ Production dependencies installed$(NC)"
 	@$(MAKE) playwright-install
 
@@ -43,7 +42,7 @@ install-dev: install ## Alias for development installation (includes dev deps)
 
 playwright-install: ## Install Playwright browsers
 	@echo "$(YELLOW)🌐 Installing Playwright browsers...$(NC)"
-	@playwright install chromium
+	@uv run playwright install chromium
 	@echo "$(GREEN)✓ Playwright browsers installed$(NC)"
 
 deps-info: ## Display dependency information from pyproject.toml

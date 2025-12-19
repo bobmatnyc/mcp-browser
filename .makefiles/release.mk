@@ -4,10 +4,11 @@
 # Provides: version bumping, build, publish to PyPI, GitHub releases
 # Include in main Makefile with: -include .makefiles/release.mk
 #
+# Uses uv for all Python operations (run, build, publish)
 # Adapted for mcp-browser to use scripts/release.py and scripts/bump_version.py
-# Dependencies: common.mk (for colors, VERSION, PYTHON, ENV)
+# Dependencies: common.mk (for colors, VERSION, ENV)
 #               quality.mk (for pre-publish checks)
-# Last updated: 2025-12-11
+# Last updated: 2025-12-19
 # ============================================================================
 
 # ============================================================================
@@ -28,7 +29,7 @@ release-check: ## Check if environment is ready for release
 	@echo "$(YELLOW)🔍 Checking release prerequisites...$(NC)"
 	@echo "Checking required tools..."
 	@command -v git >/dev/null 2>&1 || (echo "$(RED)✗ git not found$(NC)" && exit 1)
-	@command -v $(PYTHON) >/dev/null 2>&1 || (echo "$(RED)✗ python not found$(NC)" && exit 1)
+	@command -v uv >/dev/null 2>&1 || (echo "$(RED)✗ uv not found$(NC)" && exit 1)
 	@command -v gh >/dev/null 2>&1 || (echo "$(RED)✗ GitHub CLI not found. Install from: https://cli.github.com/$(NC)" && exit 1)
 	@echo "$(GREEN)✓ All required tools found$(NC)"
 	@echo "Checking working directory..."
@@ -65,7 +66,7 @@ build-metadata: ## Track build metadata in JSON format
 	SHORT_COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown"); \
 	BRANCH=$$(git branch --show-current 2>/dev/null || echo "unknown"); \
 	TIMESTAMP=$$(date -u +%Y-%m-%dT%H:%M:%SZ); \
-	PYTHON_VER=$$($(PYTHON) --version 2>&1); \
+	PYTHON_VER=$$(uv run python --version 2>&1); \
 	echo "{" > $(BUILD_DIR)/metadata.json; \
 	echo '  "version": "'$$VERSION'",' >> $(BUILD_DIR)/metadata.json; \
 	echo '  "build_number": '$$BUILD_NUM',' >> $(BUILD_DIR)/metadata.json; \
@@ -91,17 +92,17 @@ build-info-json: build-metadata ## Display build metadata from JSON
 
 bump-patch: ## Bump patch version using scripts/bump_version.py
 	@echo "$(YELLOW)🔧 Bumping patch version...$(NC)"
-	@$(PYTHON) scripts/bump_version.py patch
+	@uv run python scripts/bump_version.py patch
 	@echo "$(GREEN)✓ Version bumped$(NC)"
 
 bump-minor: ## Bump minor version using scripts/bump_version.py
 	@echo "$(YELLOW)✨ Bumping minor version...$(NC)"
-	@$(PYTHON) scripts/bump_version.py minor
+	@uv run python scripts/bump_version.py minor
 	@echo "$(GREEN)✓ Version bumped$(NC)"
 
 bump-major: ## Bump major version using scripts/bump_version.py
 	@echo "$(YELLOW)💥 Bumping major version...$(NC)"
-	@$(PYTHON) scripts/bump_version.py major
+	@uv run python scripts/bump_version.py major
 	@echo "$(GREEN)✓ Version bumped$(NC)"
 
 # ============================================================================
@@ -112,13 +113,9 @@ release-build: pre-publish ext-deploy ## Build Python package for release (runs 
 	@echo "$(YELLOW)📦 Building package...$(NC)"
 	@$(MAKE) build-metadata
 	@rm -rf $(DIST_DIR)/ $(BUILD_DIR)/ *.egg-info
-	@$(PYTHON) -m build $(BUILD_FLAGS)
-	@if command -v twine >/dev/null 2>&1; then \
-		twine check $(DIST_DIR)/*; \
-		echo "$(GREEN)✓ Package validation passed$(NC)"; \
-	else \
-		echo "$(YELLOW)⚠ twine not found, skipping package validation$(NC)"; \
-	fi
+	@uv run python -m build $(BUILD_FLAGS)
+	@uv run twine check $(DIST_DIR)/*
+	@echo "$(GREEN)✓ Package validation passed$(NC)"
 	@echo "$(GREEN)✓ Package built successfully$(NC)"
 	@ls -la $(DIST_DIR)/
 
@@ -128,27 +125,27 @@ release-build: pre-publish ext-deploy ## Build Python package for release (runs 
 
 release-patch: ## Complete patch release using scripts/release.py (RECOMMENDED)
 	@echo "$(BLUE)Running automated patch release...$(NC)"
-	@$(PYTHON) scripts/release.py patch
+	@uv run python scripts/release.py patch
 
 release-minor: ## Complete minor release using scripts/release.py (RECOMMENDED)
 	@echo "$(BLUE)Running automated minor release...$(NC)"
-	@$(PYTHON) scripts/release.py minor
+	@uv run python scripts/release.py minor
 
 release-major: ## Complete major release using scripts/release.py (RECOMMENDED)
 	@echo "$(BLUE)Running automated major release...$(NC)"
-	@$(PYTHON) scripts/release.py major
+	@uv run python scripts/release.py major
 
 release-script: release-patch ## Alias for release-patch (backward compat)
 
 release-dry-run: ## Test release script without making changes
 	@echo "$(BLUE)Running dry-run release simulation...$(NC)"
-	@$(PYTHON) scripts/release.py --dry-run patch
+	@uv run python scripts/release.py --dry-run patch
 
 release-script-dry-run: release-dry-run ## Alias for release-dry-run
 
 release-script-skip-tests: ## Run release script skipping tests
 	@echo "$(BLUE)Running release script (skipping tests)...$(NC)"
-	@$(PYTHON) scripts/release.py --skip-tests patch
+	@uv run python scripts/release.py --skip-tests patch
 
 # ============================================================================
 # Publishing to PyPI
@@ -164,13 +161,8 @@ release-publish: ## Publish release to PyPI and create GitHub release
 		exit 1; \
 	fi
 	@echo "$(YELLOW)📤 Publishing to PyPI...$(NC)"
-	@if command -v twine >/dev/null 2>&1; then \
-		$(PYTHON) -m twine upload $(DIST_DIR)/*; \
-		echo "$(GREEN)✓ Published to PyPI$(NC)"; \
-	else \
-		echo "$(RED)✗ twine not found. Install with: pip install twine$(NC)"; \
-		exit 1; \
-	fi
+	@uv run twine upload $(DIST_DIR)/*
+	@echo "$(GREEN)✓ Published to PyPI$(NC)"
 	@echo "$(YELLOW)📤 Creating GitHub release...$(NC)"
 	@VERSION=$$(cat $(VERSION_FILE)); \
 	gh release create "v$$VERSION" \
@@ -182,14 +174,9 @@ release-publish: ## Publish release to PyPI and create GitHub release
 
 release-test-pypi: release-build ## Publish to TestPyPI for testing
 	@echo "$(YELLOW)🧪 Publishing to TestPyPI...$(NC)"
-	@if command -v twine >/dev/null 2>&1; then \
-		$(PYTHON) -m twine upload --repository testpypi $(DIST_DIR)/*; \
-		echo "$(GREEN)✓ Published to TestPyPI$(NC)"; \
-		echo "$(BLUE)Test install: pip install --index-url https://test.pypi.org/simple/ mcp-browser$(NC)"; \
-	else \
-		echo "$(RED)✗ twine not found. Install with: pip install twine$(NC)"; \
-		exit 1; \
-	fi
+	@uv run twine upload --repository testpypi $(DIST_DIR)/*
+	@echo "$(GREEN)✓ Published to TestPyPI$(NC)"
+	@echo "$(BLUE)Test install: pip install --index-url https://test.pypi.org/simple/ mcp-browser$(NC)"
 
 # ============================================================================
 # Release Verification

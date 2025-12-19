@@ -86,7 +86,7 @@ quality-ci: ## Quality checks for CI/CD (strict, fail fast)
 	echo "$(YELLOW)🔍 Type checking...$(NC)"; \
 	mypy $(SRC_DIR)/ --ignore-missing-imports; \
 	echo "$(YELLOW)🧪 Running tests (parallel)...$(NC)"; \
-	$(PYTHON) -m pytest $(TESTS_DIR)/ $(PYTEST_ARGS) --tb=short
+	uv run python -m pytest $(TESTS_DIR)/ $(PYTEST_ARGS) --tb=short
 	@echo ""
 	@echo "$(GREEN)════════════════════════════════════════$(NC)"
 	@echo "$(GREEN)✅ CI quality checks passed!$(NC)"
@@ -143,7 +143,7 @@ pre-publish: clean-pre-publish ## Comprehensive pre-release quality gate
 	@echo ""
 	@echo "$(YELLOW)Step 3/4: Running unit tests...$(NC)"
 	@if command -v pytest >/dev/null 2>&1; then \
-		$(PYTHON) -m pytest $(TESTS_DIR)/unit/ $(PYTEST_ARGS) || exit 1; \
+		uv run python -m pytest $(TESTS_DIR)/unit/ $(PYTEST_ARGS) || exit 1; \
 	else \
 		echo "$(YELLOW)⚠ pytest not found, skipping tests$(NC)"; \
 	fi

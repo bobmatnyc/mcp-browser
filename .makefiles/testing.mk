@@ -4,9 +4,9 @@
 # Provides: test execution, coverage, parallel/serial modes
 # Include in main Makefile with: -include .makefiles/testing.mk
 #
-# Extracted from: claude-mpm production Makefile (97 targets)
+# Uses uv for all Python operations
 # Dependencies: common.mk (for PYTHON, ENV system, PYTEST_ARGS)
-# Last updated: 2025-11-21
+# Last updated: 2025-12-19
 # ============================================================================
 
 # ============================================================================
@@ -23,12 +23,12 @@ test: test-parallel ## Run tests with parallel execution (default, 3-4x faster)
 
 test-parallel: ## Run tests in parallel using all available CPUs
 	@echo "$(YELLOW)🧪 Running tests in parallel (using all CPUs)...$(NC)"
-	@$(PYTHON) -m pytest $(TESTS_DIR)/ $(PYTEST_ARGS)
+	@uv run python -m pytest $(TESTS_DIR)/ $(PYTEST_ARGS)
 	@echo "$(GREEN)✓ Parallel tests completed$(NC)"
 
 test-serial: ## Run tests serially for debugging (disables parallelization)
 	@echo "$(YELLOW)🧪 Running tests serially (debugging mode)...$(NC)"
-	@$(PYTHON) -m pytest $(TESTS_DIR)/ -n 0 -v
+	@uv run python -m pytest $(TESTS_DIR)/ -n 0 -v
 	@echo "$(GREEN)✓ Serial tests completed$(NC)"
 
 # ============================================================================
@@ -37,7 +37,7 @@ test-serial: ## Run tests serially for debugging (disables parallelization)
 
 test-fast: ## Run unit tests only in parallel (fastest)
 	@echo "$(YELLOW)⚡ Running unit tests in parallel...$(NC)"
-	@$(PYTHON) -m pytest $(TESTS_DIR)/ -n auto -m unit -v
+	@uv run python -m pytest $(TESTS_DIR)/ -n auto -m unit -v
 	@echo "$(GREEN)✓ Unit tests completed$(NC)"
 
 # ============================================================================
@@ -46,7 +46,7 @@ test-fast: ## Run unit tests only in parallel (fastest)
 
 test-coverage: ## Run tests with coverage report (parallel)
 	@echo "$(YELLOW)📊 Running tests with coverage...$(NC)"
-	@$(PYTHON) -m pytest $(TESTS_DIR)/ -n auto \
+	@uv run python -m pytest $(TESTS_DIR)/ -n auto \
 		--cov=$(SRC_DIR) \
 		--cov-report=html \
 		--cov-report=term \
@@ -60,15 +60,15 @@ test-coverage: ## Run tests with coverage report (parallel)
 
 test-unit: ## Run unit tests only
 	@echo "$(YELLOW)🧪 Running unit tests...$(NC)"
-	@$(PYTHON) -m pytest $(TESTS_DIR)/ -n auto -m unit -v
+	@uv run python -m pytest $(TESTS_DIR)/ -n auto -m unit -v
 
 test-integration: ## Run integration tests only
 	@echo "$(YELLOW)🧪 Running integration tests...$(NC)"
-	@$(PYTHON) -m pytest $(TESTS_DIR)/integration/ -n auto -v
+	@uv run python -m pytest $(TESTS_DIR)/integration/ -n auto -v
 
 test-e2e: ## Run end-to-end tests only
 	@echo "$(YELLOW)🧪 Running e2e tests...$(NC)"
-	@$(PYTHON) -m pytest $(TESTS_DIR)/e2e/ -n auto -v
+	@uv run python -m pytest $(TESTS_DIR)/e2e/ -n auto -v
 
 # ============================================================================
 # ENV-Specific Test Configurations

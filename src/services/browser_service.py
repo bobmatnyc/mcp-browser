@@ -455,8 +455,24 @@ class BrowserService:
         )
 
         if not connection or not connection.websocket:
-            logger.warning(f"No active browser connection for port {port}")
-            return {"success": False, "error": "No active browser connection"}
+            # Provide detailed diagnostic error message
+            total_connections = len(self.browser_state.connections)
+            extension_marked = sum(
+                1 for c in self.browser_state.connections.values() if c.is_extension
+            )
+            active_connections = sum(
+                1 for c in self.browser_state.connections.values() if c.is_active
+            )
+
+            error_msg = (
+                f"No active browser connection. "
+                f"Ensure browser extension is connected. "
+                f"(Debug: {total_connections} total, "
+                f"{extension_marked} extension-marked, "
+                f"{active_connections} active)"
+            )
+            logger.warning(error_msg)
+            return {"success": False, "error": error_msg}
 
         try:
             logger.info(
@@ -507,7 +523,19 @@ class BrowserService:
         )
 
         if not connection or not connection.websocket:
-            return {"success": False, "error": "No active browser connection"}
+            # Provide detailed diagnostic error message
+            total_connections = len(self.browser_state.connections)
+            extension_marked = sum(
+                1 for c in self.browser_state.connections.values() if c.is_extension
+            )
+
+            error_msg = (
+                f"No active browser connection. "
+                f"(Debug: {total_connections} connections, "
+                f"{extension_marked} extension-marked)"
+            )
+            logger.warning(error_msg)
+            return {"success": False, "error": error_msg}
 
         try:
             logger.info(f"Sending semantic DOM extraction request to port {port}")
@@ -585,7 +613,19 @@ class BrowserService:
         )
 
         if not connection or not connection.websocket:
-            return {"success": False, "error": "No active browser connection"}
+            # Provide detailed diagnostic error message
+            total_connections = len(self.browser_state.connections)
+            extension_marked = sum(
+                1 for c in self.browser_state.connections.values() if c.is_extension
+            )
+
+            error_msg = (
+                f"No active browser connection. "
+                f"(Debug: {total_connections} connections, "
+                f"{extension_marked} extension-marked)"
+            )
+            logger.warning(error_msg)
+            return {"success": False, "error": error_msg}
 
         try:
             result = await self._async_rr_service.send_request(
@@ -631,7 +671,24 @@ class BrowserService:
         )
 
         if not connection or not connection.websocket:
-            return {"success": False, "error": "No active browser connection"}
+            # Provide detailed diagnostic error message
+            total_connections = len(self.browser_state.connections)
+            extension_marked = sum(
+                1 for c in self.browser_state.connections.values() if c.is_extension
+            )
+            active_connections = sum(
+                1 for c in self.browser_state.connections.values() if c.is_active
+            )
+
+            error_msg = (
+                f"No active browser connection. "
+                f"Ensure browser extension is connected. "
+                f"(Debug: {total_connections} total connections, "
+                f"{extension_marked} marked as extension, "
+                f"{active_connections} active)"
+            )
+            logger.warning(error_msg)
+            return {"success": False, "error": error_msg}
 
         try:
             logger.info(f"Sending screenshot capture request to port {port}")

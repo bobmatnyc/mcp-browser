@@ -67,11 +67,16 @@ help-all: ## Show all available targets
 # ============================================================================
 build: ext-deploy ## Build and validate the project
 	@echo "$(BLUE)Building project...$(NC)"
-	@$(PYTHON) -m build
-	@echo "$(BLUE)Validating installation...$(NC)"
-	@pip install -e . --quiet
-	@mcp-browser --help > /dev/null
+	@uv run python -m build
+	@echo "$(BLUE)Validating build...$(NC)"
+	@uv run mcp-browser --help > /dev/null
 	@echo "$(GREEN)✓ Build successful$(NC)"
+
+# ============================================================================
+# Run from Source (with uv)
+# ============================================================================
+run: ## Run mcp-browser from source with uv (use: make run CMD="start")
+	@uv run mcp-browser $(CMD)
 
 # ============================================================================
 # Clean Targets
@@ -109,7 +114,7 @@ dev-status: ## Show development environment status
 	@echo "$(BLUE)Development Environment Status$(NC)"
 	@echo "================================="
 	@echo -n "Daemon: "
-	@$(PYTHON) -c "from src.cli.utils.daemon import get_server_status; running,pid,port=get_server_status(); print(f'$(GREEN)Running$(NC) (PID {pid}, port {port})' if running else '$(RED)Stopped$(NC)')"
+	@uv run python -c "from src.cli.utils.daemon import get_server_status; running,pid,port=get_server_status(); print(f'$(GREEN)Running$(NC) (PID {pid}, port {port})' if running else '$(RED)Stopped$(NC)')"
 	@echo -n "Extension Sources: "
 	@test -f src/extensions/chrome/manifest.json && echo "$(GREEN)Present$(NC)" || echo "$(RED)Missing$(NC)"
 	@echo -n "Scripts: "
@@ -140,27 +145,27 @@ dev-clean: ## Clean development artifacts
 mcp: ## Run in MCP mode for Claude Desktop
 	@echo "$(BLUE)Starting MCP server for Claude Desktop...$(NC)"
 	@echo "$(YELLOW)Add to Claude config: {\"mcpServers\": {\"mcp-browser\": {\"command\": \"mcp-browser\", \"args\": [\"mcp\"]}}}$(NC)"
-	@$(PYTHON) -m src.cli.main mcp
+	@uv run python -m src.cli.main mcp
 
 status: ## Show server status
 	@echo "$(BLUE)Checking server status...$(NC)"
-	@$(PYTHON) -m src.cli.main status
+	@uv run python -m src.cli.main status
 
 version: ## Show version information
-	@$(PYTHON) -m src.cli.main version
+	@uv run python -m src.cli.main version
 
 # ============================================================================
 # Extension Build Targets
 # ============================================================================
 extension-build: ## Build Chrome extension with icons
 	@echo "$(BLUE)Building Chrome extension...$(NC)"
-	@$(PYTHON) tmp/create_extension_icons.py || echo "$(YELLOW)Icons already exist$(NC)"
+	@uv run python tmp/create_extension_icons.py || echo "$(YELLOW)Icons already exist$(NC)"
 	@echo "$(GREEN)✓ Extension ready to load$(NC)"
 	@echo "$(YELLOW)Navigate to chrome://extensions/ and load 'extension/' folder$(NC)"
 
 extension-test: ## Test extension connection
 	@echo "$(BLUE)Testing extension connection...$(NC)"
-	@$(PYTHON) -c "import asyncio; from src.cli.main import BrowserMCPServer; server = BrowserMCPServer(); asyncio.run(server.show_status())"
+	@uv run python -c "import asyncio; from src.cli.main import BrowserMCPServer; server = BrowserMCPServer(); asyncio.run(server.show_status())"
 
 extension-reload: ## Instructions for reloading extension during development
 	@echo "$(BLUE)Extension Reload Instructions:$(NC)"
@@ -171,46 +176,46 @@ extension-reload: ## Instructions for reloading extension during development
 
 test-extension: ## Test Chrome extension functionality
 	@echo "$(BLUE)Testing Chrome extension...$(NC)"
-	@$(PYTHON) tests/integration/test_implementation.py
+	@uv run python tests/integration/test_implementation.py
 
 # ============================================================================
 # Extension Package Management
 # ============================================================================
 ext-build: ## Build extension package with current version
 	@echo "$(BLUE)Building Chrome extension package...$(NC)"
-	@$(PYTHON) scripts/build_extension.py build
+	@uv run python scripts/build_extension.py build
 
 ext-build-auto: ## Build with auto-version if changes detected
 	@echo "$(BLUE)Building extension with auto-versioning...$(NC)"
-	@$(PYTHON) scripts/build_extension.py build --auto-version
+	@uv run python scripts/build_extension.py build --auto-version
 
 ext-release: ## Auto-increment patch version and build
 	@echo "$(BLUE)Releasing extension (patch increment)...$(NC)"
-	@$(PYTHON) scripts/build_extension.py release
+	@uv run python scripts/build_extension.py release
 
 ext-release-patch: ## Release with patch version bump
 	@echo "$(BLUE)Releasing extension (patch: x.x.N+1)...$(NC)"
-	@$(PYTHON) scripts/build_extension.py release --bump patch
+	@uv run python scripts/build_extension.py release --bump patch
 
 ext-release-minor: ## Release with minor version bump
 	@echo "$(BLUE)Releasing extension (minor: x.N+1.0)...$(NC)"
-	@$(PYTHON) scripts/build_extension.py release --bump minor
+	@uv run python scripts/build_extension.py release --bump minor
 
 ext-release-major: ## Release with major version bump
 	@echo "$(BLUE)Releasing extension (major: N+1.0.0)...$(NC)"
-	@$(PYTHON) scripts/build_extension.py release --bump major
+	@uv run python scripts/build_extension.py release --bump major
 
 ext-clean: ## Clean extension build artifacts
 	@echo "$(BLUE)Cleaning extension packages...$(NC)"
-	@$(PYTHON) scripts/build_extension.py clean
+	@uv run python scripts/build_extension.py clean
 	@echo "$(GREEN)✓ Extension packages cleaned$(NC)"
 
 ext-sync: ## Sync extension version with project version
 	@echo "$(BLUE)Syncing extension version with project...$(NC)"
-	@$(PYTHON) scripts/build_extension.py sync
+	@uv run python scripts/build_extension.py sync
 
 ext-info: ## Show extension version information and change status
-	@$(PYTHON) scripts/build_extension.py info
+	@uv run python scripts/build_extension.py info
 
 ext-deploy: ## Deploy extensions from source to mcp-browser-extensions/
 	@echo "$(BLUE)Deploying browser extensions from source...$(NC)"
@@ -230,22 +235,24 @@ ext-deploy: ## Deploy extensions from source to mcp-browser-extensions/
 	@test -d mcp-browser-extensions/safari && echo "  - Safari:  mcp-browser-extensions/safari/" || true
 	@cat mcp-browser-extensions/VERSION.txt
 	@echo "$(BLUE)Generating build information...$(NC)"
-	@$(PYTHON) scripts/generate_build_info.py mcp-browser-extensions/chrome
-	@$(PYTHON) scripts/generate_build_info.py mcp-browser-extensions/firefox
-	@test -d mcp-browser-extensions/safari && $(PYTHON) scripts/generate_build_info.py mcp-browser-extensions/safari || true
+	@uv run python scripts/generate_build_info.py mcp-browser-extensions/chrome
+	@uv run python scripts/generate_build_info.py mcp-browser-extensions/firefox
+	@test -d mcp-browser-extensions/safari && uv run python scripts/generate_build_info.py mcp-browser-extensions/safari || true
 
 # ============================================================================
-# Docker Development
+# Docker Development (Optional - use 'make dev' or 'make run' for local development)
 # ============================================================================
-docker-dev: ## Start development environment with Docker
+# NOTE: Primary development uses 'uv run' from source. Docker is for CI/testing.
+docker-dev: ## [Optional] Start development environment with Docker
+	@echo "$(YELLOW)Note: For local development, use 'make dev' or 'make run CMD=\"start\"' instead$(NC)"
 	@echo "$(BLUE)Starting Docker development environment...$(NC)"
 	@docker-compose up --build
 
-docker-dev-bg: ## Start development environment with Docker in background
+docker-dev-bg: ## [Optional] Start Docker environment in background
 	@echo "$(BLUE)Starting Docker development environment in background...$(NC)"
 	@docker-compose up --build -d
 
-docker-dev-chrome: ## Start development environment with Chrome container
+docker-dev-chrome: ## [Optional] Start Docker environment with Chrome container
 	@echo "$(BLUE)Starting Docker development environment with Chrome...$(NC)"
 	@docker-compose --profile chrome up --build
 
@@ -275,16 +282,16 @@ setup: install pre-commit extension-build ## Complete development environment se
 
 pre-commit: ## Setup pre-commit hooks
 	@echo "$(BLUE)Setting up pre-commit hooks...$(NC)"
-	@pip install pre-commit
-	@pre-commit install
+	@uv run pip install pre-commit
+	@uv run pre-commit install
 	@echo "$(GREEN)✓ Pre-commit hooks installed$(NC)"
 
 health: ## Quick health check of all components
 	@echo "$(BLUE)Health Check...$(NC)"
 	@echo -n "Python package: "
-	@$(PYTHON) -c "import src; print('✓ OK')" || echo "✗ FAIL"
+	@uv run python -c "import src; print('✓ OK')" || echo "✗ FAIL"
 	@echo -n "Dependencies: "
-	@$(PYTHON) -c "import websockets, mcp; print('✓ OK')" || echo "✗ FAIL"
+	@uv run python -c "import websockets, mcp; print('✓ OK')" || echo "✗ FAIL"
 	@echo -n "Extension files: "
 	@test -f src/extensions/chrome/manifest.json && echo "✓ OK" || echo "✗ FAIL"
 	@echo -n "Tests directory: "

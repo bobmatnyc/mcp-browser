@@ -973,53 +973,60 @@ class BrowserController:
         return self._no_method_available_error()
 
     async def _has_extension_connection(self, port: int) -> bool:
-        """Check if extension is connected on port.
+        """Check if a browser EXTENSION is connected (not just any connection).
+
+        This method specifically checks for extension connections that can handle
+        DOM commands, screenshots, and content extraction. It does NOT consider
+        CLI or other non-extension connections as valid.
 
         Args:
             port: Port number to check (may be server port or client port)
 
         Returns:
-            True if extension is connected
+            True if a browser extension is connected and marked as such
 
-        Performance: O(1) dictionary lookup + await (~10-50ms)
+        Performance: O(n) where n is number of connections (~10-50ms)
         """
         # Check if daemon_client is available (MCP mode)
         if self.daemon_client and self.daemon_client.is_connected:
             logger.info(f"_has_extension_connection({port}): Using daemon client relay")
             return True
 
-        # If no websocket service available, extension cannot be connected
-        if not self.websocket:
+        # If no browser_service available, extension cannot be connected
+        if not self.browser_service:
             logger.info(
-                f"_has_extension_connection({port}): No websocket service or daemon client"
+                f"_has_extension_connection({port}): No browser service available"
             )
             return False
 
         try:
-            # Try exact port match first
-            connection = await self.browser_service.browser_state.get_connection(port)
-            logger.info(
-                f"_has_extension_connection({port}): Exact match = {connection is not None}"
+            # CRITICAL FIX: Check for actual EXTENSION connections, not just any connection
+            # This must match what screenshot/extract operations require
+            extension_conn = (
+                await self.browser_service.browser_state.get_extension_connection()
             )
 
-            # If no exact match and port is in server range, try any active connection
-            if connection is None and 8851 <= port <= 8895:
-                connection = (
-                    await self.browser_service.browser_state.get_any_active_connection()
-                )
+            if extension_conn:
                 logger.info(
-                    f"_has_extension_connection({port}): Fallback match = {connection is not None}"
+                    f"_has_extension_connection({port}): Found extension on port {extension_conn.port}, "
+                    f"is_extension={extension_conn.is_extension}, is_active={extension_conn.is_active}"
                 )
-                if connection:
-                    logger.info(
-                        f"_has_extension_connection({port}): Found active connection on port {connection.port}, is_active={connection.is_active}"
-                    )
+                return True
 
-            result = connection is not None and connection.websocket is not None
-            logger.info(f"_has_extension_connection({port}): Final result = {result}")
-            return result
+            # Log diagnostic info for debugging connection issues
+            connections = self.browser_service.browser_state.connections
+            if connections:
+                for conn_port, conn in connections.items():
+                    logger.info(
+                        f"_has_extension_connection({port}): Connection on {conn_port}: "
+                        f"is_extension={conn.is_extension}, is_active={conn.is_active}"
+                    )
+            else:
+                logger.info(f"_has_extension_connection({port}): No connections at all")
+
+            return False
         except Exception as e:
-            logger.info(f"Error checking extension connection: {e}")
+            logger.error(f"Error checking extension connection: {e}")
             return False
 
     def _select_browser_method(self, port: Optional[int] = None) -> str:
