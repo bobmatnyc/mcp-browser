@@ -814,6 +814,41 @@ class TabRegistry {
       }
     }
 
+    // ENFORCE 1:1 TAB-TO-BACKEND CONNECTION
+    // Disconnect all OTHER tabs currently assigned to this port
+    const existingTabs = this.connectionTabs.get(port);
+    if (existingTabs && existingTabs.size > 0) {
+      const tabsToDisconnect = Array.from(existingTabs).filter(id => id !== tabId);
+      console.log(`[TabRegistry] Enforcing 1:1 connection: disconnecting ${tabsToDisconnect.length} tabs from port ${port}`);
+
+      tabsToDisconnect.forEach(otherTabId => {
+        console.log(`[TabRegistry] Disconnecting tab ${otherTabId} from port ${port} (replaced by tab ${tabId})`);
+        // Remove from maps
+        this.tabConnections.delete(otherTabId);
+        existingTabs.delete(otherTabId);
+
+        // Hide connection border on disconnected tab
+        try {
+          browser.tabs.sendMessage(otherTabId, { type: 'hide_connection_border' }).catch(() => {
+            // Tab may be closed, ignore error
+            console.log(`[TabRegistry] Tab ${otherTabId} unreachable (may be closed)`);
+          });
+        } catch (e) {
+          console.log(`[TabRegistry] Error sending hide_connection_border to tab ${otherTabId}:`, e);
+        }
+
+        // Notify popup that tab was disconnected
+        browser.runtime.sendMessage({
+          type: 'tab_disconnected',
+          tabId: otherTabId,
+          port: port,
+          reason: 'replaced_by_new_tab'
+        }).catch(() => {
+          // Popup may not be open, ignore error
+        });
+      });
+    }
+
     this.tabConnections.set(tabId, port);
 
     if (!this.connectionTabs.has(port)) {
